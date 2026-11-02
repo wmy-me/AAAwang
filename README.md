@@ -2,15 +2,15 @@
 
 基于大语言模型与 MCP 的多场景生活服务智能体，围绕日常采买、美食发现、出行规划和经营采购，提供有来源、可调整的推荐方案。Java 服务用于模拟外部 MCP、验证接入方式，为后续扩展其他 MCP 服务做准备。
 
-**当前阶段：P1 · 最小 Agent 能力验证。** 001 已加入 DeepSeek 普通文本调用与本地检查脚本，执行报告记录真实请求通过；下一步为 002 MCP 接入。尚无完整 Agent 或业务功能。
+**当前阶段：P1 · 最小 Agent 能力验证。** 001 的 DeepSeek 普通文本调用与 002 的 Python—Java 模拟 MCP 联调已提交；下一步为 [003 最小工具调用闭环](docs/vibe%20coding/003-llm-mcp-tool-loop.md)。尚无模型驱动工具调用、完整 Agent 或业务功能。
 
 ## 当前实现边界
 
-- **Python 主后端**：FastAPI，仅提供 `GET /api/health` 健康检查；新增 DeepSeek 异步文本适配器与命令行检查脚本；LangGraph 尚无状态图或 Agent。
+- **Python 主后端**：FastAPI，仅提供 `GET /api/health` 健康检查；已有 DeepSeek 异步文本适配器、通用 MCP 客户端与独立命令行检查脚本；LangGraph 尚无状态图或 Agent。
 - **网页**：React + TypeScript + Vite，只展示项目名称、初始化说明和“检查后端连接”按钮。
-- **Java 服务**：三个 Spring Boot 骨架，只提供应用启动和 `/actuator/health`；MCP 协议与业务查询未接入。
+- **Java 服务**：shopping-mcp 已提供 Streamable HTTP `/mcp` 与只读模拟商品查询；travel-mcp、local-life-mcp 仍只有健康检查骨架。
 - **数据库**：`infra/compose.yaml` 可单独启动 PostgreSQL；Python 与 Java 本轮都不连接数据库。
-- **未实现**：网页模型对话、模型工具调用、MCP 联调、Worker、登录与用户隔离、账号/任务/投稿/订单等业务模块。
+- **未实现**：网页模型对话、模型工具调用闭环、Worker、登录与用户隔离、账号/任务/投稿/订单等业务模块。
 
 ## 技术栈与版本
 
@@ -31,13 +31,13 @@ Node 22.23.2 满足 Vite 8 的 `^20.19.0 || >=22.12.0` 要求；本轮沿用本�
 | `backend/src/life_agent/core/config.py` | `pydantic-settings` 应用配置 |
 | `backend/src/life_agent/api/` | API 路由，当前只有健康检查 |
 | `backend/src/life_agent/agents/` | 主协调、信息发现、采买规划、出行子图预留目录 |
-| `backend/src/life_agent/tools/` | MCP、地图、搜索、知识检索预留目录 |
+| `backend/src/life_agent/tools/` | 已有通用 MCP 客户端；地图、搜索、知识检索预留 |
 | `backend/src/life_agent/modules/` | 账号、会话、任务、投稿、方案等业务模块预留目录 |
 | `backend/src/life_agent/db/` | 数据库接入预留说明（无模型、无迁移） |
 | `backend/src/life_agent/worker/` | 后台执行器预留说明（无运行入口） |
 | `web/` | React + TypeScript + Vite 网页 |
 | `mcp-services/` | Maven 父工程与三个 Spring Boot 子模块 |
-| `contracts/` | 后续 REST、SSE、MCP 与卡片协议存放约定 |
+| `contracts/` | 已有 shopping MCP 工具契约；REST、SSE 与卡片协议预留 |
 | `infra/` | 可选本地 PostgreSQL 与本地环境模板 |
 | `mobile/android/` | Android 扩展端说明（本轮不生成工程） |
 | `docs/` | 项目定位、设计、AI 执行任务、进度、报告与指南分层管理 |
@@ -104,7 +104,8 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 - [开发路线图](docs/roadmap.md)
 - [当前进度](docs/progress.md)
 - [001 模型连通报告](docs/reports/001-llm-connection-report.md)
-- [002 MCP 接入任务](docs/vibe%20coding/002-mcp-integration.md)
+- [002 MCP 接入报告](docs/reports/002-mcp-integration-report.md)
+- [003 工具调用执行任务](docs/vibe%20coding/003-llm-mcp-tool-loop.md)
 - [Claude / Codex 执行任务](docs/vibe%20coding/README.md)
 
 - [开发说明：安装、启动、检查与常见问题](docs/guides/development.md)
@@ -114,4 +115,4 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 
 ## 明确留到下一阶段
 
-LLM 工具调用、LangGraph 状态图、Agent 与工具调用、MCP 客户端与 Java 协议层、登录/会话/任务/SSE、数据模型与迁移、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/guides/development.md` 的“后续阶段”一节。
+LLM 工具调用闭环（003 待执行）、LangGraph 状态图、多 Agent、登录/会话/任务/SSE、数据模型与迁移、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/guides/development.md` 的“后续阶段”一节。
