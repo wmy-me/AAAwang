@@ -2,7 +2,7 @@
 
 基于大语言模型与 MCP 的多场景生活服务智能体，围绕日常采买、美食发现、出行规划和经营采购，提供有来源、可调整的推荐方案。Java 服务用于模拟外部 MCP、验证接入方式，为后续扩展其他 MCP 服务做准备。
 
-**当前阶段：P1 最小能力验证及 P2 认证、私有对话基础已完成。** 001–003 验证模型与 MCP，004 建立认证，005 建立首个按用户隔离的私有对话与消息资源。目前仍无完整 Agent、任务执行或网页对话。
+**当前阶段：P1 最小能力验证已完成，P2 正在建设。** 001–003 验证模型与 MCP，004 建立认证，005 已用真实 PostgreSQL 验证私有对话与消息隔离。下一步为 [006 私有任务与条件版本](docs/vibe%20coding/006-task-revisions.md)；完整 Agent、Worker 和网页对话仍未实现。
 
 ## 当前实现边界
 
@@ -110,6 +110,7 @@ Python 认证与私有对话接口需要该数据库并先执行 Alembic 迁移�
 - [003 工具调用报告](docs/reports/003-llm-mcp-tool-loop-report.md)
 - [004 账号认证执行任务](docs/vibe%20coding/004-auth-foundation.md)与[报告](docs/reports/004-auth-foundation-report.md)
 - [005 私有对话与消息执行任务](docs/vibe%20coding/005-private-conversations.md)与[报告](docs/reports/005-private-conversations-report.md)
+- [006 私有任务与条件版本执行任务](docs/vibe%20coding/006-task-revisions.md)
 - [Claude / Codex 执行任务](docs/vibe%20coding/README.md)
 
 - [开发说明：安装、启动、检查与常见问题](docs/guides/development.md)

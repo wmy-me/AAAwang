@@ -19,7 +19,7 @@
 
 ## 下一步讨论的范围
 
-[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[005 私有对话与消息持久化](vibe%20coding/005-private-conversations.md)均已完成。P2 下一步需另建编号任务，讨论任务条件与版本，或继续 Worker/SSE；005 不包含完整 Agent，也无需先完成三个 Java 平台的业务后台。
+[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[005 私有对话与消息持久化](vibe%20coding/005-private-conversations.md)均已完成。P2 下一步执行 [006 私有任务与条件版本](vibe%20coding/006-task-revisions.md)，先建立同一对话的独立目标、不可变条件快照与并发修改保护。006 目前只有待执行文档；随后分步建立持久化 run/Worker、事件与 SSE、网页对话及 Agent 接入。无需先完成三个 Java 平台的业务后台。
 
 ## 任务与阶段的关系
 

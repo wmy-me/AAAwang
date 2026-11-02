@@ -1,6 +1,6 @@
 # 当前进度
 
-核对日期：2026-11-02。005 从 `main` 提交 `75f62f3c233a19b53a023e0f7a38eba5ffaf38c8` 开始执行；以下根据源码与本轮真实 PostgreSQL 17 和自动测试结果记录。
+核对日期：2026-11-02。已核对 `main` 提交 `76cea1ac874045c26182de6d6edc4aaaadfe5344`：005 实现及报告已提交。真实 PostgreSQL 与自动测试结果依据执行报告；本次文档更新未重新运行数据库、模型或测试。
 
 ## 代码现状
 
@@ -53,7 +53,7 @@
 - 两个账户身份不混用；额外 `user_id` 被请求 schema 拒绝。登出、到期和数据库停服分别验证为 401/401/503，健康接口在数据库停服时仍为 200。
 - 真实 Vite `/api` 代理完成注册、登录、`/me`、跨站 403 与登出；Python 全量 27 项测试及静态检查通过。
 
-## 005 已执行结果（本轮证据）
+## 005 已提交结果（执行报告证据）
 
 - Alembic `20261102_0002` 创建 `conversations` 与 `messages`，owner 外键级联删除；复合索引提供确定排序，数据库唯一约束兜底客户端消息幂等。
 - 六个 REST 接口支持建立、列表、读取、改标题、追加用户文本和读取消息；owner 只取自 `CurrentUser`，额外 owner/user/role 字段被拒绝。
@@ -74,10 +74,10 @@
 
 ## 当前状态与下一步
 
-[001](vibe%20coding/001-llm-connection.md)至[005 私有对话与消息持久化](vibe%20coding/005-private-conversations.md)均已完成；005 证据见[报告](reports/005-private-conversations-report.md)。P2 已有身份基础和首个私有业务资源，但任务条件、任务版本、Worker、SSE、网页对话与 Agent 接入尚不存在，需在后续任务分别验证所有权和恢复行为。
+[001](vibe%20coding/001-llm-connection.md)至[005 私有对话与消息持久化](vibe%20coding/005-private-conversations.md)均已提交；005 证据见[报告](reports/005-private-conversations-report.md)。P2 已有认证基础和双用户隔离验证过的私有对话。[006 私有任务与条件版本](vibe%20coding/006-task-revisions.md)已建为待执行任务，尚无代码或报告。Worker、SSE、网页对话和 Agent 接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 
-在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001 至 003 与 P2 认证基础 004 已完成，私有业务资源隔离、完整 Agent、意图路由和 RAG 尚未实现。
+在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001–003 与 P2 的 004–005 已提交，私有对话和消息的归属隔离已验证；任务隔离、完整 Agent、意图路由和 RAG 尚未实现。
 
-PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–004 均已提交。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。
+PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–005 均已提交。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。
