@@ -1,17 +1,17 @@
 # 当前进度
 
-核对日期：2026-11-02。当前代码基线为 `37634c7f6acf7fc9e7ba9d357032bc0509eface1`，001 已提交。本次复核源码与执行报告后更新文档；没有在本会话重新运行模型请求或测试。
+核对日期：2026-11-02。002 执行起点为 `8459e407f890061045dcb53b03ef98168cc656c8`，当前实现尚未提交。本页按源码与本轮实际检查记录状态。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 保留唯一 `GET /api/health`；新增 DeepSeek 普通文本适配器和本地检查脚本；LangGraph 仍仅安装依赖 |
+| Python | 保留唯一 `GET /api/health`；已有 DeepSeek 检查和按服务 ID配置的通用 MCP 客户端；LangGraph 仍仅安装依赖 |
 | 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
-| Java | 三个 Spring Boot 应用和 Actuator 健康检查，无 MCP 协议与工具 |
+| Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | 可选 PostgreSQL Compose；应用未连接数据库 |
-| Agent 与工具 | DeepSeek 最小调用位于 core 配置层，不是 Agent；仍无图、工具客户端或执行循环 |
+| Agent 与工具 | MCP 初始化、发现和调用可独立执行；仍无 LangGraph 图、LLM 工具调用循环或 Agent |
 | 业务能力 | 尚无会话、任务、方案、投稿、知识库、出行或交易实现 |
 | Android | 只有说明文件 |
 
@@ -28,6 +28,14 @@
 - SDK 自动重试关闭，显式设置超时；本地测试覆盖成功、空响应、认证失败、模型不存在、超时和客户端初始化失败映射。
 - 真实 DeepSeek 请求已成功：`deepseek-flash` 在 0.93 秒内返回非空文本，服务报告输入 15、输出 5、合计 20 tokens。该结果只证明普通文本调用连通。
 
+## 002 已完成结果（工作区待提交）
+
+- Python 使用官方 MCP SDK 2.3.0，通过同一客户端按服务 ID连接；工具身份包含服务 ID，保留 SDK schema、内容块、结构化结果和错误标志。
+- shopping-mcp 使用 Spring AI 2.0.2、MCP Java SDK 2.1.0 和 Streamable HTTP，仅注册只读 `search_products`；固定数据明确标记为模拟来源。
+- 真实联调协商 MCP `2025-11-25`，发现 `shopping:search_products`，合法查询返回 2 个模拟候选；空结果与非法参数已通过真实协议分别验证为成功空集合和工具错误。
+- shopping-mcp 只绑定回环地址；无效 Origin 最终返回 403。travel-mcp 和 local-life-mcp 未增加 MCP 或业务实现。
+- Python 13 个测试、Ruff、编译与 uv 锁检查通过；Java 多模块 `verify` 通过，其中 shopping-mcp 6 个测试通过。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -41,9 +49,7 @@
 
 ## 当前状态与下一步
 
-[001](vibe%20coding/001-llm-connection.md) 已提交，执行报告记录 7 项聚焦测试和一次真实 DeepSeek 普通文本请求通过。源码包含适配器、检查脚本及相应测试；本次未独立复跑，不将历史结果称为本轮测试结果。
-
-下一步执行 [002：通用 MCP 客户端与 Java 模拟查询服务](vibe%20coding/002-mcp-integration.md)，当前待执行，没有 MCP 实现或联调证据。之后另立 003 验证 LLM 工具调用；001 成功不能替代这两项。
+[001](vibe%20coding/001-llm-connection.md) 已提交。[002](vibe%20coding/002-mcp-integration.md) 已在工作区完成，证据见[报告](reports/002-mcp-integration-report.md)。下一步需另立 003 验证 LLM 根据工具 schema 发起调用、执行工具并根据结果回答；001 和 002 的独立成功不能替代该验证。
 
 P2 先建立最小登录认证与资源归属检查，再保存私有会话、任务、方案和偏好；安排双用户越权访问验证。当前未实现登录与用户隔离。
 

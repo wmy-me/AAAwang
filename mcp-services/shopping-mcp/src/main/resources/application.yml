@@ -1,6 +1,21 @@
 spring:
   application:
     name: shopping-mcp
+  ai:
+    mcp:
+      server:
+        name: shopping-mcp
+        version: 0.1.0
+        type: SYNC
+        protocol: STREAMABLE
+        instructions: 仅提供只读模拟商品查询，结果不代表真实平台价格或库存。
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
+        streamable-http:
+          mcp-endpoint: /mcp
 
 server:
   address: 127.0.0.1

@@ -7,9 +7,9 @@
 - FastAPI 应用入口与唯一的 `GET /api/health` 健康检查接口。
 - `pydantic-settings` 读取应用名称、运行环境与日志级别。
 - DeepSeek 普通文本最小调用适配器与本地连通检查脚本；不提供 HTTP 聊天接口。
+- 官方 MCP Python SDK 的通用服务配置、工具发现与调用入口，以及本地检查脚本。
 - 已安装 LangGraph 基础依赖，但未编写状态图、Agent、提示词或工具调用。
-- `agents/`、`tools/`、`modules/`、`db/`、`worker/` 只有职责说明与预留目录。
-- API 启动不依赖数据库、模型凭据或三个 Java 服务；只有模型检查脚本要求凭据。
+- API 启动不依赖数据库、模型凭据或 Java 服务；检查脚本才按需连接外部服务。
 
 ## 环境与安装
 
@@ -36,6 +36,7 @@ uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 cd backend
 uv run ruff check src
 uv run python -m compileall -q src
+uv run pytest -q
 ```
 
 ## 配置
@@ -56,6 +57,7 @@ cp .env.example .env
 | `LLM_BASE_URL` | `https://api.deepseek.com` | DeepSeek OpenAI 格式 API 地址 |
 | `LLM_API_KEY` | 无 | 模型检查必需；只写入本地 `.env` |
 | `LLM_TIMEOUT_SECONDS` | `60` | 单次请求超时秒数 |
+| `MCP_SERVICES` | shopping 本地映射 | 按服务 ID 配置 URL、传输、超时、启用状态和可选认证 token 的 JSON 对象 |
 
 配置有效密钥后执行一次真实请求：
 
@@ -66,4 +68,13 @@ uv run python scripts/check_llm.py
 
 脚本禁用 SDK 自动重试，成功时输出供应商、模型、耗时、最多 200 个字符的回复，以及服务实际返回时的 token 用量。失败时返回非零退出码，不输出密钥、认证头或供应商异常正文。
 
-本阶段尚无聊天 API、数据库连接、MCP 客户端、Agent 图或后台 Worker。
+启动 `shopping-mcp` 后执行真实 MCP 检查：
+
+```bash
+cd backend
+uv run python scripts/check_mcp.py --service shopping
+```
+
+脚本使用配置中的服务 ID完成初始化、工具发现和一次 `search_products` 调用。MCP 客户端不硬编码商品结构；脚本只针对本轮示例验证 `source_type=mock`。认证字段已用秘密类型预留，但本轮本地服务无认证，配置认证 token 时会明确拒绝而不会误发。
+
+本阶段尚无聊天 API、数据库连接、Agent 图或后台 Worker；也未把 MCP 工具接入 LLM。
