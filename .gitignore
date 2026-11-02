@@ -1,0 +1,41 @@
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Local environment files (.env.example is kept) ---
+.env
+.env.*
+!.env.example
+
+# --- Python / uv ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+
+# --- Node / Vite ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+coverage/
+*.tsbuildinfo
+
+# --- Java / Maven ---
+target/
+*.class
+
+# --- Logs ---
+*.log
+logs/

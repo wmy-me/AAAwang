@@ -1,0 +1,14 @@
+* text=auto eol=lf
+
+# Windows launchers keep CRLF; WSL/Linux scripts keep LF.
+*.cmd text eol=crlf
+mvnw text eol=lf
+*.sh text eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.jar binary

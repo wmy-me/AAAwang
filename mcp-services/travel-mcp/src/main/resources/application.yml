@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: travel-mcp
+
+server:
+  address: 127.0.0.1
+  port: 8102
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
