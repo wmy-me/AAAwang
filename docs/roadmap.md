@@ -31,6 +31,7 @@
 
 - P1 的通用工具接入与后续 Agent 协作：[Tools 与 MCP](design/tools-and-mcp.md)、[Agent 架构](design/agent-architecture.md)。
 - P2 建立任务上下文后逐步落地：[意图识别与路由](design/intent-routing.md)；P3 验证场景协作。
+- P4 地图、天气与公开搜索及 P6 出行复用：[免费外部服务清单](design/external-services.md)。
 - P5 投稿知识与检索：[RAG 分块、存储与检索](design/rag-and-retrieval.md)。
 
 以上细化已有方向，不调整当前执行顺序。数值与模型候选是待验证基线，不能据此把某个阶段标记为完成。
