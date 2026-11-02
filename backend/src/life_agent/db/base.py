@@ -1,0 +1,7 @@
+"""SQLAlchemy declarative base shared by models and migrations."""
+
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    """Base for persistent application models."""

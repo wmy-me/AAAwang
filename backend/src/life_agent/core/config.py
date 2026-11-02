@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,12 +36,34 @@ class Settings(BaseSettings):
     app_name: str = "life-buy-agent-api"
     app_env: str = "development"
     log_level: str = "INFO"
+    database_url: SecretStr = SecretStr(
+        "postgresql+psycopg://life_buy:dev_only_change_me@127.0.0.1:5432/"
+        "life_buy_agent"
+    )
+    session_cookie_name: str = "life_agent_session"
+    session_cookie_secure: bool = False
+    session_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    session_cookie_max_age_seconds: int = Field(default=86400, gt=0)
+    trusted_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+        ]
+    )
     llm_provider: str = "deepseek"
     llm_model: str = "deepseek-flash"
     llm_base_url: str = "https://api.deepseek.com"
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = 60.0
     mcp_services: dict[str, McpServiceConfig] = Field(default_factory=default_mcp_services)
+
+    @model_validator(mode="after")
+    def validate_cookie_security(self) -> "Settings":
+        if self.session_cookie_samesite == "none" and not self.session_cookie_secure:
+            raise ValueError("SameSite=None 要求 SESSION_COOKIE_SECURE=true。")
+        if self.app_env.casefold() == "production" and not self.session_cookie_secure:
+            raise ValueError("生产环境要求 SESSION_COOKIE_SECURE=true。")
+        return self
 
 
 @lru_cache

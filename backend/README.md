@@ -4,12 +4,13 @@
 
 ## 当前实现边界
 
-- FastAPI 应用入口与唯一的 `GET /api/health` 健康检查接口。
-- `pydantic-settings` 读取应用名称、运行环境与日志级别。
+- FastAPI 健康检查，以及注册、登录、退出和 `/me` 认证接口。
+- SQLAlchemy 2、psycopg 3 与 Alembic 管理 PostgreSQL 用户和服务端登录会话。
+- Argon2id 密码哈希、仅摘要落库的随机会话 Cookie、到期/吊销和 Origin/Fetch Metadata CSRF 防护。
 - DeepSeek 普通文本适配器、一次调用上限的 MCP 工具循环与本地检查脚本；不提供 HTTP 聊天接口。
 - 官方 MCP Python SDK 的通用服务配置、工具发现与调用入口，以及本地检查脚本。
 - 已安装 LangGraph 基础依赖，但未编写状态图或 Agent；工具循环是独立的有限执行器。
-- API 启动不依赖数据库、模型凭据或 Java 服务；检查脚本才按需连接外部服务。
+- API 导入和健康接口不依赖数据库、模型凭据或 Java 服务；认证请求才按需连接数据库。
 
 ## 环境与安装
 
@@ -52,6 +53,12 @@ cp .env.example .env
 | `APP_NAME` | `life-buy-agent-api` | 应用名称，也用于健康检查返回 |
 | `APP_ENV` | `development` | 运行环境标识 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
+| `DATABASE_URL` | 本地 PostgreSQL | SQLAlchemy psycopg URL；配置值按秘密处理 |
+| `SESSION_COOKIE_NAME` | `life_agent_session` | 服务端会话 Cookie 名 |
+| `SESSION_COOKIE_SECURE` | `false` | 本地 HTTP 为 false；生产环境强制 true |
+| `SESSION_COOKIE_SAMESITE` | `lax` | `lax`、`strict` 或配合 Secure 的 `none` |
+| `SESSION_COOKIE_MAX_AGE_SECONDS` | `86400` | Cookie 与服务端会话有效期 |
+| `TRUSTED_ORIGINS` | 本地 Vite 来源 | 允许状态变更请求的 Origin JSON数组 |
 | `LLM_PROVIDER` | `deepseek` | 本轮唯一支持的供应商 |
 | `LLM_MODEL` | `deepseek-flash` | DeepSeek 官方模型 ID |
 | `LLM_BASE_URL` | `https://api.deepseek.com` | DeepSeek OpenAI 格式 API 地址 |
@@ -87,4 +94,14 @@ uv run python scripts/check_tool_loop.py --service shopping \
 
 执行器只向模型暴露允许的已发现工具，校验参数 schema，最多执行一次 MCP 调用和一次后续模型回复。检查脚本要求真实 tool_call，并核对模拟来源、实际候选名与价格；直接回答不记为闭环成功。
 
-本阶段尚无聊天 API、数据库连接、Agent 图或后台 Worker。
+认证数据库先执行：
+
+```bash
+cd backend
+uv run alembic upgrade head
+uv run python scripts/check_auth.py
+```
+
+`check_auth.py` 只接受 PostgreSQL psycopg URL，验证迁移后的注册、登录、跨客户端身份恢复、登出、到期和摘要存储。接口契约见 `contracts/rest/auth.md`。
+
+本阶段尚无聊天 API、私有任务资源、Agent 图或后台 Worker。

@@ -2,15 +2,15 @@
 
 基于大语言模型与 MCP 的多场景生活服务智能体，围绕日常采买、美食发现、出行规划和经营采购，提供有来源、可调整的推荐方案。Java 服务用于模拟外部 MCP、验证接入方式，为后续扩展其他 MCP 服务做准备。
 
-**当前阶段：P1 最小能力验证已完成，P2 待执行。** 001–003 的报告记录了 DeepSeek 普通文本、Python—Java 模拟 MCP 和模型驱动的只读工具调用闭环。下一步是 [004 账号认证与会话基础](docs/vibe%20coding/004-auth-foundation.md)；目前仍无完整 Agent、登录或业务功能。
+**当前阶段：P1 最小能力验证及 P2 认证基础已完成。** 001–003 验证模型与 MCP，004 建立 PostgreSQL 用户、服务端登录会话和受信当前用户依赖。目前仍无完整 Agent 或私有业务资源。
 
 ## 当前实现边界
 
-- **Python 主后端**：FastAPI，仅提供 `GET /api/health` 健康检查；已有 DeepSeek 适配器、通用 MCP 客户端、一次调用上限的工具循环与独立命令行检查脚本；LangGraph 尚无状态图或 Agent。
+- **Python 主后端**：FastAPI 提供健康检查、注册、登录、退出和 `/me`；已有 DeepSeek、通用 MCP、有限工具循环、PostgreSQL/Alembic 与服务端 Cookie 会话；LangGraph 尚无状态图或 Agent。
 - **网页**：React + TypeScript + Vite，只展示项目名称、初始化说明和“检查后端连接”按钮。
 - **Java 服务**：shopping-mcp 已提供 Streamable HTTP `/mcp` 与只读模拟商品查询；travel-mcp、local-life-mcp 仍只有健康检查骨架。
-- **数据库**：`infra/compose.yaml` 可单独启动 PostgreSQL；Python 与 Java 本轮都不连接数据库。
-- **未实现**：网页模型对话、完整 Agent、Worker、登录与用户隔离、账号/任务/投稿/订单等业务模块。
+- **数据库**：`infra/compose.yaml` 提供 PostgreSQL；Python 通过正式迁移持久化用户和登录会话，Java 不连接该数据库。
+- **未实现**：网页登录页、网页模型对话、完整 Agent、Worker、私有任务/对话/方案的资源隔离、投稿和订单等业务模块。
 
 ## 技术栈与版本
 
@@ -29,11 +29,12 @@ Node 22.23.2 满足 Vite 8 的 `^20.19.0 || >=22.12.0` 要求；本轮沿用本�
 | `backend/` | Python 主系统，一个 uv 工程；未来 API 与 Worker 共享 |
 | `backend/src/life_agent/main.py` | FastAPI 应用入口 |
 | `backend/src/life_agent/core/config.py` | `pydantic-settings` 应用配置 |
-| `backend/src/life_agent/api/` | API 路由，当前只有健康检查 |
+| `backend/src/life_agent/api/` | 健康检查与认证 API 路由、受信当前用户依赖 |
 | `backend/src/life_agent/agents/` | 主协调、信息发现、采买规划、出行子图预留目录 |
 | `backend/src/life_agent/tools/` | 已有通用 MCP 客户端；地图、搜索、知识检索预留 |
-| `backend/src/life_agent/modules/` | 账号、会话、任务、投稿、方案等业务模块预留目录 |
-| `backend/src/life_agent/db/` | 数据库接入预留说明（无模型、无迁移） |
+| `backend/src/life_agent/modules/` | 已有认证服务；任务、投稿、方案等业务模块待实现 |
+| `backend/src/life_agent/db/` | SQLAlchemy 用户/登录会话模型与请求级数据库会话 |
+| `backend/migrations/` | Alembic 正式数据库迁移 |
 | `backend/src/life_agent/worker/` | 后台执行器预留说明（无运行入口） |
 | `web/` | React + TypeScript + Vite 网页 |
 | `mcp-services/` | Maven 父工程与三个 Spring Boot 子模块 |
@@ -51,6 +52,7 @@ Node 22.23.2 满足 Vite 8 的 `^20.19.0 || >=22.12.0` 要求；本轮沿用本�
 ```bash
 cd backend
 uv sync --locked
+uv run alembic upgrade head
 uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -82,7 +84,7 @@ docker compose --env-file infra/.env -f infra/compose.yaml up -d
 docker compose --env-file infra/.env -f infra/compose.yaml ps
 ```
 
-本轮任何应用都不连接该数据库。
+Python 认证接口需要该数据库并先执行 Alembic 迁移；健康接口与应用导入不主动连接数据库。
 
 ## 端口
 
@@ -106,7 +108,7 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 - [001 模型连通报告](docs/reports/001-llm-connection-report.md)
 - [002 MCP 接入报告](docs/reports/002-mcp-integration-report.md)
 - [003 工具调用报告](docs/reports/003-llm-mcp-tool-loop-report.md)
-- [004 账号认证执行任务](docs/vibe%20coding/004-auth-foundation.md)与[报告](docs/reports/003-llm-mcp-tool-loop-report.md)
+- [004 账号认证执行任务](docs/vibe%20coding/004-auth-foundation.md)与[报告](docs/reports/004-auth-foundation-report.md)
 - [Claude / Codex 执行任务](docs/vibe%20coding/README.md)
 
 - [开发说明：安装、启动、检查与常见问题](docs/guides/development.md)
@@ -116,4 +118,4 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 
 ## 明确留到下一阶段
 
-LangGraph 状态图、多 Agent、登录/会话/任务/SSE、数据模型与迁移、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/guides/development.md` 的“后续阶段”一节。
+LangGraph 状态图、多 Agent、私有任务/对话/方案及其跨用户隔离、SSE、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/guides/development.md` 的“后续阶段”一节。

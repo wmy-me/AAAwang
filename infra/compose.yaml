@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-life_buy}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_only_change_me}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -24,4 +24,4 @@ services:
 
 volumes:
   postgres-data:
-    name: life-buy-agent-postgres-data
+    name: ${POSTGRES_VOLUME_NAME:-life-buy-agent-postgres-data}

@@ -31,7 +31,7 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 | 用户 | `life_buy` |
 | 密码 | 见 `infra/.env` 中的示例值，仅限本地开发 |
 
-命名数据卷：`life-buy-agent-postgres-data`。容器健康检查使用 `pg_isready`。
+宿主端口可通过 `POSTGRES_PORT` 调整，命名数据卷可通过 `POSTGRES_VOLUME_NAME` 调整；默认卷为 `life-buy-agent-postgres-data`。容器健康检查使用 `pg_isready`。
 
 ## 停止
 
@@ -41,9 +41,20 @@ docker compose --env-file infra/.env -f infra/compose.yaml down
 
 `down` 默认保留命名数据卷。只有明确需要清空本地数据时才使用 `down -v`。
 
+## Python 迁移
+
+容器健康后，将相同连接信息写入被忽略的 `backend/.env`，再执行：
+
+```bash
+cd backend
+uv run alembic upgrade head
+```
+
+应用不会自动建表或在启动时运行迁移。
+
 ## 当前边界
 
-- Python 与 Java 本轮都**没有连接数据库**。
-- 不创建业务表、schema、账号、种子数据或迁移脚本。
+- Python 认证模块连接 PostgreSQL；Java 服务不连接该数据库。
+- 当前只创建用户和登录会话表，不包含默认账号或业务种子数据。
 - 不安装 pgvector，不包含 Redis、对象存储、消息队列或监控服务。
 - 不提供生产部署配置。

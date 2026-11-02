@@ -1,18 +1,18 @@
 # 当前进度
 
-核对日期：2026-11-02。当前核对 `main` 提交 `bd4dafad8a47c9fc02086c947255c1856645de95`：P1 的 001–003 已提交。003 的实际测试和真实联调依据执行报告；本次文档复核未重新运行模型、Java 或测试。
+核对日期：2026-11-02。004 实际执行起点为 `main` 提交 `6e4ff66d95c428d4a055af2af39f3e634c01c019`，实现当前尚未提交。本页基于本轮源码、测试、真实 PostgreSQL 和 Vite 代理联调描述状态。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 保留唯一 `GET /api/health`；已有 DeepSeek 检查、通用 MCP 客户端及一次调用上限的模型工具循环；LangGraph 仍仅安装依赖 |
+| Python | 提供健康、注册、登录、退出与 `/me`；已有服务端会话、DeepSeek、通用 MCP 和有限工具循环；LangGraph 仍仅安装依赖 |
 | 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
-| 基础设施 | 可选 PostgreSQL Compose；应用未连接数据库 |
+| 基础设施 | PostgreSQL 17 Compose；Python 认证模块通过 SQLAlchemy/psycopg 连接，Alembic 管理迁移 |
 | Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；仍无 LangGraph 图或 Agent |
-| 业务能力 | 尚无会话、任务、方案、投稿、知识库、出行或交易实现 |
+| 业务能力 | 已有账号和登录会话；尚无私有对话、任务、方案、投稿、知识库、出行或交易实现 |
 | Android | 只有说明文件 |
 
 ## 完成证据与限制
@@ -44,6 +44,15 @@
 - 真实回答引用“彩色铅笔套装”模拟价格 12.8 CNY，并明确声明商品与价格为模拟信息；检查脚本机器核对来源、候选名和价格。
 - 工具循环 9 项聚焦测试覆盖正常调用、直接回答、非法参数、授权边界、次数上限、空结果及跨服务映射；001 与 002 的 13 项测试继续通过。
 
+## 004 已完成结果（工作区待提交）
+
+- 新增 SQLAlchemy 2.1.6、psycopg 3.3.6、Alembic 1.20.1 和 Argon2 依赖；数据库 URL 使用秘密类型配置。
+- Alembic `20261102_0001` 创建用户与登录会话；真实 PostgreSQL 17 空库上重复升级、降级重建及 `alembic check` 均通过。
+- 注册、登录、退出和 `/me` 使用请求级受信身份依赖；会话秘密随机生成，数据库仅保存 SHA-256 摘要，密码保存 Argon2id 哈希。
+- 本地 Cookie 为 HttpOnly、SameSite=Lax、Path=/；生产配置强制 Secure。注册、登录、退出均拒绝恶意 Origin/cross-site Fetch Metadata。
+- 两个账户身份不混用；额外 `user_id` 被请求 schema 拒绝。登出、到期和数据库停服分别验证为 401/401/503，健康接口在数据库停服时仍为 200。
+- 真实 Vite `/api` 代理完成注册、登录、`/me`、跨站 403 与登出；Python 全量 27 项测试及静态检查通过。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -57,12 +66,12 @@
 
 ## 当前状态与下一步
 
-[001](vibe%20coding/001-llm-connection.md)、[002](vibe%20coding/002-mcp-integration.md)与[003：LLM 与 MCP 的最小工具调用闭环](vibe%20coding/003-llm-mcp-tool-loop.md)均已提交，003 证据见[报告](reports/003-llm-mcp-tool-loop-report.md)。P1 最小验证完成；仍无完整 Agent、对话或业务功能。[004 账号认证与会话基础](vibe%20coding/004-auth-foundation.md)已建为 P2 待执行任务，尚无代码或验收报告。
+[001](vibe%20coding/001-llm-connection.md)、[002](vibe%20coding/002-mcp-integration.md)与[003](vibe%20coding/003-llm-mcp-tool-loop.md)均已提交。[004 账号认证与会话基础](vibe%20coding/004-auth-foundation.md)已在工作区完成，证据见[报告](reports/004-auth-foundation-report.md)。P2 已开始但当前只有身份基础，不能宣称私有业务资源已经隔离。
 
-P2 先按 004 建立最小登录认证、数据库用户与受信身份依赖。首个私有会话、任务或方案落地时，再实现资源归属检查和双用户越权访问验证。当前未实现登录、账号会话或私有资源隔离。
+下一编号任务在首个私有会话、任务或方案落地时，必须实现资源归属检查和双用户越权访问验证。004 的两个 `/me` 身份测试不能替代私有资源读取、修改、取消、列表、SSE 和后台执行的归属检查。
 
 ## 2026-11-02 架构讨论归档
 
 在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001 至 003 已完成，完整 Agent、意图路由、RAG、登录与隔离尚未实现。
 
-PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002 和 003 已分别实现与提交。新建的 004 只是下一任务文档，尚未实施。
+PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002、003 已提交，004 认证基础已在工作区完成。当前 PostgreSQL 未安装 pgvector。

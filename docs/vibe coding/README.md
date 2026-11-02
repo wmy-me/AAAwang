@@ -33,8 +33,8 @@
 | 001 | [真实模型接入与最小调用验证](001-llm-connection.md) | 已完成；DeepSeek 实现、本地检查和一次真实请求均通过，见[报告](../reports/001-llm-connection-report.md) |
 | 002 | [通用 MCP 客户端与 Java 模拟查询服务](002-mcp-integration.md) | 已完成；真实 Streamable HTTP 初始化、发现和模拟查询通过，见[报告](../reports/002-mcp-integration-report.md) |
 | 003 | [LLM 与 MCP 的最小工具调用闭环](003-llm-mcp-tool-loop.md) | 已完成；真实 DeepSeek 发出 tool_call、MCP 查询及基于结果回答通过，见[报告](../reports/003-llm-mcp-tool-loop-report.md) |
-| 004 | [账号认证与会话基础](004-auth-foundation.md) | 待执行；P2 第一任务，仅有执行文档，无实现与报告 |
+| 004 | [账号认证与会话基础](004-auth-foundation.md) | 已完成；真实 PostgreSQL 迁移、服务端 Cookie 会话、CSRF 与代理联调通过，见[报告](../reports/004-auth-foundation-report.md) |
 
-P1 的 001、002、003 最小验证均已完成。P2 从 004 开始；建立文档不代表任务已执行。
+P1 的 001、002、003 最小验证和 P2 的 004 认证基础均已完成。私有资源归属检查需下一编号任务实施。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。
