@@ -92,6 +92,6 @@ Python 的 `agents/travel/` 负责规划；Java 的 `travel-mcp/` 模拟外部�
 
 ## 8. 落实顺序
 
-先完成 002 的标准 MCP 联调，再通过后续任务验证一个最小工具调用循环。P2 建立登录、任务上下文和持久化，P3 围绕奖品采买建立上述职责协作；RAG 与出行分别按相应阶段落地。LangGraph 已安装不代表已经实现多 Agent。
+002 标准 MCP 联调与 003 最小工具调用循环均已提交。P2 从 004 登录认证开始，再建立任务上下文和持久化；P3 围绕奖品采买建立上述职责协作。RAG 与出行分别按相应阶段落地。LangGraph 已安装不代表已经实现多 Agent。
 
 参考：[LangChain Subagents](https://docs.langchain.com/oss/python/langchain/multi-agent/subagents)。

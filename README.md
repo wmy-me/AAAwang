@@ -2,7 +2,7 @@
 
 基于大语言模型与 MCP 的多场景生活服务智能体，围绕日常采买、美食发现、出行规划和经营采购，提供有来源、可调整的推荐方案。Java 服务用于模拟外部 MCP、验证接入方式，为后续扩展其他 MCP 服务做准备。
 
-**当前阶段：P1 · 最小 Agent 能力验证已完成。** DeepSeek 普通文本、Python—Java 模拟 MCP，以及真实模型驱动的一次只读工具调用闭环均已验证。仍无完整 Agent 或业务功能。
+**当前阶段：P1 最小能力验证已完成，P2 待执行。** 001–003 的报告记录了 DeepSeek 普通文本、Python—Java 模拟 MCP 和模型驱动的只读工具调用闭环。下一步是 [004 账号认证与会话基础](docs/vibe%20coding/004-auth-foundation.md)；目前仍无完整 Agent、登录或业务功能。
 
 ## 当前实现边界
 
@@ -105,7 +105,8 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 - [当前进度](docs/progress.md)
 - [001 模型连通报告](docs/reports/001-llm-connection-report.md)
 - [002 MCP 接入报告](docs/reports/002-mcp-integration-report.md)
-- [003 工具调用执行任务](docs/vibe%20coding/003-llm-mcp-tool-loop.md)与[报告](docs/reports/003-llm-mcp-tool-loop-report.md)
+- [003 工具调用报告](docs/reports/003-llm-mcp-tool-loop-report.md)
+- [004 账号认证执行任务](docs/vibe%20coding/004-auth-foundation.md)与[报告](docs/reports/003-llm-mcp-tool-loop-report.md)
 - [Claude / Codex 执行任务](docs/vibe%20coding/README.md)
 
 - [开发说明：安装、启动、检查与常见问题](docs/guides/development.md)

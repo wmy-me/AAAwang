@@ -19,7 +19,7 @@
 
 ## 下一步讨论的范围
 
-[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)、[002 MCP 接入](vibe%20coding/002-mcp-integration.md)和[003 最小工具调用闭环](vibe%20coding/003-llm-mcp-tool-loop.md)均已完成。下一步需先为 P2 的最小登录、认证和资源隔离建立编号任务；无需先完成三个 Java 平台的业务后台。
+[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)、[002 MCP 接入](vibe%20coding/002-mcp-integration.md)和[003 最小工具调用闭环](vibe%20coding/003-llm-mcp-tool-loop.md)均已完成。下一步按 [004 账号认证与会话基础](vibe%20coding/004-auth-foundation.md)建立用户与服务端会话；随后在首个私有会话、任务等资源落地时验证双用户隔离。004 只是待执行文档，P2 尚未开始实现；无需先完成三个 Java 平台的业务后台。
 
 ## 任务与阶段的关系
 
