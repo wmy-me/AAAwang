@@ -2,15 +2,15 @@
 
 基于大语言模型与 MCP 的多场景生活服务智能体，围绕日常采买、美食发现、出行规划和经营采购，提供有来源、可调整的推荐方案。Java 服务用于模拟外部 MCP、验证接入方式，为后续扩展其他 MCP 服务做准备。
 
-**当前阶段：P1 · 最小 Agent 能力验证。** 001 的 DeepSeek 普通文本调用与 002 的 Python—Java 模拟 MCP 联调已提交；下一步为 [003 最小工具调用闭环](docs/vibe%20coding/003-llm-mcp-tool-loop.md)。尚无模型驱动工具调用、完整 Agent 或业务功能。
+**当前阶段：P1 · 最小 Agent 能力验证已完成。** DeepSeek 普通文本、Python—Java 模拟 MCP，以及真实模型驱动的一次只读工具调用闭环均已验证。仍无完整 Agent 或业务功能。
 
 ## 当前实现边界
 
-- **Python 主后端**：FastAPI，仅提供 `GET /api/health` 健康检查；已有 DeepSeek 异步文本适配器、通用 MCP 客户端与独立命令行检查脚本；LangGraph 尚无状态图或 Agent。
+- **Python 主后端**：FastAPI，仅提供 `GET /api/health` 健康检查；已有 DeepSeek 适配器、通用 MCP 客户端、一次调用上限的工具循环与独立命令行检查脚本；LangGraph 尚无状态图或 Agent。
 - **网页**：React + TypeScript + Vite，只展示项目名称、初始化说明和“检查后端连接”按钮。
 - **Java 服务**：shopping-mcp 已提供 Streamable HTTP `/mcp` 与只读模拟商品查询；travel-mcp、local-life-mcp 仍只有健康检查骨架。
 - **数据库**：`infra/compose.yaml` 可单独启动 PostgreSQL；Python 与 Java 本轮都不连接数据库。
-- **未实现**：网页模型对话、模型工具调用闭环、Worker、登录与用户隔离、账号/任务/投稿/订单等业务模块。
+- **未实现**：网页模型对话、完整 Agent、Worker、登录与用户隔离、账号/任务/投稿/订单等业务模块。
 
 ## 技术栈与版本
 
@@ -105,7 +105,7 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 - [当前进度](docs/progress.md)
 - [001 模型连通报告](docs/reports/001-llm-connection-report.md)
 - [002 MCP 接入报告](docs/reports/002-mcp-integration-report.md)
-- [003 工具调用执行任务](docs/vibe%20coding/003-llm-mcp-tool-loop.md)
+- [003 工具调用执行任务](docs/vibe%20coding/003-llm-mcp-tool-loop.md)与[报告](docs/reports/003-llm-mcp-tool-loop-report.md)
 - [Claude / Codex 执行任务](docs/vibe%20coding/README.md)
 
 - [开发说明：安装、启动、检查与常见问题](docs/guides/development.md)
@@ -115,4 +115,4 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 
 ## 明确留到下一阶段
 
-LLM 工具调用闭环（003 待执行）、LangGraph 状态图、多 Agent、登录/会话/任务/SSE、数据模型与迁移、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/guides/development.md` 的“后续阶段”一节。
+LangGraph 状态图、多 Agent、登录/会话/任务/SSE、数据模型与迁移、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/guides/development.md` 的“后续阶段”一节。

@@ -6,9 +6,9 @@
 
 - FastAPI 应用入口与唯一的 `GET /api/health` 健康检查接口。
 - `pydantic-settings` 读取应用名称、运行环境与日志级别。
-- DeepSeek 普通文本最小调用适配器与本地连通检查脚本；不提供 HTTP 聊天接口。
+- DeepSeek 普通文本适配器、一次调用上限的 MCP 工具循环与本地检查脚本；不提供 HTTP 聊天接口。
 - 官方 MCP Python SDK 的通用服务配置、工具发现与调用入口，以及本地检查脚本。
-- 已安装 LangGraph 基础依赖，但未编写状态图、Agent、提示词或工具调用。
+- 已安装 LangGraph 基础依赖，但未编写状态图或 Agent；工具循环是独立的有限执行器。
 - API 启动不依赖数据库、模型凭据或 Java 服务；检查脚本才按需连接外部服务。
 
 ## 环境与安装
@@ -77,4 +77,14 @@ uv run python scripts/check_mcp.py --service shopping
 
 脚本使用配置中的服务 ID完成初始化、工具发现和一次 `search_products` 调用。MCP 客户端不硬编码商品结构；脚本只针对本轮示例验证 `source_type=mock`。认证字段已用秘密类型预留，但本轮本地服务无认证，配置认证 token 时会明确拒绝而不会误发。
 
-本阶段尚无聊天 API、数据库连接、Agent 图或后台 Worker；也未把 MCP 工具接入 LLM。
+同时配置密钥并启动 `shopping-mcp` 后，可验证真实模型工具闭环：
+
+```bash
+cd backend
+uv run python scripts/check_tool_loop.py --service shopping \
+	--prompt "我想买一盒彩色铅笔，单价不超过15元。请查询模拟商品后回答。"
+```
+
+执行器只向模型暴露允许的已发现工具，校验参数 schema，最多执行一次 MCP 调用和一次后续模型回复。检查脚本要求真实 tool_call，并核对模拟来源、实际候选名与价格；直接回答不记为闭环成功。
+
+本阶段尚无聊天 API、数据库连接、Agent 图或后台 Worker。

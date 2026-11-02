@@ -1,6 +1,9 @@
 """DeepSeek text generation through its OpenAI-compatible API."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from openai import (
     APIConnectionError,
@@ -48,17 +51,15 @@ def _validate_settings(settings: Settings) -> str:
     return settings.llm_api_key.get_secret_value()
 
 
-async def call_deepseek(
+@asynccontextmanager
+async def open_deepseek_client(
     settings: Settings,
-    prompt: str,
-    *,
     client: AsyncOpenAI | None = None,
-) -> LLMResult:
-    """Send one non-streaming text request with retries disabled."""
+) -> AsyncIterator[AsyncOpenAI]:
+    """Yield a configured client without exposing credentials in errors."""
     api_key = _validate_settings(settings)
     owns_client = client is None
     active_client = client
-
     try:
         if active_client is None:
             active_client = AsyncOpenAI(
@@ -67,15 +68,27 @@ async def call_deepseek(
                 timeout=settings.llm_timeout_seconds,
                 max_retries=0,
             )
-        response = await active_client.chat.completions.create(
-            model=settings.llm_model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=128,
-            stream=False,
-            extra_body={"thinking": {"type": "disabled"}},
-        )
+        yield active_client
     except ImportError as exc:
         raise LLMRequestError("模型客户端初始化失败，请检查已安装的网络传输依赖。") from exc
+    finally:
+        if owns_client and active_client is not None:
+            await active_client.close()
+
+
+async def create_deepseek_completion(
+    settings: Settings,
+    client: AsyncOpenAI,
+    **kwargs: Any,
+) -> Any:
+    """Create one completion and map provider failures to safe local errors."""
+    try:
+        return await client.chat.completions.create(
+            model=settings.llm_model,
+            stream=False,
+            extra_body={"thinking": {"type": "disabled"}},
+            **kwargs,
+        )
     except AuthenticationError as exc:
         raise LLMRequestError("DeepSeek 认证失败，请检查 LLM_API_KEY。") from exc
     except NotFoundError as exc:
@@ -90,9 +103,22 @@ async def call_deepseek(
         raise LLMRequestError("无法连接 DeepSeek，请检查网络和 LLM_BASE_URL。") from exc
     except APIStatusError as exc:
         raise LLMRequestError(f"DeepSeek 返回 HTTP {exc.status_code}。") from exc
-    finally:
-        if owns_client and active_client is not None:
-            await active_client.close()
+
+
+async def call_deepseek(
+    settings: Settings,
+    prompt: str,
+    *,
+    client: AsyncOpenAI | None = None,
+) -> LLMResult:
+    """Send one non-streaming text request with retries disabled."""
+    async with open_deepseek_client(settings, client) as active_client:
+        response = await create_deepseek_completion(
+            settings,
+            active_client,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=128,
+        )
 
     if not response.choices:
         raise LLMRequestError("DeepSeek 返回空响应：没有候选结果。")

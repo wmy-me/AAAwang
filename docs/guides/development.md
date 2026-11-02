@@ -1,12 +1,12 @@
 # 开发说明
 
-本文描述现有工程的安装、启动和验证方式。业务功能尚未开发；P1 已完成模型普通文本连通及一个模拟 MCP 查询链路。
+本文描述现有工程的安装、启动和验证方式。业务功能尚未开发；P1 已完成模型普通文本、模拟 MCP 查询及一次模型工具调用闭环。
 
 ## 1. 各子工程的职责与边界
 
 | 子工程 | 职责 | 当前实现边界 |
 | --- | --- | --- |
-| `backend/` | Python 主系统 | FastAPI 健康检查、DeepSeek 检查、通用 MCP 客户端；LangGraph 仅安装依赖 |
+| `backend/` | Python 主系统 | FastAPI 健康检查、DeepSeek 检查、通用 MCP 客户端及有限工具循环；LangGraph 仅安装依赖 |
 | `web/` | React 网页 | 初始化说明页与真实健康检查按钮；Vite 开发代理 |
 | `mcp-services/` | 三个 Java 服务 | shopping 提供模拟 MCP 查询；travel 与 local-life 保持健康检查骨架 |
 | `infra/` | 本地基础服务 | 可选 PostgreSQL 容器；应用不连接 |
@@ -79,7 +79,19 @@ uv run python scripts/check_mcp.py --service shopping
 
 默认配置位于 `MCP_SERVICES`，按服务 ID保存 URL、`streamable_http` 传输、超时和启用状态。读取配置或启动 API 不会建立连接。shopping-mcp 只绑定回环地址，MCP 端点为 `/mcp`，模拟契约见 `contracts/mcp/`。
 
-### 3.4 网页
+### 3.4 LLM 与 MCP 工具闭环
+
+先按 3.3 启动 shopping-mcp，并在 `backend/.env` 配置 `LLM_API_KEY`：
+
+```bash
+cd backend
+uv run python scripts/check_tool_loop.py --service shopping \
+	--prompt "我想买一盒彩色铅笔，单价不超过15元。请查询模拟商品后回答。"
+```
+
+成功必须包含真实结构化 tool_call、一次 MCP 调用和基于结构化结果的后续模型回答。脚本会核对模拟来源、候选名和价格；模型直接回答会返回失败，不能作为闭环证据。
+
+### 3.5 网页
 
 ```bash
 cd web
@@ -89,7 +101,7 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 
 打开 <http://127.0.0.1:5173>，点击“检查后端连接”。Vite 将 `/api` 代理到 `http://127.0.0.1:8000`，保留路径前缀。该代理仅用于开发，不代表生产部署完成。
 
-### 3.5 Java 服务
+### 3.6 Java 服务
 
 ```bash
 cd mcp-services
@@ -100,7 +112,7 @@ cd mcp-services
 
 分别访问 `http://127.0.0.1:8101/actuator/health`、`8102`、`8103`。shopping 另有 `/mcp`；其余服务仍只有健康端点。
 
-### 3.6 可选 PostgreSQL
+### 3.7 可选 PostgreSQL
 
 ```bash
 cp -n infra/.env.example infra/.env
@@ -182,6 +194,7 @@ shopping-mcp 包含查询边界和 Origin 过滤测试；另外两个模块仍�
 | 模型检查提示缺少 `LLM_API_KEY` | 将 DeepSeek API Key 写入被忽略的 `backend/.env`；不要写入 `.env.example` |
 | 模型检查认证、模型或超时失败 | 分别核对本地密钥、DeepSeek 当前模型 ID、网络和 `LLM_TIMEOUT_SECONDS`；脚本不会自动重试 |
 | MCP 检查初始化失败或超时 | 确认 shopping-mcp 已启动、8101 未被占用，并核对 `MCP_SERVICES` 中的 URL 与超时 |
+| 工具闭环提示模型未调用工具 | 使用明确要求查询模拟商品的问题；这不是成功证据，脚本不会无界重试 |
 | Python 3.12 不存在 | 执行 `uv python install 3.12`；项目已通过 `.python-version` 固定版本 |
 | `npm ci` 失败或很慢 | 检查 `npm config get registry` 与网络；不要删除 `package-lock.json` 后盲目重装 |
 | 5173 / 8000 / 8101–8103 被占用 | `ss -ltnp \| grep <端口>` 或 `lsof -i :<端口>` 找到进程；只结束自己启动的进程，或换端口并同步代理配置 |
@@ -218,11 +231,11 @@ shopping-mcp 包含查询边界和 Origin 过滤测试；另外两个模块仍�
 
 - Python 与 DeepSeek、shopping-mcp 的独立检查入口已实现。PostgreSQL、地图/搜索仍未连接。
 - shopping-mcp 已有标准协议和一个只读模拟工具；travel 与 local-life 没有 MCP。
-- LLM 尚未根据 schema 调用 MCP 工具；该验证属于后续任务。
+- LLM 已通过独立有限执行器根据 schema 调用一个只读 MCP 工具；尚未接入 HTTP 聊天、LangGraph 或 Agent。
 - 网页没有聊天、任务、投稿、方案等业务页面。
 
 ## 9. 后续阶段
 
-LLM 工具调用与 Agent 状态图、登录/会话/任务/SSE、ORM 与迁移、投稿与知识库、地图/搜索/天气、商品比较与预算、出行规划、Android 工程、订单/预订/支付，以及完整页面设计与全应用容器化。
+Agent 状态图、登录/会话/任务/SSE、ORM 与迁移、投稿与知识库、地图/搜索/天气、商品比较与预算、出行规划、Android 工程、订单/预订/支付，以及完整页面设计与全应用容器化。
 
 这些能力需要收到新的开发任务后再实施。

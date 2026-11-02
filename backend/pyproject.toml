@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.162.0",
+    "jsonschema>=4.26.0,<5",
     "langgraph>=1.2.19",
     "mcp>=2.3.0,<3",
     "openai>=3.42.1",

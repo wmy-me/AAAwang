@@ -1,17 +1,17 @@
 # 当前进度
 
-核对日期：2026-11-02。已核对 `main` 提交 `a9195288da6ab83cc0a1a475297fd24a923a0376`：002 实现与报告已提交，003 仅建立待执行文档。本页基于源码与已有执行报告描述状态；本次未重新运行模型或测试。
+核对日期：2026-11-02。003 实际执行起点为 `main` 提交 `991c0828c2a1c44c34b73a81454d716c3178356b`，实现当前尚未提交。本页基于本轮源码、测试和真实联调结果描述状态。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 保留唯一 `GET /api/health`；已有 DeepSeek 检查和按服务 ID配置的通用 MCP 客户端；LangGraph 仍仅安装依赖 |
+| Python | 保留唯一 `GET /api/health`；已有 DeepSeek 检查、通用 MCP 客户端及一次调用上限的模型工具循环；LangGraph 仍仅安装依赖 |
 | 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | 可选 PostgreSQL Compose；应用未连接数据库 |
-| Agent 与工具 | MCP 初始化、发现和调用可独立执行；仍无 LangGraph 图、LLM 工具调用循环或 Agent |
+| Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；仍无 LangGraph 图或 Agent |
 | 业务能力 | 尚无会话、任务、方案、投稿、知识库、出行或交易实现 |
 | Android | 只有说明文件 |
 
@@ -36,6 +36,14 @@
 - shopping-mcp 只绑定回环地址；无效 Origin 最终返回 403。travel-mcp 和 local-life-mcp 未增加 MCP 或业务实现。
 - Python 13 个测试、Ruff、编译与 uv 锁检查通过；Java 多模块 `verify` 通过，其中 shopping-mcp 6 个测试通过。
 
+## 003 已完成结果（工作区待提交）
+
+- 新增有限工具循环：只暴露允许列表中的发现工具，模型工具名稳定包含服务身份且满足供应商命名约束；模型不能提交服务 ID或 URL。
+- 模型参数先解析 JSON并按 MCP 公布的 schema 验证；未知/未授权、多调用、重复调用和超限结果均不继续执行额外工具。
+- 真实 DeepSeek `deepseek-flash` 发出结构化 tool_call，MCP `2025-11-25` 调用 `shopping:search_products` 一次，第二次模型请求基于返回结果回答。
+- 真实回答引用“彩色铅笔套装”模拟价格 12.8 CNY，并明确声明商品与价格为模拟信息；检查脚本机器核对来源、候选名和价格。
+- 工具循环 9 项聚焦测试覆盖正常调用、直接回答、非法参数、授权边界、次数上限、空结果及跨服务映射；001 与 002 的 13 项测试继续通过。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -49,12 +57,12 @@
 
 ## 当前状态与下一步
 
-[001](vibe%20coding/001-llm-connection.md) 与 [002](vibe%20coding/002-mcp-integration.md) 已提交，证据见各自报告。[003：LLM 与 MCP 的最小工具调用闭环](vibe%20coding/003-llm-mcp-tool-loop.md) 已建为待执行任务；尚无代码或验收结果。它要验证模型根据发现的工具 schema 发起调用、后端执行 MCP 工具并将结果交回模型回答。001 和 002 的独立成功不能替代该验证。
+[001](vibe%20coding/001-llm-connection.md) 与 [002](vibe%20coding/002-mcp-integration.md) 已提交。[003：LLM 与 MCP 的最小工具调用闭环](vibe%20coding/003-llm-mcp-tool-loop.md) 已在工作区完成，证据见[报告](reports/003-llm-mcp-tool-loop-report.md)。P1 最小能力验证到此停止，不据此宣称已有完整 Agent 或业务功能。
 
 P2 先建立最小登录认证与资源归属检查，再保存私有会话、任务、方案和偏好；安排双用户越权访问验证。当前未实现登录与用户隔离。
 
 ## 2026-11-02 架构讨论归档
 
-在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 001 和 002 已提交，003 待执行，完整 Agent、意图路由、RAG、登录与隔离尚未实现。
+在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001 至 003 已完成，完整 Agent、意图路由、RAG、登录与隔离尚未实现。
 
 PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航，没有执行应用、测试、模型请求或 MCP 联调；本次已新增 003 执行文档，尚未实施。

@@ -1,6 +1,6 @@
 # 003：LLM 与 MCP 的最小工具调用闭环
 
-- 状态：待执行；本文件仅定义任务，未实现或验证
+- 状态：已完成；真实 DeepSeek → MCP → DeepSeek 闭环与聚焦测试均已通过
 - 所属阶段：P1 最小 Agent 能力验证
 - 起始分支与代码提交：`main` / `a9195288da6ab83cc0a1a475297fd24a923a0376`；执行前重新核对最新提交并保留后续改动
 - 前置任务：[001 模型普通文本连通](001-llm-connection.md)及[报告](../reports/001-llm-connection-report.md)；[002 MCP 接入](002-mcp-integration.md)及[报告](../reports/002-mcp-integration-report.md)

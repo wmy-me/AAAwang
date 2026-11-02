@@ -825,6 +825,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "jsonschema" },
     { name = "langgraph" },
     { name = "mcp" },
     { name = "openai" },
@@ -842,6 +843,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.162.0" },
+    { name = "jsonschema", specifier = ">=4.26.0,<5" },
     { name = "langgraph", specifier = ">=1.2.19" },
     { name = "mcp", specifier = ">=2.3.0,<3" },
     { name = "openai", specifier = ">=3.42.1" },
