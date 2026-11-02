@@ -2,7 +2,7 @@
 
 - 状态：已完成（实现、本地替身检查与真实 DeepSeek 请求均已验证）
 - 所属阶段：P1 最小 Agent 能力验证
-- 起始代码基线：`c3978b402a31984214ca958cca8c515b0ad0bd9a`
+- 起始代码基线：`5d6198de602cdd10b5f295e65b1c8288ba948f45`
 - 前置条件：000 初始化骨架已建立；执行机可使用 uv 安装依赖
 - 对应报告：`docs/reports/001-llm-connection-report.md`
 - 本任务完成时停止，后续 MCP 与 Agent 工具调用另立任务

@@ -2,16 +2,16 @@
 
 ## 项目概况
 
-生活采买智能体：React 网页 + Python 主后端 + 三个 Java 服务。当前处于**第 0 阶段：项目初始化**。
+生活采买智能体：React 网页 + Python 主后端 + 三个 Java 服务。当前处于 **P1：最小 Agent 能力验证**。001 模型普通文本调用已提交，002 MCP 接入待执行。
 
-## 当前阶段约束
+## 当前执行边界
 
-- 只完成初始化；**在没有新任务前不要继续实现业务**，也不要因为框架能启动就接着实现教师奖品采买链路。
+- 依据用户指定的编号任务执行；001 已完成，当前下一任务为 002。不要因文本模型连通就自动实现采买业务或 Agent。
 - 后端只有一个 API：`GET /api/health`。不要新增聊天、任务、用户、商品、投稿或订单接口。
 - 网页只有项目名称、初始化说明和真实健康检查按钮。不要新增路由、聊天界面、管理后台、商品卡片或模拟业务列表。
-- Java 服务只有启动类和 `/actuator/health`。不要创建 `/mcp` 路由、工具注册、Entity、Mapper、Repository、Service 或 Controller。
-- 不创建模拟商品数据、假对话或“演示 Agent”；不为了数量添加检查空类存在的测试。
-- 健康检查只代表进程可响应，**不代表数据库、LLM 或 MCP 已接通**。
+- 当前 Java 只有启动类和 `/actuator/health`。执行 002 时允许在 shopping-mcp 接入标准 MCP 协议与一个只读模拟工具；其他模块保持骨架，不建设业务后台。
+- 002 允许少量明确标注模拟来源的商品查询数据，仅用于协议联调；不创建假对话或完整演示 Agent，不添加仅检查空类存在的测试。
+- 健康检查只代表进程可响应，**不代表数据库或 MCP 已接通，也不是 LLM 验证证据**。
 
 ## 已确定的技术方向
 
@@ -50,8 +50,9 @@
 ```bash
 # backend
 cd backend && uv sync --locked
-uv run ruff check src
-uv run python -m compileall -q src
+uv run ruff check src scripts tests
+uv run python -m compileall -q src scripts tests
+uv run pytest -q tests/test_llm.py
 uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 
 # web
@@ -69,4 +70,4 @@ cd mcp-services && ./mvnw -B -ntp verify
 
 先读 [文档导航](docs/README.md)、[当前进度](docs/progress.md)，再读用户本次指定的 [AI 执行任务](docs/vibe%20coding/README.md)。每个具体实施步骤先有编号任务文档，完成后有对应报告与进度更新。当前阶段约束描述初始化范围；收到明确的新任务后，以新任务确定的范围为准，不把旧初始化文档当作永久禁止业务开发的规则。
 
-路线图和初始设计包是参考，不自动执行其中所有阶段；000 为已执行历史任务。核对最新代码后再判断状态，区分“规划”“已实现”“已验证”。本次只整理文档，下一业务任务仍待讨论。
+路线图和初始设计包是参考，不自动执行其中所有阶段；000 为已执行历史任务。核对最新代码后再判断状态，区分“规划”“已实现”“已验证”。当前按 002 的范围接入 MCP；后续 Agent、登录与业务任务分别规划。001 的真实文本请求证据在对应报告中，本次文档复核未重新运行。
