@@ -1,12 +1,12 @@
 # 开发说明
 
-本文只描述第 0 阶段（项目初始化）的实际环境、安装、启动和验证方式。业务功能尚未开发。
+本文描述现有工程的安装、启动和验证方式。业务功能尚未开发；P1 仅增加了本地模型连通检查。
 
 ## 1. 各子工程的职责与边界
 
 | 子工程 | 职责 | 当前实现边界 |
 | --- | --- | --- |
-| `backend/` | Python 主系统 | FastAPI 入口、配置读取、`GET /api/health`；LangGraph 仅安装依赖 |
+| `backend/` | Python 主系统 | FastAPI 健康检查、DeepSeek 本地连通检查；LangGraph 仅安装依赖 |
 | `web/` | React 网页 | 初始化说明页与真实健康检查按钮；Vite 开发代理 |
 | `mcp-services/` | 三个 Java 服务 | Spring Boot 启动类、Actuator 健康检查；无 MCP 协议与业务接口 |
 | `infra/` | 本地基础服务 | 可选 PostgreSQL 容器；应用不连接 |
@@ -50,7 +50,18 @@ uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 
 配置可选：`cp backend/.env.example backend/.env`。模板不含任何密钥；应用启动不访问模型、地图或数据库。
 
-### 3.2 网页
+### 3.2 DeepSeek 连通检查
+
+在 `backend/.env` 中设置 `LLM_API_KEY`。密钥只保留在本机，不要写入命令、对话、报告或提交。模型默认使用已由官方文档确认的 `deepseek-flash` 和 `https://api.deepseek.com`。
+
+```bash
+cd backend
+uv run python scripts/check_llm.py
+```
+
+该命令发送一次非流式普通文本请求，超时为 60 秒且自动重试关闭。缺少配置、认证失败、模型不存在、超时、连接失败或空响应时返回非零退出码。它不验证工具调用、结构化输出、流式响应、MCP 或 Agent。
+
+### 3.3 网页
 
 ```bash
 cd web
@@ -60,7 +71,7 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 
 打开 <http://127.0.0.1:5173>，点击“检查后端连接”。Vite 将 `/api` 代理到 `http://127.0.0.1:8000`，保留路径前缀。该代理仅用于开发，不代表生产部署完成。
 
-### 3.3 Java 服务
+### 3.4 Java 服务
 
 ```bash
 cd mcp-services
@@ -71,7 +82,7 @@ cd mcp-services
 
 分别访问 `http://127.0.0.1:8101/actuator/health`、`8102`、`8103`。每个服务只暴露 `health` 端点。
 
-### 3.4 可选 PostgreSQL
+### 3.5 可选 PostgreSQL
 
 ```bash
 cp -n infra/.env.example infra/.env
@@ -101,6 +112,7 @@ cd backend
 uv sync --locked
 uv run ruff check src
 uv run python -m compileall -q src
+uv run pytest -q tests/test_llm.py
 uv run python -c "from life_agent.main import app; print(app.title)"
 uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 ```
@@ -149,6 +161,8 @@ curl http://127.0.0.1:8101/actuator/health
 | 现象 | 排查与处理 |
 | --- | --- |
 | `uv sync --locked` 提示锁文件过期 | 不要手工改锁文件；在确认依赖变更后运行 `uv lock`，再提交 `uv.lock` |
+| 模型检查提示缺少 `LLM_API_KEY` | 将 DeepSeek API Key 写入被忽略的 `backend/.env`；不要写入 `.env.example` |
+| 模型检查认证、模型或超时失败 | 分别核对本地密钥、DeepSeek 当前模型 ID、网络和 `LLM_TIMEOUT_SECONDS`；脚本不会自动重试 |
 | Python 3.12 不存在 | 执行 `uv python install 3.12`；项目已通过 `.python-version` 固定版本 |
 | `npm ci` 失败或很慢 | 检查 `npm config get registry` 与网络；不要删除 `package-lock.json` 后盲目重装 |
 | 5173 / 8000 / 8101–8103 被占用 | `ss -ltnp \| grep <端口>` 或 `lsof -i :<端口>` 找到进程；只结束自己启动的进程，或换端口并同步代理配置 |
@@ -183,7 +197,7 @@ curl http://127.0.0.1:8101/actuator/health
 
 尚未接通：
 
-- Python 与 PostgreSQL、LLM、地图/搜索服务、三个 Java 服务均未连接。
+- Python 与 DeepSeek 的适配和本地检查入口已实现；真实连通结果见 001 报告。PostgreSQL、地图/搜索及三个 Java 服务仍未连接。
 - Java 服务没有 MCP 协议、工具注册或业务查询。
 - 网页没有聊天、任务、投稿、方案等业务页面。
 

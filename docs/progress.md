@@ -1,17 +1,17 @@
 # 当前进度
 
-核对日期：2026-11-02。代码基线：[f68268e](https://github.com/wmy-me/AAAwang/commit/f68268e5c3f9691b47a6638b620cd0c5c85c0fa3)。随后 main 的 676d694 提交仅将初始化任务移入 `docs/vibe coding/`；本次沿用该目录，在此基础上只整理文档和目录职责说明，未修改业务代码。
+核对日期：2026-11-02。当前执行基线为 `5d6198d`；工作区正在实施 001，尚未提交。本页按当前源码与实际命令记录状态。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 只有 `GET /api/health`；LangGraph 仅安装依赖 |
+| Python | 保留唯一 `GET /api/health`；新增 DeepSeek 普通文本适配器和本地检查脚本；LangGraph 仍仅安装依赖 |
 | 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
 | Java | 三个 Spring Boot 应用和 Actuator 健康检查，无 MCP 协议与工具 |
 | 基础设施 | 可选 PostgreSQL Compose；应用未连接数据库 |
-| Agent 与工具 | 预留 README 与包目录，无图、工具客户端或执行循环 |
+| Agent 与工具 | DeepSeek 最小调用位于 core 配置层，不是 Agent；仍无图、工具客户端或执行循环 |
 | 业务能力 | 尚无会话、任务、方案、投稿、知识库、出行或交易实现 |
 | Android | 只有说明文件 |
 
@@ -21,13 +21,12 @@
 
 截至上述代码基线，GitHub Actions 无运行记录。前次源码审查另发现健康响应的 `service` 字段校验不完整，以及报告中 Vite `/docs` 代理验证描述不准确；本次按讨论范围未处理这些小项。
 
-## 本次文档整理
+## 001 当前结果
 
-- 已将文档分为 overview、design、vibe coding、reports 和 guides。
-- 已建立文档导航、项目定位、路线图和本进度页。
-- 明确 Java 为模拟外部 MCP 的测试服务，Python 侧应支持扩展接入。
-- 000 初始化任务保留为已执行的历史任务，不重复执行。
-- 已形成下一步建议：[001 模型接入与最小调用验证](vibe%20coding/001-llm-connection.md)。当前为草案，待执行机明确模型配置；没有开始实现，也没有完成真实模型验证。
+- 已按 DeepSeek 官方 OpenAI 格式接入 `deepseek-flash`，Base URL 为 `https://api.deepseek.com`，使用异步 OpenAI Python SDK。
+- 模型配置保持可选；无密钥时 FastAPI 可导入，只有执行检查脚本时报告缺少 `LLM_API_KEY`。
+- SDK 自动重试关闭，显式设置超时；本地测试覆盖成功、空响应、认证失败、模型不存在、超时和客户端初始化失败映射。
+- 真实 DeepSeek 请求已成功：`deepseek-flash` 在 0.93 秒内返回非空文本，服务报告输入 15、输出 5、合计 20 tokens。该结果只证明普通文本调用连通。
 
 ## 每次读取最新 GitHub 时的检查方式
 
@@ -40,6 +39,6 @@
 
 用户每次主动请求查看仓库时执行上述流程；没有自动轮询或后台监控。
 
-## 下一步建议（001）
+## 当前状态与下一步
 
-基于文档提交 `c3978b4` 核对后，下一步先验证真实 LLM 连接，再推进 MCP 和工具调用。任务入口见 [001](vibe%20coding/001-llm-connection.md)；本次只新增执行说明与索引，没有创建联调报告或修改应用代码。模型供应商、模型 ID、API 地址及本地认证配置由用户在执行机明确。
+[001](vibe%20coding/001-llm-connection.md) 已完成，证据见[报告](reports/001-llm-connection-report.md)。下一步 MCP 接入与 Agent 工具调用需另立任务；本轮不继续实施。
