@@ -1,18 +1,18 @@
 # 当前进度
 
-核对日期：2026-11-02。已核对 `main` 提交 `454fe132630d921e1d5b5cdd9d380344f2e991d3`：004 认证与会话实现及报告已提交。本页根据源码与执行报告记录已实现、已验证和待做内容；本次文档更新没有重新运行 PostgreSQL、模型或测试。
+核对日期：2026-11-02。005 从 `main` 提交 `75f62f3c233a19b53a023e0f7a38eba5ffaf38c8` 开始执行；以下根据源码与本轮真实 PostgreSQL 17 和自动测试结果记录。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 提供健康、注册、登录、退出与 `/me`；已有服务端会话、DeepSeek、通用 MCP 和有限工具循环；LangGraph 仍仅安装依赖 |
+| Python | 提供健康、认证、私有对话与用户消息 API；已有服务端会话、DeepSeek、通用 MCP 和有限工具循环；LangGraph 仍仅安装依赖 |
 | 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | PostgreSQL 17 Compose；Python 认证模块通过 SQLAlchemy/psycopg 连接，Alembic 管理迁移 |
 | Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；仍无 LangGraph 图或 Agent |
-| 业务能力 | 已有账号和登录会话；尚无私有对话、任务、方案、投稿、知识库、出行或交易实现 |
+| 业务能力 | 已有账号、登录会话、私有对话和手工用户消息；尚无任务、方案、投稿、知识库、出行或交易实现 |
 | Android | 只有说明文件 |
 
 ## 完成证据与限制
@@ -53,6 +53,14 @@
 - 两个账户身份不混用；额外 `user_id` 被请求 schema 拒绝。登出、到期和数据库停服分别验证为 401/401/503，健康接口在数据库停服时仍为 200。
 - 真实 Vite `/api` 代理完成注册、登录、`/me`、跨站 403 与登出；Python 全量 27 项测试及静态检查通过。
 
+## 005 已执行结果（本轮证据）
+
+- Alembic `20261102_0002` 创建 `conversations` 与 `messages`，owner 外键级联删除；复合索引提供确定排序，数据库唯一约束兜底客户端消息幂等。
+- 六个 REST 接口支持建立、列表、读取、改标题、追加用户文本和读取消息；owner 只取自 `CurrentUser`，额外 owner/user/role 字段被拒绝。
+- 别人的对话与不存在的对话统一 404；相同客户端 ID 同正文重试返回原消息，不同正文返回 409；写请求沿用受信 Origin 检查。
+- 真实 PostgreSQL 17 空库升级、重复升级、005 单独降级/重升及 `alembic check` 均通过。A、B 双向读写隔离、新客户端持久化读取及数据库消息行数已核对。
+- Python 全量 31 项测试、Ruff、compileall 与锁文件检查通过。停库时健康接口 200，带有效 Cookie 的对话请求安全返回 503。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -66,9 +74,7 @@
 
 ## 当前状态与下一步
 
-[001](vibe%20coding/001-llm-connection.md)至[004 账号认证与会话基础](vibe%20coding/004-auth-foundation.md)均已提交，004 证据见[报告](reports/004-auth-foundation-report.md)。P2 目前只有身份基础，尚无私有业务资源。[005 私有对话与消息持久化](vibe%20coding/005-private-conversations.md)已建为待执行任务；尚无代码或报告。
-
-005 将对首个私有对话与消息实现读取、改标题、追加和列表的归属检查，以及真实 PostgreSQL 双用户越权验证。任务取消、SSE 和后台执行尚不存在，待各自落地时分别检查所有权；004 的两个 `/me` 身份测试不能替代这些资源检查。
+[001](vibe%20coding/001-llm-connection.md)至[005 私有对话与消息持久化](vibe%20coding/005-private-conversations.md)均已完成；005 证据见[报告](reports/005-private-conversations-report.md)。P2 已有身份基础和首个私有业务资源，但任务条件、任务版本、Worker、SSE、网页对话与 Agent 接入尚不存在，需在后续任务分别验证所有权和恢复行为。
 
 ## 2026-11-02 架构讨论归档
 

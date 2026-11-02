@@ -6,8 +6,8 @@
 
 ## 当前执行边界
 
-- 依据用户指定的编号任务执行；001–004 已完成，005 私有对话与消息持久化已建为待执行文档。不自动实现采买业务或多 Agent。
-- 后端已有公开健康接口以及最小注册、登录、退出和 `/me`；执行 005 时允许新增私有对话与用户消息的基础接口；任务、商品、投稿、订单和 Agent 对话接口留待后续任务。
+- 依据用户指定的编号任务执行；001–005 已完成。不自动实现采买业务或多 Agent。
+- 后端已有公开健康、认证、私有对话与用户消息基础接口；任务、商品、投稿、订单和 Agent 对话接口留待后续任务。
 - 网页只有项目名称、初始化说明和真实健康检查按钮。不要新增路由、聊天界面、管理后台、商品卡片或模拟业务列表。
 - shopping-mcp 已提供标准 Streamable HTTP `/mcp`、`search_products` 只读模拟工具与 `/actuator/health`；travel-mcp、local-life-mcp 仍为健康检查骨架。不建设业务后台。
 - 003 已复用 002 的模拟商品完成真实模型工具调用联调并保留来源标记；该有限执行器不是完整 Agent 或业务对话。
@@ -39,8 +39,8 @@
 - `backend/src/life_agent/core/`：应用配置。
 - `backend/src/life_agent/agents/`：未来主协调、信息发现、采买规划、出行子图；当前仅 README 和空的 `__init__.py`。
 - `backend/src/life_agent/tools/`：已有通用 MCP 客户端；地图、搜索、知识检索仍为预留。
-- `backend/src/life_agent/modules/`：已有认证模块；其他业务模块待后续任务。
-- `backend/src/life_agent/db/`：已有用户和登录会话模型及请求级会话；`worker/` 仍为预留。
+- `backend/src/life_agent/modules/`：已有认证与私有对话模块；其他业务模块待后续任务。
+- `backend/src/life_agent/db/`：已有用户、登录会话、私有对话和消息模型及请求级会话；`worker/` 仍为预留。
 - `web/src/api/health.ts`：唯一的前端请求封装。
 - `web/src/components/`、`features/`：预留目录。
 - `mcp-services/`：Spring Boot 4.1.2 多模块，JDK 21；shopping 已提供只读模拟 MCP 工具。
@@ -71,7 +71,7 @@ cd mcp-services && ./mvnw -B -ntp verify
 
 先读 [文档导航](docs/README.md)、[当前进度](docs/progress.md)，再读用户本次指定的 [AI 执行任务](docs/vibe%20coding/README.md)。每个具体实施步骤先有编号任务文档，完成后有对应报告与进度更新。当前阶段约束描述初始化范围；收到明确的新任务后，以新任务确定的范围为准，不把旧初始化文档当作永久禁止业务开发的规则。
 
-路线图和初始设计包是参考，不自动执行其中所有阶段；000 为已执行历史任务。核对最新代码后再判断状态，区分“规划”“已实现”“已验证”。P1 的 001–003 与 P2 的 004 均已提交并有报告；下一任务为 [005 私有对话与消息持久化](docs/vibe%20coding/005-private-conversations.md)。005 仅为待执行文档，私有资源归属需实施后用两个账号与真实 PostgreSQL 验证；完整 Agent 和业务任务另行规划。
+路线图和初始设计包是参考，不自动执行其中所有阶段；000 为已执行历史任务。核对最新代码后再判断状态，区分“规划”“已实现”“已验证”。P1 的 001–003 与 P2 的 004–005 均已有实现和报告；005 已用两个账号与真实 PostgreSQL 验证私有资源归属。完整 Agent、业务任务、Worker 和 SSE 另行规划。
 
 ## Agent、工具与知识检索设计
 

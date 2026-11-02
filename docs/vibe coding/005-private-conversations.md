@@ -1,6 +1,6 @@
 # 005：私有对话与消息持久化
 
-- 状态：待执行；本文件只定义任务，尚无实现或验收报告
+- 状态：已完成；实现与验收见[报告](../reports/005-private-conversations-report.md)
 - 所属阶段：P2 任务与对话基础
 - 起始分支与提交：`main` / `454fe132630d921e1d5b5cdd9d380344f2e991d3`；执行前核对最新 HEAD，保留之后已有改动
 - 前置：[004 账号认证与会话基础](004-auth-foundation.md)及[报告](../reports/004-auth-foundation-report.md)；001–003 的模型/MCP 验证保持可用
