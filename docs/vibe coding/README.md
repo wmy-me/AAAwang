@@ -35,8 +35,8 @@
 | 003 | [LLM 与 MCP 的最小工具调用闭环](003-llm-mcp-tool-loop.md) | 已完成；真实 DeepSeek 发出 tool_call、MCP 查询及基于结果回答通过，见[报告](../reports/003-llm-mcp-tool-loop-report.md) |
 | 004 | [账号认证与会话基础](004-auth-foundation.md) | 已完成；真实 PostgreSQL 迁移、服务端 Cookie 会话、CSRF 与代理联调通过，见[报告](../reports/004-auth-foundation-report.md) |
 | 005 | [私有对话与消息持久化](005-private-conversations.md) | 已完成；真实 PostgreSQL 双用户隔离、持久化和消息幂等已通过，见[报告](../reports/005-private-conversations-report.md) |
-| 006 | [私有任务与条件版本](006-task-revisions.md) | 待执行；仅有执行文档，没有任务版本代码或验收报告 |
+| 006 | [私有任务与条件版本](006-task-revisions.md) | 已完成；真实 PostgreSQL 任务隔离、不可变快照和并发冲突保护已通过，见[报告](../reports/006-task-revisions-report.md) |
 
-P1 的 001–003 和 P2 的 004–005 均有实现与报告。下一步按用户指定执行 006；建立文档不代表已实现。
+P1 的 001–003 和 P2 的 004–006 均有实现与报告。run、Worker、SSE、网页对话和 Agent 接入仍需后续编号任务。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。

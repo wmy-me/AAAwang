@@ -1,9 +1,10 @@
-"""Persistent account, login-session, and conversation models."""
+"""Persistent account, conversation, and versioned-task models."""
 
 import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     ForeignKey,
@@ -80,6 +81,9 @@ class Conversation(Base):
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan"
     )
+    tasks: Mapped[list["Task"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
 
 
 class Message(Base):
@@ -109,3 +113,53 @@ class Message(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+    __table_args__ = (
+        Index(
+            "ix_tasks_conversation_updated_id",
+            "conversation_id",
+            desc("updated_at"),
+            desc("id"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    domain: Mapped[str] = mapped_column(String(24))
+    goal: Mapped[str] = mapped_column(String(500))
+    current_revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    conversation: Mapped[Conversation] = relationship(back_populates="tasks")
+    revisions: Mapped[list["TaskRevision"]] = relationship(
+        back_populates="task", cascade="all, delete-orphan"
+    )
+
+
+class TaskRevision(Base):
+    __tablename__ = "task_revisions"
+    __table_args__ = (
+        UniqueConstraint("task_id", "revision", name="uq_task_revisions_version"),
+        Index("ix_task_revisions_task_revision", "task_id", "revision"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE")
+    )
+    revision: Mapped[int]
+    conditions: Mapped[dict[str, object]] = mapped_column(JSON)
+    change_note: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    task: Mapped[Task] = relationship(back_populates="revisions")

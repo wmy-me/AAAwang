@@ -1,18 +1,18 @@
 # 当前进度
 
-核对日期：2026-11-02。已核对 `main` 提交 `76cea1ac874045c26182de6d6edc4aaaadfe5344`：005 实现及报告已提交。真实 PostgreSQL 与自动测试结果依据执行报告；本次文档更新未重新运行数据库、模型或测试。
+核对日期：2026-11-02。006 从 `main` 提交 `9c394b0258f7c177de02378ae88cb577a8e81380` 开始执行；以下根据源码、本轮真实 PostgreSQL 17 和自动测试结果记录。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 提供健康、认证、私有对话与用户消息 API；已有服务端会话、DeepSeek、通用 MCP 和有限工具循环；LangGraph 仍仅安装依赖 |
+| Python | 提供健康、认证、私有对话、用户消息、私有任务与条件版本 API；已有服务端会话、DeepSeek、通用 MCP 和有限工具循环；LangGraph 仍仅安装依赖 |
 | 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | PostgreSQL 17 Compose；Python 认证模块通过 SQLAlchemy/psycopg 连接，Alembic 管理迁移 |
 | Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；仍无 LangGraph 图或 Agent |
-| 业务能力 | 已有账号、登录会话、私有对话和手工用户消息；尚无任务、方案、投稿、知识库、出行或交易实现 |
+| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务和条件版本；尚无 run、方案、投稿、知识库、实际出行规划或交易实现 |
 | Android | 只有说明文件 |
 
 ## 完成证据与限制
@@ -61,6 +61,14 @@
 - 真实 PostgreSQL 17 空库升级、重复升级、005 单独降级/重升及 `alembic check` 均通过。A、B 双向读写隔离、新客户端持久化读取及数据库消息行数已核对。
 - Python 全量 31 项测试、Ruff、compileall 与锁文件检查通过。停库时健康接口 200，带有效 Cookie 的对话请求安全返回 503。
 
+## 006 已执行结果（本轮证据）
+
+- Alembic `20261102_0003` 创建 `tasks` 与 `task_revisions`；每个任务指向当前版本，每个 revision 保存完整不可变 JSON 条件快照。
+- shopping/travel 使用受控字段和类型；任务创建与 revision 1、新快照与当前版本更新分别原子提交。相同快照明确提交也创建新版本。
+- owner 经私有对话验证；跨账号创建、列表、读取和修订统一 404。过期 `expected_revision` 返回 409 及当前版本。
+- 真实 PostgreSQL 17 从 005 head 升级、重复升级、006 单独降级/重升及 `alembic check` 均通过；两个并发请求基于同一版本实际得到 201/409。
+- Python 全量 35 项测试、Ruff、compileall 与锁文件检查通过。停库时健康接口 200，带有效 Cookie 的任务请求安全返回 503。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -74,10 +82,10 @@
 
 ## 当前状态与下一步
 
-[001](vibe%20coding/001-llm-connection.md)至[005 私有对话与消息持久化](vibe%20coding/005-private-conversations.md)均已提交；005 证据见[报告](reports/005-private-conversations-report.md)。P2 已有认证基础和双用户隔离验证过的私有对话。[006 私有任务与条件版本](vibe%20coding/006-task-revisions.md)已建为待执行任务，尚无代码或报告。Worker、SSE、网页对话和 Agent 接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[006 私有任务与条件版本](vibe%20coding/006-task-revisions.md)均已完成；006 证据见[报告](reports/006-task-revisions-report.md)。P2 已有认证、私有对话、任务条件快照和并发修改保护；run、Worker、SSE、网页对话和 Agent 接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 
-在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001–003 与 P2 的 004–005 已提交，私有对话和消息的归属隔离已验证；任务隔离、完整 Agent、意图路由和 RAG 尚未实现。
+在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001–003 与 P2 的 004–006 已完成，私有对话、任务和条件版本隔离已验证；完整 Agent、自动意图路由和 RAG 尚未实现。
 
-PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–005 均已提交。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。
+PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–006 均已完成。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。

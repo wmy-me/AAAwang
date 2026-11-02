@@ -1,16 +1,16 @@
 # 开发说明
 
-本文描述现有工程的安装、启动和验证方式。P1 已完成模型与 MCP 最小闭环；P2 已完成账号认证、服务端登录会话及私有对话与用户消息基础。
+本文描述现有工程的安装、启动和验证方式。P1 已完成模型与 MCP 最小闭环；P2 已完成认证、私有对话、用户消息及任务条件版本基础。
 
 ## 1. 各子工程的职责与边界
 
 | 子工程 | 职责 | 当前实现边界 |
 | --- | --- | --- |
-| `backend/` | Python 主系统 | FastAPI 健康、认证与私有对话 API、PostgreSQL/Alembic、DeepSeek、通用 MCP 及有限工具循环；LangGraph 仅安装依赖 |
+| `backend/` | Python 主系统 | FastAPI 健康、认证、私有对话与任务版本 API、PostgreSQL/Alembic、DeepSeek、通用 MCP 及有限工具循环；LangGraph 仅安装依赖 |
 | `web/` | React 网页 | 初始化说明页与真实健康检查按钮；Vite 开发代理 |
 | `mcp-services/` | 三个 Java 服务 | shopping 提供模拟 MCP 查询；travel 与 local-life 保持健康检查骨架 |
 | `infra/` | 本地基础服务 | PostgreSQL 容器；Python 认证模块连接 |
-| `contracts/` | 协议契约 | 包含认证、私有对话 REST 与 shopping 模拟 MCP 工具约定 |
+| `contracts/` | 协议契约 | 包含认证、私有对话、任务版本 REST 与 shopping 模拟 MCP 工具约定 |
 | `mobile/android/` | Android 扩展端 | 仅说明，未生成工程 |
 
 ## 2. 实际环境与版本
@@ -53,7 +53,7 @@ uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 
 将 `backend/.env.example` 复制为 `backend/.env`，并使 `DATABASE_URL` 与 infra 配置一致。应用导入和健康接口不连接数据库；认证请求按需连接。数据库结构必须显式运行 Alembic 迁移，应用不自动建表。
 
-认证接口为 `POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/logout` 和 `GET /api/me`。私有对话提供创建、列表、读取、改标题、追加用户消息和消息列表接口。本地 Vite 代理来源在 `TRUSTED_ORIGINS` 中；生产环境必须使用 HTTPS 并设置 `SESSION_COOKIE_SECURE=true`，否则配置校验失败。完整字段与状态码见 `contracts/rest/auth.md` 和 `contracts/rest/conversations.md`。
+认证接口为 `POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/logout` 和 `GET /api/me`。私有对话提供创建、列表、读取、改标题和用户消息；任务接口提供独立目标、完整条件快照及乐观并发修订。本地 Vite 代理来源在 `TRUSTED_ORIGINS` 中；生产环境必须使用 HTTPS 并设置 `SESSION_COOKIE_SECURE=true`。完整字段与状态码见 `contracts/rest/`。
 
 ### 3.2 DeepSeek 连通检查
 
@@ -183,7 +183,18 @@ uv run python scripts/check_conversations.py
 
 `check_conversations.py` 只接受真实 PostgreSQL psycopg URL，使用随机账号验证双用户双向隔离、新客户端持久化读取、同文幂等重试、异文冲突及数据库实际行数，并在结束时删除测试用户。当前网页没有对话界面；可通过 `/docs` 或 HTTP 客户端调用接口。
 
-### 5.4 网页检查、构建与代理
+### 5.4 私有任务与版本检查
+
+```bash
+cd backend
+uv run alembic upgrade head
+uv run alembic check
+uv run python scripts/check_tasks.py
+```
+
+`check_tasks.py` 只接受真实 PostgreSQL psycopg URL，使用随机账号验证同对话双任务、历史快照、新客户端读取、双用户隔离，以及两个请求基于同一版本时真实产生一个 201 和一个 409。脚本结束时删除测试用户。
+
+### 5.5 网页检查、构建与代理
 
 ```bash
 cd web
@@ -202,7 +213,7 @@ curl http://127.0.0.1:5173/api/health
 
 浏览器中点击“检查后端连接”应显示成功；关闭 API 后再次点击应显示失败，而不是固定显示“全部服务正常”。
 
-### 5.5 Java 构建与健康
+### 5.6 Java 构建与健康
 
 ```bash
 cd mcp-services
@@ -225,6 +236,7 @@ shopping-mcp 包含查询边界和 Origin 过滤测试；另外两个模块仍�
 | 认证请求返回 503 | 确认 PostgreSQL 健康、`DATABASE_URL` 与 infra 配置一致，并已执行 `uv run alembic upgrade head` |
 | 对话接口返回 404 | 对话不存在或不属于当前登录用户；服务端有意使用相同响应防止枚举 |
 | 消息接口返回 409 | 同一对话的 `client_message_id` 已用于不同正文；生成新 ID 或使用原正文重试 |
+| 任务修订返回 409 | `expected_revision` 已过期；读取响应中的当前版本和最新任务后再提交完整快照 |
 | 登录成功但浏览器不保存 Cookie | 本地 HTTP 应为 `Secure=false`；生产必须 HTTPS + `Secure=true`，并核对 Origin 是否在 `TRUSTED_ORIGINS` |
 | 状态变更返回 403 | 请求 Origin 未受信或浏览器标记为 cross-site；开发时应通过 Vite 同源代理访问 `/api` |
 | Python 3.12 不存在 | 执行 `uv python install 3.12`；项目已通过 `.python-version` 固定版本 |
@@ -254,20 +266,20 @@ shopping-mcp 包含查询边界和 Origin 过滤测试；另外两个模块仍�
 
 - `backend/src/life_agent/agents/`（含四个子目录）
 - `backend/src/life_agent/tools/` 中 maps、search、knowledge 仍为预留；mcp 已实现通用客户端
-- `backend/src/life_agent/modules/` 中认证已实现，其他业务模块仍预留
+- `backend/src/life_agent/modules/` 中认证、私有对话和任务版本已实现，其他业务模块仍预留
 - `backend/src/life_agent/worker/`
 - `web/src/components/`、`web/src/features/`
 - `mobile/android/`
 
 尚未接通：
 
-- Python 已连接 PostgreSQL 用于认证、私有对话和用户消息；地图/搜索仍未连接。
+- Python 已连接 PostgreSQL 用于认证、私有对话、用户消息、任务和条件版本；地图/搜索仍未连接。
 - shopping-mcp 已有标准协议和一个只读模拟工具；travel 与 local-life 没有 MCP。
 - LLM 已通过独立有限执行器根据 schema 调用一个只读 MCP 工具；尚未接入 HTTP 聊天、LangGraph 或 Agent。
-- 网页没有聊天、任务、投稿、方案等业务页面；后端保存用户消息不等于已有 Agent 回复或长期记忆。
+- 网页没有聊天、任务、投稿、方案等业务页面；后端任务版本不等于已有执行器、Agent 回复或长期记忆。
 
 ## 9. 后续阶段
 
-Agent 状态图、私有任务/对话/方案与跨用户隔离、SSE、投稿与知识库、地图/搜索/天气、商品比较与预算、出行规划、Android 工程、订单/预订/支付，以及完整页面设计与全应用容器化。
+Agent 状态图、run/Worker、私有方案与跨用户隔离、SSE、投稿与知识库、地图/搜索/天气、商品比较与预算、出行规划、Android 工程、订单/预订/支付，以及完整页面设计与全应用容器化。
 
 这些能力需要收到新的开发任务后再实施。

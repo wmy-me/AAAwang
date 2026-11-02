@@ -1,6 +1,6 @@
 # 006：私有任务与条件版本
 
-- 状态：待执行；本文件仅定义任务，尚无实现或报告
+- 状态：已完成；实现与验收见[报告](../reports/006-task-revisions-report.md)
 - 所属阶段：P2 任务与对话基础
 - 起始分支与代码提交：`main` / `76cea1ac874045c26182de6d6edc4aaaadfe5344`；实施前核对最新 HEAD，保留之后已有改动
 - 前置：[004 账号认证](004-auth-foundation.md)和[005 私有对话与消息](005-private-conversations.md)均已提交并有执行报告
