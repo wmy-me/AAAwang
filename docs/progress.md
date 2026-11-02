@@ -82,6 +82,8 @@
 
 ## 当前状态与下一步
 
+截至 2026-11-02 已核对最新代码提交 `56be3b6c044fa57a431f1fb3c8aa1f4697aa5cb4`：006 的模型、迁移、五个任务接口及报告已提交。报告记录 35 项 Python 测试通过、真实 PostgreSQL 双用户隔离与并发提交 201/409；本次只审阅仓库及报告，未在当前环境重跑数据库或测试。已新建待执行 [007 持久化 Run 与最小 Worker](vibe%20coding/007-persistent-runs-worker.md)，先建立独立执行记录、版本绑定、幂等与多 Worker 领取/恢复；SSE 和 Agent 执行仍拆为后续任务。
+
 [001](vibe%20coding/001-llm-connection.md)至[006 私有任务与条件版本](vibe%20coding/006-task-revisions.md)均已完成；006 证据见[报告](reports/006-task-revisions-report.md)。P2 已有认证、私有对话、任务条件快照和并发修改保护；run、Worker、SSE、网页对话和 Agent 接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档

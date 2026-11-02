@@ -37,6 +37,8 @@
 | 005 | [私有对话与消息持久化](005-private-conversations.md) | 已完成；真实 PostgreSQL 双用户隔离、持久化和消息幂等已通过，见[报告](../reports/005-private-conversations-report.md) |
 | 006 | [私有任务与条件版本](006-task-revisions.md) | 已完成；真实 PostgreSQL 任务隔离、不可变快照和并发冲突保护已通过，见[报告](../reports/006-task-revisions-report.md) |
 
-P1 的 001–003 和 P2 的 004–006 均有实现与报告。run、Worker、SSE、网页对话和 Agent 接入仍需后续编号任务。
+| 007 | [持久化 Run 与最小 Worker](007-persistent-runs-worker.md) | 待执行；建立版本绑定的私有 run、幂等入队、Worker 领取与故障恢复，不执行 Agent 规划 |
+
+P1 的 001–003 和 P2 的 004–006 均有实现与报告。下一步执行 007；SSE、网页对话和 Agent 接入仍需后续编号任务。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。

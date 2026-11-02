@@ -19,7 +19,7 @@
 
 ## 下一步讨论的范围
 
-[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[006 私有任务与条件版本](vibe%20coding/006-task-revisions.md)均已完成。P2 后续需另建编号任务，分步建立持久化 run/Worker、事件与 SSE、网页对话及 Agent 接入。无需先完成三个 Java 平台的业务后台。
+[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[006 私有任务与条件版本](vibe%20coding/006-task-revisions.md)均已完成。P2 下一步是 [007 持久化 Run 与最小 Worker](vibe%20coding/007-persistent-runs-worker.md)（待执行）；完成后再分步建立事件与 SSE、网页对话及 Agent 接入。无需先完成三个 Java 平台的业务后台。
 
 ## 任务与阶段的关系
 
