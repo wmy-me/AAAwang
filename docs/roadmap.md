@@ -19,7 +19,7 @@
 
 ## 下一步讨论的范围
 
-[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)、[002 MCP 接入](vibe%20coding/002-mcp-integration.md)、[003 最小工具调用闭环](vibe%20coding/003-llm-mcp-tool-loop.md)和[004 账号认证基础](vibe%20coding/004-auth-foundation.md)均已完成。下一步应为首个私有资源及双用户归属验证建立编号任务；无需先完成三个 Java 平台的业务后台。
+[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)、[002 MCP 接入](vibe%20coding/002-mcp-integration.md)、[003 最小工具调用闭环](vibe%20coding/003-llm-mcp-tool-loop.md)和[004 账号认证基础](vibe%20coding/004-auth-foundation.md)均已完成。下一步执行 [005 私有对话与消息持久化](vibe%20coding/005-private-conversations.md)，用两个账号验证首个私有业务资源的创建、列表、读取与修改隔离；005 目前只有待执行文档。任务版本、Worker、SSE 和完整 Agent 留待后续编号任务，无需先完成三个 Java 平台的业务后台。
 
 ## 任务与阶段的关系
 
