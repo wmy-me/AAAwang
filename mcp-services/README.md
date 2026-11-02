@@ -8,6 +8,10 @@ Maven 多模块工程，父工程统一管理 Spring Boot 版本。本轮只提�
 | `travel-mcp` | `dev.lifebuy.travel` | 8102 | 交通与酒店查询 |
 | `local-life-mcp` | `dev.lifebuy.locallife` | 8103 | 门店、菜单、规格和口味查询 |
 
+## 定位
+
+这些工程用于模拟成熟的外部 MCP 服务，验证 Python 侧统一客户端的接入与工具调用。三个领域是测试与演示场景，后续可扩展其他 MCP 服务。当前没有实现 MCP 协议，也不要求先建设完整商城、外卖或旅游平台。详见 [项目定位](../docs/overview/project.md)。
+
 ## 技术版本
 
 - Spring Boot 4.1.2（正式版，三个模块统一锁定）

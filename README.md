@@ -1,6 +1,6 @@
 # 生活采买智能体
 
-基于大语言模型与 MCP 的多场景生活服务智能体。
+基于大语言模型与 MCP 的多场景生活服务智能体，围绕日常采买、美食发现、出行规划和经营采购，提供有来源、可调整的推荐方案。Java 服务用于模拟外部 MCP、验证接入方式，为后续扩展其他 MCP 服务做准备。
 
 **当前阶段：第 0 阶段 · 项目初始化。** 本轮只建立框架、依赖、配置模板、最小启动入口和健康检查，不包含业务功能。
 
@@ -40,11 +40,11 @@ Node 22.23.2 满足 Vite 8 的 `^20.19.0 || >=22.12.0` 要求；本轮沿用本�
 | `contracts/` | 后续 REST、SSE、MCP 与卡片协议存放约定 |
 | `infra/` | 可选本地 PostgreSQL 与本地环境模板 |
 | `mobile/android/` | Android 扩展端说明（本轮不生成工程） |
-| `docs/` | 开发说明、初始化报告与既有设计资料 |
+| `docs/` | 项目定位、设计、AI 执行任务、进度、报告与指南分层管理 |
 
 ## 快速开始
 
-三个子工程可独立启动。完整步骤与常见问题见 [docs/development.md](docs/development.md)。
+三个子工程可独立启动。完整步骤与常见问题见 [docs/development.md](docs/guides/development.md)。
 
 ### 1. Python API
 
@@ -99,11 +99,17 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 
 ## 开发文档
 
-- [开发说明：安装、启动、检查与常见问题](docs/development.md)
-- [初始化报告：实际完成项与验证结果](docs/initialization-report.md)
-- [项目初始设计包](docs/生活采买智能体_项目初始设计包.md)
-- [课题项目计划书](docs/生活采买智能体_课题项目计划书.md)
+- [文档导航](docs/README.md)
+- [项目定位与主线](docs/overview/project.md)
+- [开发路线图](docs/roadmap.md)
+- [当前进度](docs/progress.md)
+- [Claude / Codex 执行任务](docs/vibe%20coding/README.md)
+
+- [开发说明：安装、启动、检查与常见问题](docs/guides/development.md)
+- [初始化报告：实际完成项与验证结果](docs/reports/000-initialization-report.md)
+- [项目初始设计包](docs/design/生活采买智能体_项目初始设计包.md)
+- [课题项目计划书](docs/overview/生活采买智能体_课题项目计划书.md)
 
 ## 明确留到下一阶段
 
-LLM 接入、LangGraph 状态图、Agent 与工具调用、MCP 客户端与 Java 协议层、登录/会话/任务/SSE、数据模型与迁移、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/development.md` 的“后续阶段”一节。
+LLM 接入、LangGraph 状态图、Agent 与工具调用、MCP 客户端与 Java 协议层、登录/会话/任务/SSE、数据模型与迁移、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/guides/development.md` 的“后续阶段”一节。

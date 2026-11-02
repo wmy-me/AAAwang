@@ -18,7 +18,7 @@
 - Python 是主系统，一个 uv 工程；未来 API 与 Worker 共享，不为每个 Agent 建服务。
 - Python 使用 FastAPI，LangGraph 只装基础依赖（当前无图、无检查点）。
 - 网页使用 React + TypeScript + Vite。
-- 三个 Java 服务（shopping / travel / local-life）保留为未来 MCP 服务；本轮只是 Spring Boot 骨架。
+- 三个 Java 服务（shopping / travel / local-life）用于模拟外部 MCP 服务，验证通用接入机制，后续可接入其他 MCP；当前只是 Spring Boot 骨架。
 - 主体为一个仓库、多个子工程；根目录不建立 npm 或 uv workspace，不引入 Nx、Turborepo。
 
 ## 包管理边界
@@ -63,4 +63,10 @@ cd mcp-services && ./mvnw -B -ntp verify
 ./mvnw -pl shopping-mcp spring-boot:run
 ```
 
-环境：Python 3.12、Node 22（Vite 8 要求 `^20.19.0 || >=22.12.0`）、JDK 21、Spring Boot 4.1.2。详细端口与说明见 `docs/development.md`。
+环境：Python 3.12、Node 22（Vite 8 要求 `^20.19.0 || >=22.12.0`）、JDK 21、Spring Boot 4.1.2。详细端口与说明见 `docs/guides/development.md`。
+
+## 文档驱动的后续工作
+
+先读 [文档导航](docs/README.md)、[当前进度](docs/progress.md)，再读用户本次指定的 [AI 执行任务](docs/vibe%20coding/README.md)。每个具体实施步骤先有编号任务文档，完成后有对应报告与进度更新。当前阶段约束描述初始化范围；收到明确的新任务后，以新任务确定的范围为准，不把旧初始化文档当作永久禁止业务开发的规则。
+
+路线图和初始设计包是参考，不自动执行其中所有阶段；000 为已执行历史任务。核对最新代码后再判断状态，区分“规划”“已实现”“已验证”。本次只整理文档，下一业务任务仍待讨论。

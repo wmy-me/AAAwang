@@ -1,5 +1,7 @@
 # 初始化报告
 
+> 本文件是 000 任务的历史执行报告，文档迁移不代表重新运行了其中的检查。当前状态见 [进度记录](../progress.md)。
+
 **项目：** 生活采买智能体  
 **阶段：** 第 0 阶段 · 项目初始化  
 **执行日期：** 2026-11-02  
@@ -47,7 +49,7 @@
 
 ## 3. 与执行文档的差异
 
-1. **操作系统：** 实际为原生 Linux，不是 Windows + WSL2。未在 Windows 浏览器中验证；WSL2 访问方式已写入 `docs/development.md`。
+1. **操作系统：** 实际为原生 Linux，不是 Windows + WSL2。未在 Windows 浏览器中验证；WSL2 访问方式已写入 `docs/guides/development.md`。
 2. **Node.js：** 使用本机已安装的 Node 22.23.2，而非建议的 24 LTS。Vite 8 要求 `^20.19.0 || >=22.12.0`，当前版本满足；`.nvmrc` 记录主版本 `22`。
 3. **前端 lint：** create-vite 9.3.3 生成的模板自带 **Oxlint**，不再包含 ESLint。项目保留了模板自带的 TypeScript、lint（`npm run lint`）与构建配置；未额外引入 ESLint。
 4. **Spring Boot Web starter：** 4.1.2 中 `spring-boot-starter-web` 已标注弃用，改用 `spring-boot-starter-webmvc`。
@@ -91,9 +93,9 @@
 - `infra/compose.yaml`、`infra/.env.example`、`infra/README.md`
 - `contracts/README.md`
 - `mobile/android/README.md`
-- `docs/development.md`、`docs/initialization-report.md`
+- `docs/guides/development.md`、`docs/reports/000-initialization-report.md`
 
-保留的原有文件：根目录执行文档、`docs/生活采买智能体_项目初始设计包.md`、`docs/生活采买智能体_课题项目计划书.md`，均未修改。
+保留的原有文件：根目录执行文档、`docs/design/生活采买智能体_项目初始设计包.md`、`docs/overview/生活采买智能体_课题项目计划书.md`，均未修改。
 
 ## 5. 本轮未实现、未接通的能力
 

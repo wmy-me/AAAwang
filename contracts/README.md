@@ -8,7 +8,7 @@
 | --- | --- |
 | `contracts/rest/` | Python REST 接口的 OpenAPI 文档或手写契约 |
 | `contracts/sse/` | 后台任务事件类型、字段与顺序 |
-| `contracts/mcp/` | Python 客户端与三个 Java 服务之间的工具名、入参、返回结构 |
+| `contracts/mcp/` | Python 客户端接入外部及模拟 MCP 服务的工具名、入参、返回结构与适配约定 |
 | `contracts/cards/` | 网页展示用的方案卡片结构 |
 
 约定：
