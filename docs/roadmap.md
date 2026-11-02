@@ -26,3 +26,11 @@
 每个具体开发或验证步骤在实施前建立 `vibe coding/NNN-主题.md`，写清属于哪个阶段、起始提交、前置条件、范围和完成标准。实施后在 `reports/NNN-主题-report.md` 记录结果，并同步 `progress.md`。
 
 历史初始化任务是 000。后续编号按实际讨论结果递增，不提前把整份路线图细化为大量未经核对的执行文档。
+
+## 专题设计参考
+
+- P1 的通用工具接入与后续 Agent 协作：[Tools 与 MCP](design/tools-and-mcp.md)、[Agent 架构](design/agent-architecture.md)。
+- P2 建立任务上下文后逐步落地：[意图识别与路由](design/intent-routing.md)；P3 验证场景协作。
+- P5 投稿知识与检索：[RAG 分块、存储与检索](design/rag-and-retrieval.md)。
+
+以上细化已有方向，不调整当前执行顺序。数值与模型候选是待验证基线，不能据此把某个阶段标记为完成。
