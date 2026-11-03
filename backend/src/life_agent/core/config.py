@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = 60.0
     mcp_services: dict[str, McpServiceConfig] = Field(default_factory=default_mcp_services)
+    run_worker_lease_seconds: int = Field(default=30, gt=0)
+    run_worker_poll_seconds: float = Field(default=1.0, gt=0)
+    run_worker_max_attempts: int = Field(default=3, ge=1, le=20)
 
     @model_validator(mode="after")
     def validate_cookie_security(self) -> "Settings":

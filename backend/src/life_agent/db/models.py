@@ -1,4 +1,4 @@
-"""Persistent account, conversation, and versioned-task models."""
+"""Persistent account, conversation, task, and run models."""
 
 import uuid
 from datetime import datetime
@@ -35,6 +35,9 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     conversations: Mapped[list["Conversation"]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
+    )
+    runs: Mapped[list["Run"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan"
     )
 
@@ -143,6 +146,9 @@ class Task(Base):
     revisions: Mapped[list["TaskRevision"]] = relationship(
         back_populates="task", cascade="all, delete-orphan"
     )
+    runs: Mapped[list["Run"]] = relationship(
+        back_populates="task", cascade="all, delete-orphan"
+    )
 
 
 class TaskRevision(Base):
@@ -163,3 +169,43 @@ class TaskRevision(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     task: Mapped[Task] = relationship(back_populates="revisions")
+
+
+class Run(Base):
+    __tablename__ = "runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "task_id", "idempotency_key", name="uq_runs_task_idempotency_key"
+        ),
+        Index("ix_runs_task_created_id", "task_id", desc("created_at"), desc("id")),
+        Index("ix_runs_claimable", "status", "lease_until", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_revisions.id", ondelete="RESTRICT")
+    )
+    revision: Mapped[int]
+    conditions: Mapped[dict[str, object]] = mapped_column(JSON)
+    idempotency_key: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    worker_id: Mapped[str | None] = mapped_column(String(128))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempt: Mapped[int] = mapped_column(default=0)
+    fencing_token: Mapped[int] = mapped_column(default=0)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
+    diagnostic: Mapped[dict[str, object] | None] = mapped_column(JSON)
+    error_summary: Mapped[str | None] = mapped_column(String(500))
+    task: Mapped[Task] = relationship(back_populates="runs")
+    owner: Mapped[User] = relationship(back_populates="runs")

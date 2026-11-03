@@ -6,7 +6,7 @@
 
 | 子工程 | 职责 | 当前实现边界 |
 | --- | --- | --- |
-| `backend/` | Python 主系统 | FastAPI 健康、认证、私有对话与任务版本 API、PostgreSQL/Alembic、DeepSeek、通用 MCP 及有限工具循环；LangGraph 仅安装依赖 |
+| `backend/` | Python 主系统 | FastAPI 健康、认证、私有对话、任务版本与持久化 run API、PostgreSQL/Alembic、DeepSeek、通用 MCP 及有限工具循环；LangGraph 仅安装依赖 |
 | `web/` | React 网页 | 初始化说明页与真实健康检查按钮；Vite 开发代理 |
 | `mcp-services/` | 三个 Java 服务 | shopping 提供模拟 MCP 查询；travel 与 local-life 保持健康检查骨架 |
 | `infra/` | 本地基础服务 | PostgreSQL 容器；Python 认证模块连接 |
@@ -55,7 +55,20 @@ uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 
 认证接口为 `POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/logout` 和 `GET /api/me`。私有对话提供创建、列表、读取、改标题和用户消息；任务接口提供独立目标、完整条件快照及乐观并发修订。本地 Vite 代理来源在 `TRUSTED_ORIGINS` 中；生产环境必须使用 HTTPS 并设置 `SESSION_COOKIE_SECURE=true`。完整字段与状态码见 `contracts/rest/`。
 
-### 3.2 DeepSeek 连通检查
+### 3.2 持久化 Run 与独立 Worker
+
+数据库迁移完成后，API 与 Worker 必须作为独立进程运行：
+
+```bash
+cd backend
+uv run alembic upgrade head
+uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
+uv run python -m life_agent.worker.runner
+```
+
+Worker 通过 PostgreSQL 行锁和 `SKIP LOCKED` 领取 run，使用租约与 fencing token 防止旧进程覆盖新持有者；`--once` 适合单次验收。默认租约为 30 秒、轮询为 1 秒、最多 3 次尝试，可用 `RUN_WORKER_LEASE_SECONDS`、`RUN_WORKER_POLL_SECONDS` 和 `RUN_WORKER_MAX_ATTEMPTS` 调整。当前 runner 只做无副作用诊断，`completed` 不代表已有 Agent 规划或采购/出行方案。契约见 `contracts/rest/runs.md`。
+
+### 3.3 DeepSeek 连通检查
 
 在 `backend/.env` 中设置 `LLM_API_KEY`。密钥只保留在本机，不要写入命令、对话、报告或提交。模型默认使用已由官方文档确认的 `deepseek-flash` 和 `https://api.deepseek.com`。
 

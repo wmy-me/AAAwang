@@ -1,6 +1,6 @@
 # 007：持久化 Run 与最小 Worker
 
-- 状态：待执行；本文件是下一步执行任务，不表示已有实现
+- 状态：已完成；实现与验收见对应报告
 - 所属阶段：P2 任务与对话基础
 - 起始分支与代码提交：`main` / `56be3b6c044fa57a431f1fb3c8aa1f4697aa5cb4`；实施前再次核对 HEAD 并保留之后的改动
 - 前置：[006 私有任务与条件版本](006-task-revisions.md)已提交；[执行报告](../reports/006-task-revisions-report.md)记录真实 PostgreSQL 验证

@@ -1,18 +1,18 @@
 # 当前进度
 
-核对日期：2026-11-02。006 从 `main` 提交 `9c394b0258f7c177de02378ae88cb577a8e81380` 开始执行；以下根据源码、本轮真实 PostgreSQL 17 和自动测试结果记录。
+核对日期：2026-11-03。007 从当前 `main` 提交 `94450018eb881e1317b6d651d212331cdd8535b7` 开始执行；以下根据源码、本轮真实 PostgreSQL 17 和自动测试结果记录。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 提供健康、认证、私有对话、用户消息、私有任务与条件版本 API；已有服务端会话、DeepSeek、通用 MCP 和有限工具循环；LangGraph 仍仅安装依赖 |
+| Python | 提供健康、认证、私有对话、用户消息、私有任务、条件版本与持久化 run API；已有服务端会话、DeepSeek、通用 MCP、有限工具循环和独立诊断 Worker；LangGraph 仍仅安装依赖 |
 | 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | PostgreSQL 17 Compose；Python 认证模块通过 SQLAlchemy/psycopg 连接，Alembic 管理迁移 |
 | Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；仍无 LangGraph 图或 Agent |
-| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务和条件版本；尚无 run、方案、投稿、知识库、实际出行规划或交易实现 |
+| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务、条件版本和版本绑定 run；尚无 SSE、方案、投稿、知识库、实际出行规划或交易实现 |
 | Android | 只有说明文件 |
 
 ## 完成证据与限制
@@ -69,6 +69,15 @@
 - 真实 PostgreSQL 17 从 005 head 升级、重复升级、006 单独降级/重升及 `alembic check` 均通过；两个并发请求基于同一版本实际得到 201/409。
 - Python 全量 35 项测试、Ruff、compileall 与锁文件检查通过。停库时健康接口 200，带有效 Cookie 的任务请求安全返回 503。
 
+## 007 已执行结果（本轮证据）
+
+- Alembic `20261103_0004` 创建 `runs`；每个 run 保存 owner、task revision ID/版本号和完整条件快照，并有 task 内幂等键唯一约束。
+- 新增创建、列表、读取和取消 REST；创建事务锁定 task 并核对 `expected_revision`，旧 run 不读取后来 current revision。越权与不存在统一 404，过期版本和幂等冲突返回 409。
+- 独立 Worker 使用 PostgreSQL 行锁、`SKIP LOCKED`、租约、attempt 和 fencing token；诊断 runner 只记录 task/revision 与“尚未运行 Agent 规划”，不调用 LLM、MCP 或写消息。
+- SQLite 聚焦测试 4 项，Python 全量测试 **39 passed**；Ruff、compileall 通过。
+- 真实 PostgreSQL 17 从 006 head 升级、重复升级、`alembic current` 和 `alembic check` 通过；API + 两个独立 Worker 验证幂等、单次领取完成、排队取消、租约过期接管和旧 Worker 迟到写入拒绝。
+- 未验证真实外部服务、SSE、网页、LangGraph 或 Agent 规划；本轮 `completed` 仅代表无副作用诊断 runner 完成。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -82,9 +91,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-02 已核对最新代码提交 `56be3b6c044fa57a431f1fb3c8aa1f4697aa5cb4`：006 的模型、迁移、五个任务接口及报告已提交。报告记录 35 项 Python 测试通过、真实 PostgreSQL 双用户隔离与并发提交 201/409；本次只审阅仓库及报告，未在当前环境重跑数据库或测试。已新建待执行 [007 持久化 Run 与最小 Worker](vibe%20coding/007-persistent-runs-worker.md)，先建立独立执行记录、版本绑定、幂等与多 Worker 领取/恢复；SSE 和 Agent 执行仍拆为后续任务。
+截至 2026-11-03 已核对最新代码提交 `94450018eb881e1317b6d651d212331cdd8535b7`：007 的 run 模型、迁移、四个私有接口、独立 Worker 和报告已实现并通过真实 PostgreSQL 验收。SSE、网页对话和 Agent 接入仍拆为后续任务。
 
-[001](vibe%20coding/001-llm-connection.md)至[006 私有任务与条件版本](vibe%20coding/006-task-revisions.md)均已完成；006 证据见[报告](reports/006-task-revisions-report.md)。P2 已有认证、私有对话、任务条件快照和并发修改保护；run、Worker、SSE、网页对话和 Agent 接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[007 持久化 Run 与最小 Worker](vibe%20coding/007-persistent-runs-worker.md)均已完成；006 和 007 证据分别见[报告](reports/006-task-revisions-report.md)与[007 报告](reports/007-persistent-runs-worker-report.md)。P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化 run 和最小 Worker；SSE、网页对话和 Agent 接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 

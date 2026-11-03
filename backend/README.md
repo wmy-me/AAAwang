@@ -104,4 +104,12 @@ uv run python scripts/check_auth.py
 
 `check_auth.py` 只接受 PostgreSQL psycopg URL，验证迁移后的注册、登录、跨客户端身份恢复、登出、到期和摘要存储。接口契约见 `contracts/rest/auth.md`。
 
-本阶段尚无聊天 API、私有任务资源、Agent 图或后台 Worker。
+私有任务支持版本绑定的持久化 run。先执行 `uv run alembic upgrade head`，再分别启动 API 和独立 Worker：
+
+```bash
+cd backend
+uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
+uv run python -m life_agent.worker.runner
+```
+
+Worker 使用数据库轮询和租约领取 queued run；`--once` 可只领取一次，适合验收。默认租约 30 秒、轮询 1 秒、最多 3 次尝试，可通过 `RUN_WORKER_LEASE_SECONDS`、`RUN_WORKER_POLL_SECONDS` 和 `RUN_WORKER_MAX_ATTEMPTS` 配置。当前 runner 只记录只读诊断，`completed` 不代表已有 Agent 规划、采购方案或出行方案。
