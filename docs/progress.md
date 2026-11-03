@@ -1,6 +1,6 @@
 # 当前进度
 
-核对日期：2026-11-03。以下按 001–012 的对应执行报告和最新源码归档；本次规划基线为 `main` 提交 `87d46c26bf4cadcd5a668f0aad24c077f6c9cf85`，未重新运行测试或用户本地数据库。
+核对日期：2026-11-03。以下按 001–012 的对应执行报告和最新源码归档；本次规划基线为 `main` 提交 `04c76e961b0fa64f977e398d2560a5565f56aef6`，本轮未重新运行测试或用户本地数据库。
 
 ## 代码现状
 
@@ -123,7 +123,7 @@
 
 截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证。012 已完成主从 Agent 代码、0008 迁移、真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读。
 
-[001](vibe%20coding/001-llm-connection.md)至[012 购物主 Agent 与信息发现 Agent 的最小委派](vibe%20coding/012-shopping-agent-delegation.md)均已完成；012 的真实外部闭环、隔离和 SSE 已验收；网页对话和完整采买规划仍待后续任务。
+[001](vibe%20coding/001-llm-connection.md)至[012 购物主 Agent 与信息发现 Agent 的最小委派](vibe%20coding/012-shopping-agent-delegation.md)均已完成；012 的真实委派、隔离和 SSE 已验收，直接回答/追问主要有替身测试证据。下一步为[013 网页登录与购物 Agent Run 可视化](vibe%20coding/013-shopping-web-workbench.md)（待执行）；自然语言多轮对话和完整采买规划另拆任务。
 
 ## 2026-11-02 架构讨论归档
 
