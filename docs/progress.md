@@ -8,7 +8,7 @@
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
 | Python | 提供健康、认证、私有对话、用户消息、私有任务、条件版本与持久化 run API；已有服务端会话、DeepSeek、通用 MCP、有限工具循环和独立 Worker；LangGraph 已有最小 `shopping_agent` 主从委派图，无检查点或完整多 Agent |
-| 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
+| 网页 | 已有网页登录、私有购物任务、版本化条件、shopping_agent Run、SSE状态和结果工作台；013 的登出后刷新和独立 SSE 终态补读已验收 |
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | PostgreSQL 17 Compose；Python 认证模块通过 SQLAlchemy/psycopg 连接，Alembic 管理迁移 |
 | Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；已有最小 LangGraph `shopping_agent` 主从委派图；仍无完整多 Agent、自动意图路由或长期记忆 |
@@ -108,6 +108,13 @@
 - 第二个用户读取 Run/结果/事件均为 404；SSE 终态补读 `queued -> running -> completed`；根配置缺少密钥的首次尝试安全失败且无结果。
 - 验收后删除隔离测试用户及其级联数据，项目库恢复为 0 用户/0 Run；API/shopping-mcp 已停止，数据库卷保留。补齐前次的 API/Worker/PostgreSQL 缺口。
 
+## 013 网页工作台
+
+- 网页已提供登录/注册、私有对话、购物任务与条件版本、`shopping_agent` Run、取消、SSE 状态同步和受限结果展示；真实 Worker/MCP completed、刷新恢复和双用户隔离已验收。
+- 真实 Chrome 152 登录保留账号 `web013run` 后显示保留对话、任务和 completed Run；点击“退出”后回到认证页，刷新后仍为登录页，`/api/me` 返回 401，私有任务文本不再出现。
+- 独立 HTTP 客户端补读 completed Run 的 SSE：`after=0` 返回 queued/running/completed，`after=2` 仅终态，`after=3` 空流关闭；JSON 事件补读一致。
+- 测试账号、对话、任务和两个 Run 按报告保留；一次性服务端会话已删除；数据库卷未删除；API、Vite、Chrome 和 shopping-mcp 已停止。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -121,9 +128,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证。012 已完成主从 Agent 代码、0008 迁移、真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读。
+截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证。012 已完成主从 Agent 代码、0008 迁移、真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读。013 已完成网页认证、私有对话/任务、Run 排队、SSE 状态展示、真实 Worker/MCP 结果、双用户隔离、登出后刷新和独立 SSE 终态补读。
 
-[001](vibe%20coding/001-llm-connection.md)至[012 购物主 Agent 与信息发现 Agent 的最小委派](vibe%20coding/012-shopping-agent-delegation.md)均已完成；012 的真实委派、隔离和 SSE 已验收，直接回答/追问主要有替身测试证据。下一步为[013 网页登录与购物 Agent Run 可视化](vibe%20coding/013-shopping-web-workbench.md)（待执行）；自然语言多轮对话和完整采买规划另拆任务。
+[001](vibe%20coding/001-llm-connection.md)至[013 网页登录与购物 Agent Run 可视化](vibe%20coding/013-shopping-web-workbench.md)均已完成；013 的登出刷新和独立 SSE 已验收；自然语言多轮对话和完整采买规划另拆任务。
 
 ## 2026-11-02 架构讨论归档
 

@@ -44,8 +44,8 @@
 | 010 | [购物任务 Run 接入有限模型与 MCP 查询](010-shopping-run-execution.md) | 已完成；[报告](../reports/010-shopping-run-execution-report.md)记录受控执行、结果持久化、租约续期、真实 DeepSeek→shopping-mcp→PostgreSQL 闭环和外部调用中断恢复；外部调用不承诺 exactly-once |
 | 011 | [项目数据库开发环境与配置收敛](011-dev-database-config.md) | 已完成；项目专用 PostgreSQL、单源配置、可选服务 profile；旧卷角色对齐、0007 迁移和 down/up 持久化已验证，未删除卷 |
 | 012 | [购物主 Agent 与信息发现 Agent 的最小委派](012-shopping-agent-delegation.md) | 已完成；LangGraph 主从委派、shopping_agent、0008迁移、真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读均通过，见[报告](../reports/012-shopping-agent-delegation-report.md) |
-| 013 | [网页登录与购物 Agent Run 可视化](013-shopping-web-workbench.md) | 待执行；网页认证、购物任务、Agent Run、SSE 与持久化结果的浏览器纵向闭环 |
+| 013 | [网页登录与购物 Agent Run 可视化](013-shopping-web-workbench.md) | 已完成；网页工作台、真实 Worker/MCP completed 结果、刷新恢复、双用户隔离、登出后刷新和独立 SSE 终态补读均通过，见[报告](../reports/013-shopping-web-workbench-report.md) |
 
-P1 的 001–003 和 P2 的 004–012 均有实现与报告；012 的真实 API/Worker/PostgreSQL 闭环、隔离和 SSE 已验收；013 为待执行的购物任务网页入口；自然语言多轮对话另拆任务。
+P1 的 001–003 和 P2 的 004–013 均有实现与报告；013 的登出刷新与独立 SSE 已验收；自然语言多轮对话另拆任务。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。

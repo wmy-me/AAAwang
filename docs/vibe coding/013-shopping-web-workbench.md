@@ -1,10 +1,10 @@
 # 013：网页登录与购物 Agent Run 可视化
 
-- 状态：待执行；仅为下一步执行说明，尚未实现或验收
+- 状态：已完成；网页认证、任务、Run、结果、刷新恢复、双用户隔离、浏览器登出后刷新和独立 SSE 终态补读均已验收
 - 所属阶段：P2 任务与对话基础的网页使用入口
 - 起始分支与代码提交：`main` / `04c76e961b0fa64f977e398d2560a5565f56aef6`；执行前核对最新 HEAD
 - 前置：[012 主从委派报告](../reports/012-shopping-agent-delegation-report.md)及[010 购物 Run 报告](../reports/010-shopping-run-execution-report.md)
-- 对应报告：`docs/reports/013-shopping-web-workbench-report.md`
+- 对应报告：[013 执行报告](../reports/013-shopping-web-workbench-report.md)
 
 ## 1. 问题与目标
 

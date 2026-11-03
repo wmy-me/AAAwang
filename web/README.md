@@ -4,11 +4,11 @@
 
 ## 当前实现边界
 
-- 只展示项目名称、初始化说明和“检查后端连接”按钮。
-- `src/api/health.ts` 使用浏览器原生 `fetch` 请求 `GET /api/health`。
+- 提供服务端 Cookie 登录/注册、私有对话、购物任务条件版本、`shopping_agent` Run、取消、SSE 状态同步和受限结果展示。
+- `src/api/workbench.ts` 使用浏览器原生 `fetch` 访问现有 `/api` 契约；`src/api/health.ts` 仍保留健康检查封装。
 - Vite 开发服务器把 `/api` 代理到 `http://127.0.0.1:8000`，保留路径前缀。
-- 未引入 Router、全局状态库、Axios、UI 组件库、地图 SDK 或 SSE 客户端。
-- `src/components/` 与 `src/features/` 仅为预留目录。
+- 使用浏览器原生 `EventSource` 读取私有 Run 事件；私有数据只保留在当前页面内存状态，刷新后重新从服务端读取。
+- 未引入 Router、全局状态库、Axios、UI 组件库或地图 SDK；`src/components/` 与 `src/features/` 仍为预留目录。
 
 ## 安装与启动
 
