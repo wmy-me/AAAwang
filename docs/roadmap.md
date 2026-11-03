@@ -19,7 +19,7 @@
 
 ## 下一步讨论的范围
 
-[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)均已完成；[010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)已完成真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收，外部调用不承诺 exactly-once。011 已完成数据库配置收敛；012 已完成真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读；013 已完成网页工作台、真实 Worker/MCP 结果、双用户隔离、登出刷新和独立 SSE 验收；自然语言多轮对话另拆任务。最终一键部署和数据备份恢复属于 P7。无需先完成三个 Java 平台的业务后台。
+[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)均已完成；[010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)已完成真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收，外部调用不承诺 exactly-once。011 已完成数据库配置收敛；012 已完成真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读；013 已完成网页工作台、真实 Worker/MCP 结果、双用户隔离、登出刷新和独立 SSE 验收；下一步[014 已选购物任务的多轮对话与助手消息持久化](vibe%20coding/014-shopping-task-chat.md)（待执行），再进入 P3 候选与方案。最终一键部署和数据备份恢复属于 P7。无需先完成三个 Java 平台的业务后台。
 
 ## 任务与阶段的关系
 

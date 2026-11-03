@@ -52,11 +52,12 @@
 
 ## 4. 运行方式
 
+以下命令从仓库根目录被忽略的 `.env` 加载 `DATABASE_URL` 与密钥。为避免在报告中复制开发数据库凭据，命令不以内联 URL 展示密码；此前的执行证据与结果未变。
+
 ```bash
 # backend
 cd backend
-DATABASE_URL='postgresql+psycopg://life_buy:postgres@127.0.0.1:55432/life_buy_agent' \
-  uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
+uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 
 # web
 cd web
