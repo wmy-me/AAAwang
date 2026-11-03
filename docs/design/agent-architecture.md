@@ -3,7 +3,7 @@
 - 更新日期：2026-11-02
 - 状态：对话设计结论与实现基线，尚未实现；后续按编号任务逐步验证
 - 整理时仓库基线：`8459e407f890061045dcb53b03ef98168cc656c8`
-- 相关：[意图识别](intent-routing.md)、[Tools 与 MCP](tools-and-mcp.md)、[RAG](rag-and-retrieval.md)
+- 相关：[Agent 执行与预算](agent-execution-rules.md)、[意图识别](intent-routing.md)、[Tools 与 MCP](tools-and-mcp.md)、[RAG](rag-and-retrieval.md)
 - 本文是设计参考，不授权一次性实施全部能力；当前代码与验收状态见 [进度](../progress.md)
 
 ## 1. Agent 的种类与业务分工分开讨论
@@ -95,3 +95,7 @@ Python 的 `agents/travel/` 负责规划；Java 的 `travel-mcp/` 模拟外部�
 002 标准 MCP 联调与 003 最小工具调用循环均已提交。P2 从 004 登录认证开始，再建立任务上下文和持久化；P3 围绕奖品采买建立上述职责协作。RAG 与出行分别按相应阶段落地。LangGraph 已安装不代表已经实现多 Agent。
 
 参考：[LangChain Subagents](https://docs.langchain.com/oss/python/langchain/multi-agent/subagents)。
+
+## 9. 012 后续执行规则
+
+012 已实现单次购物主从委派，尚未实现本图的规划、补搜、修正与出行子图。后续具体 ReAct 角色、共享轮次/工具预算、停止和恢复策略以[Agent 执行与预算规则](agent-execution-rules.md)及对应编号任务为准；本文的职责关系不表示所有节点已存在。
