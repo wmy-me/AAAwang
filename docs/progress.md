@@ -1,6 +1,6 @@
 # 当前进度
 
-核对日期：2026-11-03。007 从当前 `main` 提交 `94450018eb881e1317b6d651d212331cdd8535b7` 开始执行；以下根据源码、本轮真实 PostgreSQL 17 和自动测试结果记录。
+核对日期：2026-11-03。以下按 001–008 的对应执行报告和最新源码归档；本次审查基线为 `main` 提交 `d2c28f16453b5b832f466f6ff03e5ca0e0401ce0`，未重新运行测试或数据库。
 
 ## 代码现状
 
@@ -76,7 +76,14 @@
 - 独立 Worker 使用 PostgreSQL 行锁、`SKIP LOCKED`、租约、attempt 和 fencing token；诊断 runner 只记录 task/revision 与“尚未运行 Agent 规划”，不调用 LLM、MCP 或写消息。
 - SQLite 聚焦测试 4 项，Python 全量测试 **39 passed**；Ruff、compileall 通过。
 - 真实 PostgreSQL 17 从 006 head 升级、重复升级、`alembic current` 和 `alembic check` 通过；API + 两个独立 Worker 验证幂等、单次领取完成、排队取消、租约过期接管和旧 Worker 迟到写入拒绝。
-- 未验证真实外部服务、网页、LangGraph 或 Agent 规划；008已完成自动SSE验证，真实PostgreSQL事件迁移联调待补做；本轮 `completed` 仅代表无副作用诊断 runner 完成。
+- 007 当轮未验证真实外部服务、网页、LangGraph 或 Agent 规划；008 随后的验证见本页 008 小节。本轮 `completed` 仅代表无副作用诊断 runner 完成。
+
+## 008 已提交结果与验收边界
+
+- Alembic `20261103_0005` 创建 `run_events`，状态转换与事件同事务；提供私有增量补读和 SSE 游标重连。报告记录 Python 全量 **41 passed**、Ruff、编译、锁文件检查通过。
+- [008 报告](reports/008-run-events-sse-report.md)已经记录真实 PostgreSQL 17 从空库升级至 0005、重复升级、`alembic check`、真实 API 的 queued/cancelled 事件与两个独立 Worker 的 007 基础回归。此前根 `CLAUDE.md` 的“008 真实 PostgreSQL 联调仍需补做”与报告矛盾，现以报告为准。
+- 报告也明确：**真实双 Worker 的完整事件序列与无缺失检查尚未单独验收**；旧租约接管、fencing 的事件约束在自动测试中覆盖。用户 ORM 级联删除与 `runs.task_revision_id ON DELETE RESTRICT` 在临时数据清理中发生冲突，不能视为已解决。
+- 新建 [009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md) 为下一步；修复删除链并补齐真实库事件验收后再接 Agent/网页。
 
 ## 每次读取最新 GitHub 时的检查方式
 
@@ -91,12 +98,12 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03，008已在007基础上完成：新增 `run_events` 迁移、状态事件事务、私有补读接口和SSE断线续传，自动测试6项通过。真实PostgreSQL迁移、双Worker与租约接管的008联调尚未重新执行；网页对话和Agent真正执行继续分开实施。
+截至 2026-11-03 已核对最新功能提交 `d2c28f16453b5b832f466f6ff03e5ca0e0401ce0`：008 事件持久化、私有补读与 SSE 已提交。报告记录了真实 PostgreSQL 迁移、部分事件和 Worker 回归，不等于已完成真实双 Worker 的完整事件并发验收；删除用户的 ORM 级联与 run→revision 外键还存在已发现的冲突。下一步执行待实施的 [009 删除链与事件回归](vibe%20coding/009-run-deletion-events-regression.md)，其后再接持久化 run 的 Agent 执行与网页对话。本次未重新运行检查。
 
-[001](vibe%20coding/001-llm-connection.md)至[008 持久化 Run 事件与 SSE](vibe%20coding/008-run-events-sse.md)均已完成；008证据见[报告](reports/008-run-events-sse-report.md)。P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化run、事件与私有SSE；网页对话和Agent接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[008 持久化 Run 事件与 SSE](vibe%20coding/008-run-events-sse.md)均已完成；008证据见[报告](reports/008-run-events-sse-report.md)。P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化 run、事件与私有 SSE；009 修复与验收未实施，网页对话和 Agent 接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 
-在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001–003 与 P2 的 004–006 已完成，私有对话、任务和条件版本隔离已验证；完整 Agent、自动意图路由和 RAG 尚未实现。
+在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001–003 与 P2 的 004–008 已提交，私有对话、任务和条件版本隔离已验证；完整 Agent、自动意图路由和 RAG 尚未实现。
 
-PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–006 均已完成。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。
+PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–008 均已提交，验收边界见各报告。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。

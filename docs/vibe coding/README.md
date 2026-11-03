@@ -37,8 +37,10 @@
 | 005 | [私有对话与消息持久化](005-private-conversations.md) | 已完成；真实 PostgreSQL 双用户隔离、持久化和消息幂等已通过，见[报告](../reports/005-private-conversations-report.md) |
 | 006 | [私有任务与条件版本](006-task-revisions.md) | 已完成；真实 PostgreSQL 任务隔离、不可变快照和并发冲突保护已通过，见[报告](../reports/006-task-revisions-report.md) |
 | 007 | [持久化 Run 与最小 Worker](007-persistent-runs-worker.md) | 已完成；版本绑定、幂等入队、独立 Worker 领取、取消、租约回收与 fencing 已通过真实 PostgreSQL，见[报告](../reports/007-persistent-runs-worker-report.md) |
-| 008 | [持久化 Run 事件与 SSE](008-run-events-sse.md) | 已完成；[报告](../reports/008-run-events-sse-report.md)记录事件事务、私有补读和SSE断线续传 |
+| 008 | [持久化 Run 事件与 SSE](008-run-events-sse.md) | 已完成；[报告](../reports/008-run-events-sse-report.md)记录事件事务、私有补读、SSE 和真实 PostgreSQL 部分联调；完整并发事件与删除链另见 009 |
 
-P1 的 001–003 和 P2 的 004–008 均有实现与报告。网页对话和 Agent 接入仍需后续编号任务。
+| 009 | [Run 删除链修复与事件真实并发回归](009-run-deletion-events-regression.md) | 待执行；修复已发现外键删除冲突，并补齐真实双 Worker 事件验收 |
+
+P1 的 001–003 和 P2 的 004–008 均有实现与报告。009 为下一步；其后接持久化 run 的 Agent 执行与网页对话。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。

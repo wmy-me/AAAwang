@@ -19,7 +19,7 @@
 
 ## 下一步讨论的范围
 
-[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[008 持久化 Run 事件与 SSE](vibe%20coding/008-run-events-sse.md)均已完成。P2 后续分步建立网页对话及 Agent 接入。无需先完成三个 Java 平台的业务后台。
+[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[008 持久化 Run 事件与 SSE](vibe%20coding/008-run-events-sse.md)均已完成。P2 下一步执行 [009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)（待执行）；完成后将现有 DeepSeek/MCP 工具循环接入持久化 run，再分步建立网页对话和更完整的 Agent 协作。无需先完成三个 Java 平台的业务后台。
 
 ## 任务与阶段的关系
 
