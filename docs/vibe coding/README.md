@@ -47,9 +47,9 @@
 | 013 | [网页登录与购物 Agent Run 可视化](013-shopping-web-workbench.md) | 已完成；网页工作台、真实 Worker/MCP completed 结果、刷新恢复、双用户隔离、登出后刷新和独立 SSE 终态补读均通过，见[报告](../reports/013-shopping-web-workbench-report.md) |
 | 014 | [已选购物任务的多轮对话与助手消息持久化](014-shopping-task-chat.md) | 已完成；两轮真实 Worker/DeepSeek/MCP、assistant 消息唯一持久化、幂等、跨账号和浏览器刷新重读均通过，见[报告](../reports/014-shopping-task-chat-report.md) |
 | 015 | [教师奖品采买候选与结构化方案](015-shopping-candidates-and-plan.md) | 已完成；候选快照、服务端复算、版本隔离和网页刷新验收见[报告](../reports/015-shopping-candidates-and-plan-report.md) |
-| 016 | [已选购物任务的方案调整与条件一致性](016-shopping-plan-adjustment.md) | 手动调整与真实外部/浏览器闭环已验收；目标文本与结构化条件冲突提示已由 017 实现，待 017 真实外部闭环补验后整体收口，见[报告](../reports/016-shopping-plan-adjustment-report.md) |
-| 017 | [任务目标与结构化条件一致性](017-task-goal-consistency.md) | 部分完成；目标快照、冲突 409、双入口 Run 前门禁、迁移和浏览器冲突处理已验证；真实 DeepSeek/MCP 新 Run 外部闭环未重跑，见[报告](../reports/017-task-goal-consistency-report.md) |
+| 016 | [已选购物任务的方案调整与条件一致性](016-shopping-plan-adjustment.md) | 已完成；不可变调整、并发/幂等/权限、真实外部/浏览器闭环，以及 017 补齐的目标冲突提示与 Run 前门禁均已验收，见[报告](../reports/016-shopping-plan-adjustment-report.md) |
+| 017 | [任务目标与结构化条件一致性](017-task-goal-consistency.md) | 已完成；目标快照、冲突 409、双入口 Run 前门禁、迁移、浏览器冲突处理与真实 DeepSeek/MCP 新 Run 闭环均通过，见[报告](../reports/017-task-goal-consistency-report.md) |
 
-P1 的 001–003、P2 的 004–014 和 P3 的 015 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁并通过报告所述浏览器验收，真实 DeepSeek/MCP 新 Run 外部闭环待补。
+P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。

@@ -1,6 +1,6 @@
 # 017：任务目标与结构化条件一致性
 
-- 状态：部分完成；服务端、迁移、Run 前门禁与真实浏览器冲突处理已验证，真实 DeepSeek/MCP 新 Run 外部闭环未重跑
+- 状态：已完成；目标快照、冲突 409、双入口门禁、真实浏览器冲突处理与真实 Worker/DeepSeek/MCP 新 Run 闭环均已验收
 - 所属阶段：P3 首条采买闭环收口
 - 基线：`main` / `9dc7fa6d5cc5cd4ada6e23a40e9e8abab0406d32`；开始前核对最新 HEAD
 - 前置：[016 报告](../reports/016-shopping-plan-adjustment-report.md)、[016 任务](016-shopping-plan-adjustment.md)
