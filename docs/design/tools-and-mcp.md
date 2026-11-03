@@ -112,3 +112,10 @@ API、业务服务和工具各司其职，普通页面请求不必经过模型�
 - 涉及个人资源时加入跨用户访问和缓存隔离验证。
 
 官方参考：[MCP 工具规范](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)、[传输规范](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)、[Python SDK](https://github.com/modelcontextprotocol/python-sdk)、[Spring AI MCP Server](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-server-boot-starter-docs.html)。具体版本在实施任务中核对。
+
+## 9. 工具注册与白名单演进规则
+
+- 以服务配置、工具元数据、能力组和 Agent 职责生成本次 Run 的可见工具集合。发现 MCP 工具后先经受信注册策略筛选，模型只能选择集合内的稳定别名；每个实际调用再核验 schema、owner/任务版本、读写权限、预算与超时。
+- 白名单按风险和职责设置：主协调只见授权的委派与交互工具；信息发现只见当前场景需要的只读商品、地图或搜索工具；规划只见候选读取和受控计算校验。任何写操作逐项授权，并由业务服务再次校验。新增 MCP 不能自动对所有 Agent 可见。
+- 注册表允许新增服务和领域适配，无需在 Graph 每条分支硬编码服务 URL、工具名或某一家供应商。服务缺配置、工具未发现、schema 变化或鉴权失败时标记该能力不可用，按任务条件追问或降级；不能用另一个来源伪装该工具的结果。
+- 验收覆盖同名工具跨服务、动态开关服务、未授权工具拒绝、参数与结果边界、调用预算耗尽及现有 Java 模拟 MCP 回归。
