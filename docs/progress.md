@@ -115,7 +115,7 @@
 
 截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证；完整主从 Agent 和网页另拆任务。
 
-[001](vibe%20coding/001-llm-connection.md)至[011 开发数据库与配置收敛](vibe%20coding/011-dev-database-config.md)均已完成；010 的真实外部闭环与中断恢复已验收；P2 的网页对话和完整 Agent 接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[011 开发数据库与配置收敛](vibe%20coding/011-dev-database-config.md)均已完成。下一步执行[012 购物主 Agent 与信息发现 Agent 的最小委派](vibe%20coding/012-shopping-agent-delegation.md)（待执行，尚未实现）；网页对话和完整采买规划仍待后续任务。
 
 ## 2026-11-02 架构讨论归档
 
