@@ -15,6 +15,7 @@ from sqlalchemy import (
     Uuid,
     desc,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -103,6 +104,14 @@ class Message(Base):
             "created_at",
             "id",
         ),
+        Index("ix_messages_task_created_id", "task_id", "created_at", "id"),
+        Index(
+            "uq_messages_assistant_run_id",
+            "run_id",
+            unique=True,
+            postgresql_where=text("role = 'assistant'"),
+            sqlite_where=text("role = 'assistant'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -112,6 +121,12 @@ class Message(Base):
     client_message_id: Mapped[str] = mapped_column(String(128))
     role: Mapped[str] = mapped_column(String(16), default="user")
     content: Mapped[str] = mapped_column(Text)
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -190,6 +205,9 @@ class Run(Base):
     )
     task_revision_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("task_revisions.id", ondelete="CASCADE")
+    )
+    input_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), index=True
     )
     revision: Mapped[int]
     conditions: Mapped[dict[str, object]] = mapped_column(JSON)

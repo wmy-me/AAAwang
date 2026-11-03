@@ -39,6 +39,7 @@ class _ShoppingState(TypedDict, total=False):
     discovery: ToolLoopResult
     answer: str
     source: dict[str, object]
+    supervisor_requests: int
     mcp_call_count: int
 
 
@@ -64,13 +65,45 @@ def _delegate_tool() -> dict[str, Any]:
     }
 
 
+_DECISION_CORRECTION = (
+    "请只返回一个 JSON 对象，不要 Markdown 代码块或额外说明："
+    '{"decision_type":"direct_answer|clarification|delegated_discovery","answer":"..."}。'
+    "如果需要查询商品候选，请改用委派工具调用。"
+)
+
+
+def _extract_json_object(content: str) -> dict[str, Any]:
+    """Parse a JSON object, tolerating code fences, prose, or trailing noise."""
+    text = content.strip()
+    candidates = [text]
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 3 and lines[-1].strip().startswith("```"):
+            candidates.append("\n".join(lines[1:-1]))
+    for candidate in candidates:
+        try:
+            value = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    raise LLMRequestError("主 Agent 返回的决策不是有效 JSON。")
+
+
 def _parse_decision(content: str | None) -> tuple[str, str]:
     if not content or not content.strip():
         raise LLMRequestError("主 Agent 返回空响应。")
-    try:
-        value = json.loads(content)
-    except json.JSONDecodeError as exc:
-        raise LLMRequestError("主 Agent 返回的决策不是有效 JSON。") from exc
+    value = _extract_json_object(content)
     decision = value.get("decision_type")
     answer = value.get("answer")
     if decision not in DECISIONS or not isinstance(answer, str) or not answer.strip():
@@ -106,24 +139,9 @@ def _supervisor_messages(goal: str, conditions: Mapping[str, object]) -> list[di
     ]
 
 
-async def _supervisor_decide(
-    settings: Settings,
-    goal: str,
-    conditions: dict[str, object],
-    model_client: AsyncOpenAI | None,
+def _decision_from_message(
+    message: Any,
 ) -> tuple[str, str, dict[str, object] | None]:
-    async with open_deepseek_client(settings, model_client) as client:
-        response = await create_deepseek_completion(
-            settings,
-            client,
-            messages=_supervisor_messages(goal, conditions),
-            tools=[_delegate_tool()],
-            tool_choice="auto",
-            max_tokens=256,
-        )
-    if not response.choices:
-        raise LLMRequestError("主 Agent 返回空响应。")
-    message = response.choices[0].message
     calls = list(message.tool_calls or [])
     if len(calls) > 1:
         raise LLMRequestError("主 Agent 返回多个委派，超过一次委派上限。")
@@ -143,6 +161,53 @@ async def _supervisor_decide(
         return "delegated_discovery", "", {"keyword": request["keyword"], "limit": limit}
     decision, answer = _parse_decision(message.content)
     return decision, answer, None
+
+
+async def _supervisor_decide(
+    settings: Settings,
+    goal: str,
+    conditions: dict[str, object],
+    model_client: AsyncOpenAI | None,
+) -> tuple[str, str, dict[str, object] | None, int]:
+    """Decide once; retry the JSON contract at most once when formatting fails."""
+    messages = _supervisor_messages(goal, conditions)
+    tools = [_delegate_tool()]
+    async with open_deepseek_client(settings, model_client) as client:
+        response = await create_deepseek_completion(
+            settings,
+            client,
+            messages=messages,
+            tools=tools,
+            tool_choice="auto",
+            max_tokens=256,
+        )
+        if not response.choices:
+            raise LLMRequestError("主 Agent 返回空响应。")
+        message = response.choices[0].message
+        if message.tool_calls:
+            decision, answer, request = _decision_from_message(message)
+            return decision, answer, request, 1
+        try:
+            decision, answer = _parse_decision(message.content)
+            return decision, answer, None, 1
+        except LLMRequestError:
+            retry_messages = [
+                *messages,
+                {"role": "assistant", "content": message.content or ""},
+                {"role": "user", "content": _DECISION_CORRECTION},
+            ]
+            retry = await create_deepseek_completion(
+                settings,
+                client,
+                messages=retry_messages,
+                tools=tools,
+                tool_choice="auto",
+                max_tokens=256,
+            )
+    if not retry.choices:
+        raise LLMRequestError("主 Agent 纠正后仍返回空响应。")
+    decision, answer, request = _decision_from_message(retry.choices[0].message)
+    return decision, answer, request, 2
 
 
 async def _summarize_discovery(
@@ -184,7 +249,7 @@ def _build_graph(
     mcp_client: McpClient | Any | None,
 ):
     async def supervisor(state: _ShoppingState) -> dict[str, object]:
-        decision, answer, request = await _supervisor_decide(
+        decision, answer, request, requests = await _supervisor_decide(
             settings, state["goal"], state["conditions"], model_client
         )
         return {
@@ -192,6 +257,7 @@ def _build_graph(
             "delegated": decision == "delegated_discovery",
             "answer": answer,
             "discovery_request": request or {},
+            "supervisor_requests": requests,
         }
 
     async def discovery(state: _ShoppingState) -> dict[str, object]:
@@ -213,8 +279,15 @@ def _build_graph(
         return {"discovery": result, "mcp_call_count": result.tool_calls}
 
     async def finalize(state: _ShoppingState) -> dict[str, object]:
+        supervisor_requests = int(state.get("supervisor_requests", 1))
         if state["decision_type"] != "delegated_discovery":
-            return {"source": {"simulated": False}, "mcp_call_count": 0}
+            return {
+                "source": {
+                    "simulated": False,
+                    "model_requests": supervisor_requests,
+                },
+                "mcp_call_count": 0,
+            }
         discovery_result = cast(ToolLoopResult, state["discovery"])
         answer = await _summarize_discovery(
             settings, state["goal"], discovery_result, model_client
@@ -226,7 +299,9 @@ def _build_graph(
                 "tool": discovery_result.called_tool,
                 "simulated": True,
                 "tool_result": _bounded_json(discovery_result.tool_result),
-                "model_requests": discovery_result.model_requests + 2,
+                "model_requests": (
+                    supervisor_requests + discovery_result.model_requests + 1
+                ),
                 "tool_calls": discovery_result.tool_calls,
             },
         }

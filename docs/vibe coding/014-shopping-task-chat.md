@@ -1,6 +1,6 @@
 # 014：已选购物任务的多轮对话与助手消息持久化
 
-- 状态：待执行；本文件只定义下一步，不表示代码和真实联调已完成
+- 状态：已完成；两轮真实 Worker/DeepSeek/MCP/浏览器闭环、assistant 消息唯一持久化、幂等与刷新重读均已验收
 - 所属阶段：P2 → P3 过渡；在 013 购物工作台上补真实消息→任务→Run→回复链路
 - 起始分支与代码提交：`main` / `ba69c6e7180c700333d9fd6ea15d1a614796f8b3`；执行前核对最新 HEAD
 - 前置：[013 网页工作台报告](../reports/013-shopping-web-workbench-report.md)、[012 主从委派报告](../reports/012-shopping-agent-delegation-report.md)

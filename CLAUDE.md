@@ -6,9 +6,9 @@
 
 ## 当前执行边界
 
-- 依据用户指定的编号任务执行；001–013 已完成，010 的真实购物闭环与中断恢复、011 的数据库配置收敛、012 的最小主从委派端到端、013 的网页工作台与登出/SSE 均已验收；外部调用不承诺 exactly-once。不自动实施完整 Agent 或采买业务。
-- 后端已有健康、认证、私有对话、手工消息、私有任务、条件版本、持久化 run、Run 事件与私有 SSE、最小 Worker 及 `shopping_agent` 决策结果接口。商品、投稿和订单接口留待后续编号任务。
-- 网页已提供登录/注册、私有对话、任务条件、`shopping_agent` Run、取消、SSE 状态和受限结果工作台；不要新增自然语言伪聊天、管理后台、商品卡片或模拟业务列表。
+- 依据用户指定的编号任务执行；001–014 已完成，010 的真实购物闭环与中断恢复、011 的数据库配置收敛、012 的最小主从委派端到端、013 的网页工作台与登出/SSE、014 的已选任务两轮对话与 assistant 消息持久化均已验收；外部调用不承诺 exactly-once。不自动实施完整 Agent 或采买业务。
+- 后端已有健康、认证、私有对话、手工消息、私有任务、条件版本、持久化 run、Run 事件与私有 SSE、最小 Worker、`shopping_agent` 决策结果接口及已选购物任务回合接口。商品卡片、投稿和订单接口留待后续编号任务。
+- 网页已提供登录/注册、私有对话、任务条件、`shopping_agent` Run、取消、SSE 状态、受限结果工作台和已选任务对话面板；不要新增自动跨任务意图路由、管理后台、商品卡片或模拟业务列表。
 - shopping-mcp 已提供标准 Streamable HTTP `/mcp`、`search_products` 只读模拟工具与 `/actuator/health`；travel-mcp、local-life-mcp 仍为健康检查骨架。不建设业务后台。
 - 003 已复用 002 的模拟商品完成真实模型工具调用联调并保留来源标记；该有限执行器不是完整 Agent 或业务对话。
 - 健康检查只代表进程可响应，**不代表数据库或 MCP 已接通，也不是 LLM 验证证据**。
@@ -45,7 +45,7 @@
 - `backend/src/life_agent/core/`：应用配置。
 - `backend/src/life_agent/agents/`：未来主协调、信息发现、采买规划、出行子图；当前仅 README 和空的 `__init__.py`。
 - `backend/src/life_agent/tools/`：已有通用 MCP 客户端；地图、搜索、知识检索仍为预留。
-- `backend/src/life_agent/modules/`：已有认证、私有对话、任务版本与 run 模块；其他业务模块待后续任务。
+- `backend/src/life_agent/modules/`：已有认证、私有对话、任务版本、run 与已选任务对话模块；其他业务模块待后续任务。
 - `backend/src/life_agent/db/`：已有用户、登录会话、私有对话、消息、任务、条件版本与 run 模型及请求级会话；`worker/` 已有最小诊断 runner。
 - `web/src/api/health.ts`：唯一的前端请求封装。
 - `web/src/components/`、`features/`：预留目录。

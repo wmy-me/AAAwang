@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from life_agent.db.models import (
     Conversation,
+    Message,
     Run,
     RunEvent,
     ShoppingRunResult,
@@ -49,6 +50,7 @@ class RunClaim:
     revision: int
     conditions: dict[str, object]
     goal: str
+    input_message: str | None
     execution_type: str
     worker_id: str
     fencing_token: int
@@ -92,6 +94,8 @@ def create_run(
     expected_revision: int,
     idempotency_key: str,
     execution_type: str = "diagnostic",
+    input_message_id: uuid.UUID | None = None,
+    commit: bool = True,
 ) -> Run:
     task = db.scalar(
         select(Task)
@@ -133,6 +137,7 @@ def create_run(
         revision=snapshot.revision,
         conditions=dict(snapshot.conditions),
         idempotency_key=idempotency_key,
+        input_message_id=input_message_id,
         execution_type=execution_type,
         status="queued",
         attempt=0,
@@ -142,8 +147,9 @@ def create_run(
     db.add(run)
     db.flush()
     _append_event(db, run, "run.queued", datetime.now(UTC))
-    db.commit()
-    db.refresh(run)
+    if commit:
+        db.commit()
+        db.refresh(run)
     return run
 
 
@@ -211,6 +217,12 @@ def claim_run(
         _append_event(db, run, "run.cancelled", now)
         db.commit()
         return None
+    goal = run.task.goal
+    input_message = (
+        db.scalar(select(Message.content).where(Message.id == run.input_message_id))
+        if run.input_message_id is not None
+        else None
+    )
     run.status = "running"
     run.worker_id = worker_id
     run.lease_until = now + timedelta(seconds=lease_seconds)
@@ -225,7 +237,8 @@ def claim_run(
         task_revision_id=run.task_revision_id,
         revision=run.revision,
         conditions=dict(run.conditions),
-        goal=run.task.goal,
+        goal=goal,
+        input_message=input_message,
         execution_type=run.execution_type,
         worker_id=worker_id,
         fencing_token=run.fencing_token,
@@ -268,6 +281,21 @@ def _finish_claim(
                 mcp_call_count=int(shopping_result.get("mcp_call_count", 0)),
             )
         )
+        if run.input_message_id is not None:
+            input_message = db.scalar(
+                select(Message).where(Message.id == run.input_message_id)
+            )
+            if input_message is not None:
+                db.add(
+                    Message(
+                        conversation_id=input_message.conversation_id,
+                        client_message_id=f"assistant:{run.id}",
+                        role="assistant",
+                        content=str(shopping_result["answer"]),
+                        task_id=run.task_id,
+                        run_id=run.id,
+                    )
+                )
     _append_event(db, run, f"run.{status}", now)
     db.commit()
     return True

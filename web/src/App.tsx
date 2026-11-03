@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ApiError, api, detailMessage, isAuthError, type Conditions, type Conversation, type Run, type RunResult, type Task, type User } from './api/workbench'
+import { ApiError, api, detailMessage, isAuthError, type Conditions, type Conversation, type Message, type Run, type RunResult, type Task, type User } from './api/workbench'
 import './App.css'
 
 type AuthMode = 'login' | 'register'
@@ -17,6 +17,9 @@ function App() {
   const [runs, setRuns] = useState<Run[]>([])
   const [selectedRunId, setSelectedRunId] = useState('')
   const [result, setResult] = useState<RunResult | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [turnSubmitting, setTurnSubmitting] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [showTaskForm, setShowTaskForm] = useState(false)
@@ -53,9 +56,14 @@ function App() {
     }).catch(handleError)
   }, [task])
 
+  useEffect(() => {
+    if (!task) { setMessages([]); return }
+    void refreshTaskMessages(task.conversation_id, task.id)
+  }, [task])
+
   function handleError(value: unknown) {
     if (isAuthError(value)) {
-      setUser(null); setConversations([]); setTasks([]); setTask(null); setRuns([]); setResult(null)
+      setUser(null); setConversations([]); setTasks([]); setTask(null); setRuns([]); setResult(null); setMessages([])
       setError('登录状态已失效，请重新登录。')
       return
     }
@@ -87,7 +95,7 @@ function App() {
 
   async function handleLogout() {
     try { await api.logout() } catch { /* clear private UI even if server is unavailable */ }
-    stopWatcher.current?.(); setUser(null); setConversations([]); setTasks([]); setTask(null); setRuns([]); setResult(null); setConversationId(''); setNotice('已退出当前账号。')
+    stopWatcher.current?.(); setUser(null); setConversations([]); setTasks([]); setTask(null); setRuns([]); setResult(null); setMessages([]); setConversationId(''); setNotice('已退出当前账号。')
   }
 
   async function createConversation() {
@@ -99,7 +107,7 @@ function App() {
   async function createTask(goal: string, conditions: Conditions) {
     if (!conversationId) return
     setBusy(true)
-    try { const created = await api.createTask(conversationId, goal, conditions); setTasks((items) => [created, ...items]); setTask(created); setShowTaskForm(false); setRuns([]); setResult(null); setNotice('任务已保存，可以开始一次 Agent Run。') }
+    try { const created = await api.createTask(conversationId, goal, conditions); setTasks((items) => [created, ...items]); setTask(created); setShowTaskForm(false); setRuns([]); setResult(null); setMessages([]); setNotice('任务已保存，可以开始一次 Agent Run。') }
     catch (value) { handleError(value) } finally { setBusy(false) }
   }
 
@@ -124,6 +132,30 @@ function App() {
     } finally { runSubmitting.current = false; setBusy(false) }
   }
 
+  async function refreshTaskMessages(conversation: string, taskId: string) {
+    try {
+      const page = await api.messages(conversation)
+      setMessages(page.items.filter((message) => message.task_id === taskId))
+    } catch (value) { handleError(value) }
+  }
+
+  async function submitChatTurn() {
+    const content = chatInput.trim()
+    if (!task || !conversationId || !content || turnSubmitting) return
+    setTurnSubmitting(true); setError('')
+    try {
+      const turn = await api.submitTurn(conversationId, task.id, crypto.randomUUID(), content, task.current_revision)
+      setChatInput('')
+      setMessages((items) => [...items.filter((item) => item.id !== turn.message.id), turn.message, ...(turn.assistant_message ? [turn.assistant_message] : [])])
+      setTask(turn.task); setRuns((items) => [turn.run, ...items.filter((item) => item.id !== turn.run.id)]); selectRun(turn.run)
+      setNotice('本轮消息已保存，Run 正在处理。')
+    } catch (value) {
+      if (value instanceof ApiError && value.status === 409 && task) {
+        const fresh = await api.getTask(task.id); setTask(fresh); setNotice('任务版本已变化，已刷新最新条件；请重新发送本轮消息。')
+      } else handleError(value)
+    } finally { setTurnSubmitting(false) }
+  }
+
   function selectRun(run: Run) {
     selectedRunIdRef.current = run.id
     stopWatcher.current?.()
@@ -133,7 +165,7 @@ function App() {
   }
 
   async function loadResult(runId: string) {
-    try { setResult(await api.result(runId)) }
+    try { setResult(await api.result(runId)); if (task) void refreshTaskMessages(task.conversation_id, task.id) }
     catch (value) { if (!(value instanceof ApiError && value.status === 404)) handleError(value) }
   }
 
@@ -183,14 +215,16 @@ function App() {
     <header className="topbar"><div className="brand"><span className="brand-mark">采</span><span>生活采买 <small>WORKBENCH</small></span></div><div className="topbar-actions"><span className="identity">{user.username}</span><button className="button button-quiet" onClick={handleLogout}>退出</button></div></header>
     <div className="workspace">
       <aside className="sidebar"><div className="sidebar-heading"><div><span className="eyebrow">PRIVATE SPACE</span><h2>我的对话</h2></div><button className="icon-button" onClick={createConversation} disabled={busy} aria-label="新建对话">＋</button></div><div className="conversation-list">{conversations.map((conversation) => <button className={`conversation-item ${conversation.id === conversationId ? 'is-selected' : ''}`} key={conversation.id} onClick={() => { setConversationId(conversation.id); setTask(null); setResult(null) }}><span className="conversation-dot" /><span>{conversation.title || '未命名对话'}</span></button>)}{!conversations.length && <div className="empty-sidebar">还没有对话。<br />从右上角创建一个新的购物空间。</div>}</div><div className="sidebar-foot"><span className="status-led" />数据只来自当前账号</div></aside>
-      <section className="content"><div className="content-head"><div><span className="eyebrow">SHOPPING AGENT / 013</span><h1>把一次采购，<em>说清楚。</em></h1><p className="intro">先固定目标和条件，再让 Agent 在当前版本上执行一次可追溯的查询。</p></div><div className="head-note"><span>当前用户</span><strong>{user.username}</strong></div></div>
+      <section className="content"><div className="content-head"><div><span className="eyebrow">SHOPPING AGENT / 014</span><h1>把一次采购，<em>说清楚。</em></h1><p className="intro">先固定目标和条件，再让 Agent 在当前版本上执行一次可追溯的查询。</p></div><div className="head-note"><span>当前用户</span><strong>{user.username}</strong></div></div>
         {error && <div className="alert alert-error" role="alert">{error}<button onClick={() => setError('')} aria-label="关闭错误">×</button></div>}{notice && <div className="alert alert-note" role="status">{notice}<button onClick={() => setNotice('')} aria-label="关闭提示">×</button></div>}
         {!conversationId ? <EmptyWorkspace onCreate={createConversation} disabled={busy} /> : <><section className="task-section"><div className="section-bar"><div><span className="eyebrow">01 / TASK BRIEF</span><h2>购物任务</h2></div>{task && <span className="revision-chip">REV {task.current_revision}</span>}</div>{!task && !showTaskForm && <div className="empty-panel"><div className="empty-icon">＋</div><div><h3>先建立一个明确的目标</h3><p>例如：为两个人买一盒彩色铅笔，预算不超过 15 元。</p></div><button className="button button-primary" onClick={() => setShowTaskForm(true)}>创建任务</button></div>}{showTaskForm && <TaskForm busy={busy} onCancel={() => setShowTaskForm(false)} onSubmit={createTask} />}{task && <TaskCard task={task} busy={busy} onUpdate={updateConditions} onRun={createRun} />}</section>{task && <section className="run-section"><div className="section-bar"><div><span className="eyebrow">02 / RUN HISTORY</span><h2>执行记录</h2></div><span className="section-meta">{runs.length} 次运行</span></div>{runs.length ? <div className="run-layout"><div className="run-list">{runs.map((run) => <button key={run.id} className={`run-item ${run.id === selectedRun?.id ? 'is-selected' : ''}`} onClick={() => selectRun(run)}><span className={`run-status-dot run-status-${run.status}`} /><span className="run-main"><strong>Shopping Agent</strong><small>第 {run.revision} 版 · {formatDate(run.created_at)}</small></span><span className={`status-label status-${run.status}`}>{statusText(run.status)}</span></button>)}</div><RunDetail run={selectedRun} result={result} onCancel={async () => { if (!selectedRun) return; try { const updated = await api.cancelRun(selectedRun.id); setRuns((items) => items.map((item) => item.id === updated.id ? updated : item)); setNotice('已发送取消请求。') } catch (value) { handleError(value) } }} /></div> : <div className="run-empty">还没有运行记录。确认任务条件后，点击“运行 Agent”。</div>}</section>}</>}
-        <footer className="page-foot"><span>本工作台不自动识别自然语言意图，也不代表真实下单。</span><span>条件、Run 与结果均由服务端保存。</span></footer>
+        {task && <TaskChat messages={messages} input={chatInput} busy={turnSubmitting} onInput={setChatInput} onSubmit={submitChatTurn} />}<footer className="page-foot"><span>本工作台不自动识别自然语言意图，也不代表真实下单。</span><span>条件、Run 与结果均由服务端保存。</span></footer>
       </section>
     </div>
   </main>
 }
+
+function TaskChat({ messages, input, busy, onInput, onSubmit }: { messages: Message[]; input: string; busy: boolean; onInput: (value: string) => void; onSubmit: () => void }) { return <section className="chat-section"><div className="section-bar"><div><span className="eyebrow">02 / TASK CHAT</span><h2>继续补充条件</h2></div><span className="section-meta">消息会绑定当前任务</span></div><div className="chat-history">{messages.length ? messages.map((message) => <div className={`chat-message chat-${message.role}`} key={message.id}><span>{message.role === 'assistant' ? '助手' : '你'}</span><p>{message.content}</p></div>) : <div className="chat-empty">告诉助手还缺什么条件，例如“25 人”。</div>}</div><form className="chat-composer" onSubmit={(event) => { event.preventDefault(); onSubmit() }}><input value={input} onChange={(event) => onInput(event.target.value)} placeholder="补充人数、预算、数量或物品" maxLength={2000} disabled={busy} /><button type="button" className="button button-primary" onClick={onSubmit} disabled={busy || !input.trim()}>{busy ? '发送中…' : '发送'}</button></form></section> }
 
 function AuthScreen({ mode, busy, error, onModeChange, onSubmit }: { mode: AuthMode; busy: boolean; error: string; onModeChange: (mode: AuthMode) => void; onSubmit: (username: string, password: string) => void }) { const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); return <main className="auth-screen"><div className="auth-aside"><span className="brand-mark">采</span><span className="eyebrow">LIFE BUY / 013</span><h1>从一个明确的<br /><em>目标</em>开始。</h1><p>把购物目标、条件和每次 Agent Run 留在同一个可信空间里。</p><div className="signal-list"><span><i />服务端会话</span><span><i />版本化条件</span><span><i />可追溯结果</span></div></div><form className="auth-card" onSubmit={(event) => { event.preventDefault(); onSubmit(username, password) }}><span className="eyebrow">{mode === 'login' ? 'WELCOME BACK' : 'NEW WORKSPACE'}</span><h2>{mode === 'login' ? '登录工作台' : '创建账号'}</h2><p>{mode === 'login' ? '继续你的私有购物任务。' : '创建一个仅属于你的采购空间。'}</p><label>用户名<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required minLength={3} maxLength={64} /></label><label>密码<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={12} maxLength={128} /></label>{error && <div className="form-error" role="alert">{error}</div>}<button className="button button-primary auth-submit" disabled={busy}>{busy ? '处理中…' : mode === 'login' ? '进入工作台' : '创建并登录'}</button><button type="button" className="switch-auth" onClick={() => onModeChange(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? '还没有账号？创建一个' : '已有账号？返回登录'}</button></form></main> }
 

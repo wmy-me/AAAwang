@@ -62,6 +62,8 @@ class MessageResponse(BaseModel):
     client_message_id: str
     role: str
     content: str
+    task_id: uuid.UUID | None = None
+    run_id: uuid.UUID | None = None
     created_at: datetime
 
 

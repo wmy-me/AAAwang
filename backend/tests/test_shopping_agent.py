@@ -12,6 +12,7 @@ from pydantic import SecretStr
 
 from life_agent.agents.shopping import run_shopping_agent
 from life_agent.core.config import Settings
+from life_agent.core.llm import LLMRequestError
 from life_agent.core.llm.tool_loop import _model_tool_name
 from life_agent.tools.mcp import DiscoveredTool, McpCallResult
 
@@ -110,6 +111,60 @@ def test_clarification_does_not_delegate_or_call_mcp() -> None:
     )
     assert result.decision_type == "clarification"
     assert result.mcp_call_count == 0
+    assert connection.calls == []
+
+
+def test_fenced_json_decision_is_accepted_without_retry() -> None:
+    content = '```json\n{"decision_type":"direct_answer","answer":"可以直接回答。"}\n```'
+    supervisor = FakeModel([message(content)])
+    result = asyncio.run(
+        run_shopping_agent(settings(), "什么是预算", {}, model_client=supervisor)
+    )
+    assert result.decision_type == "direct_answer"
+    assert len(supervisor.completions.requests) == 1
+    assert result.source["model_requests"] == 1
+
+
+def test_json_with_trailing_noise_is_accepted_without_retry() -> None:
+    content = '{"decision_type":"clarification","answer":"请补充预算。"}"}'
+    supervisor = FakeModel([message(content)])
+    result = asyncio.run(
+        run_shopping_agent(settings(), "买奖品", {}, model_client=supervisor)
+    )
+    assert result.decision_type == "clarification"
+    assert result.answer == "请补充预算。"
+    assert len(supervisor.completions.requests) == 1
+
+
+def test_plain_text_is_corrected_with_one_bounded_retry() -> None:
+    supervisor = FakeModel(
+        [
+            message("我需要先确认预算和人数。"),
+            message(json.dumps({"decision_type": "clarification", "answer": "请补充预算和人数。"})),
+        ]
+    )
+    result = asyncio.run(
+        run_shopping_agent(settings(), "买奖品", {}, model_client=supervisor)
+    )
+    assert result.decision_type == "clarification"
+    assert result.delegated is False
+    assert len(supervisor.completions.requests) == 2
+    assert result.source["model_requests"] == 2
+
+
+def test_two_unstructured_replies_fail_safely_without_touching_mcp() -> None:
+    supervisor = FakeModel([message("纯文本一"), message("纯文本二")])
+    connection = FakeConnection()
+    try:
+        asyncio.run(
+            run_shopping_agent(
+                settings(), "买奖品", {}, model_client=supervisor, mcp_client=FakeMcp(connection)
+            )
+        )
+    except LLMRequestError as exc:
+        assert "决策" in str(exc)
+    else:
+        raise AssertionError("expected LLMRequestError")
     assert connection.calls == []
 
 

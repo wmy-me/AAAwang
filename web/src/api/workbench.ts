@@ -70,6 +70,24 @@ export interface RunResult {
   mcp_call_count: number
 }
 
+export interface Message {
+  id: string
+  conversation_id: string
+  client_message_id: string
+  role: 'user' | 'assistant'
+  content: string
+  task_id: string | null
+  run_id: string | null
+  created_at: string
+}
+
+export interface ChatTurnResponse {
+  message: Message
+  run: Run
+  task: Task
+  assistant_message: Message | null
+}
+
 interface Page<T> {
   items: T[]
 }
@@ -119,6 +137,8 @@ export const api = {
     request<Conversation>('/conversations', json({ title })),
   tasks: (conversationId: string) =>
     request<Page<Task>>(`/conversations/${conversationId}/tasks?limit=100`),
+  messages: (conversationId: string) =>
+    request<Page<Message>>(`/conversations/${conversationId}/messages?limit=100`),
   createTask: (conversationId: string, goal: string, conditions: Conditions) =>
     request<Task>(
       `/conversations/${conversationId}/tasks`,
@@ -144,6 +164,17 @@ export const api = {
   getRun: (runId: string) => request<Run>(`/runs/${runId}`),
   cancelRun: (runId: string) => request<Run>(`/runs/${runId}/cancel`, { method: 'POST' }),
   result: (runId: string) => request<RunResult>(`/runs/${runId}/result`),
+  submitTurn: (
+    conversationId: string,
+    taskId: string,
+    clientTurnId: string,
+    content: string,
+    expectedRevision: number,
+  ) =>
+    request<ChatTurnResponse>(
+      `/conversations/${conversationId}/tasks/${taskId}/turns`,
+      json({ client_turn_id: clientTurnId, content, task_id: taskId, expected_revision: expectedRevision }),
+    ),
 }
 
 export function detailMessage(error: unknown, fallback = '请求没有完成，请稍后再试。') {

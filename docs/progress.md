@@ -1,18 +1,18 @@
 # 当前进度
 
-核对日期：2026-11-03。以下按 001–013 的对应执行报告和最新源码归档；本次规划基线为 `main` 提交 `ba69c6e7180c700333d9fd6ea15d1a614796f8b3`，本轮未重新运行测试或用户本地数据库。
+核对日期：2026-11-03。以下按 001–014 的对应执行报告和最新源码归档；013 的规划基线为 `main` 提交 `ba69c6e7180c700333d9fd6ea15d1a614796f8b3`，014 在其后的工作区变更上完成并已在真实 PostgreSQL、真实 Worker/DeepSeek/MCP 和浏览器中重新验收。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 提供健康、认证、私有对话、用户消息、私有任务、条件版本与持久化 run API；已有服务端会话、DeepSeek、通用 MCP、有限工具循环和独立 Worker；LangGraph 已有最小 `shopping_agent` 主从委派图，无检查点或完整多 Agent |
-| 网页 | 已有网页登录、私有购物任务、版本化条件、shopping_agent Run、SSE状态和结果工作台；013 的登出后刷新和独立 SSE 终态补读已验收 |
+| Python | 提供健康、认证、私有对话、用户消息、私有任务、条件版本、持久化 run 与已选任务对话回合 API；已有服务端会话、DeepSeek、通用 MCP、有限工具循环和独立 Worker；成功 Run 写入唯一 assistant 消息；LangGraph 已有最小 `shopping_agent` 主从委派图，无检查点或完整多 Agent |
+| 网页 | 已有网页登录、私有购物任务、版本化条件、shopping_agent Run、SSE状态、结果工作台和任务对话面板；013 的登出刷新、独立 SSE 与 014 的两轮消息刷新重读已验收 |
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | PostgreSQL 17 Compose；Python 认证模块通过 SQLAlchemy/psycopg 连接，Alembic 管理迁移 |
 | Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；已有最小 LangGraph `shopping_agent` 主从委派图；仍无完整多 Agent、自动意图路由或长期记忆 |
-| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务、条件版本、版本绑定 run、持久化 Run 事件、私有 SSE 和 shopping_agent 决策结果；尚无方案、投稿、知识库、实际出行规划或交易实现 |
+| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务、条件版本、版本绑定 run、持久化 Run 事件、私有 SSE、shopping_agent 决策结果和已选任务两轮对话/assistant 回复；尚无方案、投稿、知识库、实际出行规划或交易实现 |
 | Android | 只有说明文件 |
 
 ## 完成证据与限制
@@ -115,6 +115,14 @@
 - 独立 HTTP 客户端补读 completed Run 的 SSE：`after=0` 返回 queued/running/completed，`after=2` 仅终态，`after=3` 空流关闭；JSON 事件补读一致。
 - 测试账号、对话、任务和两个 Run 按报告保留；一次性服务端会话已删除；数据库卷未删除；API、Vite、Chrome 和 shopping-mcp 已停止。
 
+## 014 已选购物任务多轮对话
+
+- 新增 `POST /api/conversations/{conversation_id}/tasks/{task_id}/turns`、0009 消息/Run 关联迁移和 0010 assistant 部分唯一索引；网页增加任务对话面板。
+- 真实两轮链路通过：第 1 轮追问生成 assistant 消息；第 2 轮“25 人，预算 200 元，买彩色铅笔”生成新 revision 和 Run，独立 Worker 经真实 DeepSeek 委派 real shopping-mcp 1 次并 completed，assistant 消息与结果一致。
+- 幂等同键重试返回原 Run/assistant，同键异内容 409；第二账号读取任务、Run、消息、结果均为 404；浏览器刷新后 4 条消息、REV 3 和两个 completed Run 与刷新前一致。
+- 模型决策解析增加容错和一次有界纠正重试，Worker 失败摘要保留真实 LLM 错误；0010 已完成降级/重升级，`alembic check` 无新增操作。Python `51 passed`，前端 lint/build 通过。
+- 本轮隔离测试账号已删除，013 保留账号与数据库卷未删除；详见 [014 报告](reports/014-shopping-task-chat-report.md)。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -128,9 +136,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证。012 已完成主从 Agent 代码、0008 迁移、真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读。013 已完成网页认证、私有对话/任务、Run 排队、SSE 状态展示、真实 Worker/MCP 结果、双用户隔离、登出后刷新和独立 SSE 终态补读。
+截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证。012 已完成主从 Agent 代码、0008 迁移、真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读。013 已完成网页认证、私有对话/任务、Run 排队、SSE 状态展示、真实 Worker/MCP 结果、双用户隔离、登出后刷新和独立 SSE 终态补读。014 已完成已选购物任务的两轮对话、条件修订、assistant 消息唯一持久化、真实 Worker/DeepSeek/MCP 执行、幂等、跨账号隔离和浏览器刷新重读。
 
-[001](vibe%20coding/001-llm-connection.md)至[013 网页登录与购物 Agent Run 可视化](vibe%20coding/013-shopping-web-workbench.md)均已完成；013 的登出刷新和独立 SSE 已验收（自动 EventSource 断线重连未作为单独浏览器验收），报告保留了隔离测试账号/两个 Run。下一步[014 已选购物任务的多轮对话与助手消息持久化](vibe%20coding/014-shopping-task-chat.md)待执行；完整采买规划仍未实现。
+[001](vibe%20coding/001-llm-connection.md)至[014 已选购物任务的多轮对话与助手消息持久化](vibe%20coding/014-shopping-task-chat.md)均已完成；013 的登出刷新、独立 SSE 和 014 的两轮真实闭环均有报告证据。完整采买规划、候选/方案表与金额复算仍未实现，下一步需另拆编号任务。
 
 ## 2026-11-02 架构讨论归档
 

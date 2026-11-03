@@ -68,6 +68,8 @@ uv run python -m life_agent.worker.runner
 
 Worker 通过 PostgreSQL 行锁和 `SKIP LOCKED` 领取 run，使用租约、后台续租和 fencing token 防止慢模型期间重复执行或旧进程覆盖新持有者；`--once` 适合单次验收。默认租约为 30 秒、轮询为 1 秒、最多 3 次尝试，可用 `RUN_WORKER_LEASE_SECONDS`、`RUN_WORKER_POLL_SECONDS` 和 `RUN_WORKER_MAX_ATTEMPTS` 调整。诊断Run仍无副作用；明确创建 `shopping_research` 的购物Run才会调用 DeepSeek 和受信 shopping-mcp。外部调用不承诺 exactly-once，调用历史不确定时用新幂等键人工重试。结果通过 `GET /api/runs/{run_id}/result` 读取。契约见 `contracts/rest/runs.md`。
 
+已选 shopping task 的多轮入口为 `POST /api/conversations/{conversation_id}/tasks/{task_id}/turns`，请求使用 `client_turn_id` 和 `expected_revision`。服务端按需创建新 revision、写用户消息并排队 `shopping_agent` Run；completed Run 至多写入一条绑定该 Run 的 assistant 消息。`messages.run_id` 只对 assistant 行做部分唯一约束（0010），因此同一 Run 同时关联一条用户消息和一条 assistant 消息。契约见 `contracts/rest/conversations.md`。
+
 购物Run本地联调需要同时启动 PostgreSQL、shopping-mcp、API和Worker：
 
 ```bash

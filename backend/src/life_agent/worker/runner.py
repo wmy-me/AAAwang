@@ -10,7 +10,7 @@ import time
 import uuid
 
 from life_agent.core.config import get_settings
-from life_agent.core.llm import ToolLoopError, run_tool_loop
+from life_agent.core.llm import LLMRequestError, ToolLoopError, run_tool_loop
 from life_agent.db.session import get_session_factory
 from life_agent.modules.runs.service import (
     cancel_claim,
@@ -129,7 +129,10 @@ def _run_shopping_agent_with_lease(settings, claim):
     heartbeat = threading.Thread(target=renew, name="run-lease-renewal", daemon=True)
     heartbeat.start()
     try:
-        result = asyncio.run(run_shopping_agent(settings, claim.goal, claim.conditions))
+        goal = claim.goal
+        if claim.input_message:
+            goal = f"{goal}\n本轮用户消息：{claim.input_message}"
+        result = asyncio.run(run_shopping_agent(settings, goal, claim.conditions))
         if lease_lost.is_set():
             raise ToolLoopError("购物Agent执行租约丢失，结果不会提交；请创建新的 run 重试。")
         return result
@@ -183,7 +186,7 @@ def _bounded_json(value: object) -> object:
 
 
 def _safe_error(error: Exception) -> str:
-    if isinstance(error, ToolLoopError):
+    if isinstance(error, (ToolLoopError, LLMRequestError)):
         return str(error)[:500]
     return "shopping execution failed; external call history may be uncertain"
 
