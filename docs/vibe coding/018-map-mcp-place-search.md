@@ -1,6 +1,6 @@
 # 018：真实地图 MCP 地点查询最小接入
 
-- 状态：待执行；不表示已获得外部凭据或真实调用成功
+- 状态：部分完成；真实高德 MCP 握手、工具发现和一次 POI 查询已通过；网页入口、选定任务内请求、条件路由/工具注册和错误细分未实现，详见[报告](../reports/018-map-mcp-place-search-report.md)
 - 阶段：P4 真实信息与更多采买场景
 - 起始基线：`main` / `b1b0334a680a47edafc8f7731634b9eeac7077b7`；执行前核对 HEAD
 - 前置：[017 报告](../reports/017-task-goal-consistency-report.md)、[外部服务清单](../design/external-services.md)、[Tools 与 MCP](../design/tools-and-mcp.md)

@@ -18,6 +18,8 @@ class McpServiceConfig(BaseModel):
     timeout_seconds: float = Field(default=10.0, gt=0)
     enabled: bool = True
     auth_token: SecretStr | None = None
+    auth_query_parameter: str | None = None
+    allowed_tool_names: tuple[str, ...] = ()
 
 
 def default_mcp_services() -> dict[str, McpServiceConfig]:
@@ -59,6 +61,11 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = 60.0
     mcp_services: dict[str, McpServiceConfig] = Field(default_factory=default_mcp_services)
+    map_mcp_url: str = "https://mcp.amap.com/mcp"
+    map_mcp_key: SecretStr | None = None
+    map_mcp_timeout_seconds: float = Field(default=20.0, gt=0)
+    map_mcp_enabled: bool = False
+    map_mcp_tool_name: str = "maps_text_search"
     run_worker_lease_seconds: int = Field(default=30, gt=0)
     run_worker_poll_seconds: float = Field(default=1.0, gt=0)
     run_worker_max_attempts: int = Field(default=3, ge=1, le=20)
@@ -73,6 +80,19 @@ class Settings(BaseSettings):
             raise ValueError("SameSite=None 要求 SESSION_COOKIE_SECURE=true。")
         if self.app_env.casefold() == "production" and not self.session_cookie_secure:
             raise ValueError("生产环境要求 SESSION_COOKIE_SECURE=true。")
+        if self.map_mcp_enabled:
+            if self.map_mcp_key is None or not self.map_mcp_key.get_secret_value().strip():
+                raise ValueError("MAP_MCP_ENABLED=true 时必须配置 MAP_MCP_KEY。")
+            if not self.map_mcp_tool_name.strip():
+                raise ValueError("MAP_MCP_TOOL_NAME 不能为空。")
+            self.mcp_services["map"] = McpServiceConfig(
+                url=self.map_mcp_url,
+                timeout_seconds=self.map_mcp_timeout_seconds,
+                enabled=True,
+                auth_token=self.map_mcp_key,
+                auth_query_parameter="key",
+                allowed_tool_names=(self.map_mcp_tool_name.strip(),),
+            )
         return self
 
 

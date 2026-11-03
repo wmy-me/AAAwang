@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from mcp import Client
 from mcp.types import CallToolResult, Tool
@@ -150,17 +151,30 @@ class McpClient:
             raise McpServiceConfigurationError(
                 f"MCP 服务 {service_id} 使用了不支持的传输类型。"
             )
-        if config.auth_token is not None:
-            raise McpServiceConfigurationError(
-                f"MCP 服务 {service_id} 已配置认证，但本轮尚未实现认证传输。"
-            )
         return config
+
+    @staticmethod
+    def _authenticated_url(config: McpServiceConfig) -> str:
+        if config.auth_token is None:
+            return config.url
+        if not config.auth_query_parameter:
+            raise McpServiceConfigurationError(
+                "MCP 认证令牌已配置，但未配置认证查询参数名。"
+            )
+        parsed = urlsplit(config.url)
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        if config.auth_query_parameter in query:
+            raise McpServiceConfigurationError(
+                "MCP 服务 URL 不得预置认证查询参数。"
+            )
+        query[config.auth_query_parameter] = config.auth_token.get_secret_value()
+        return urlunsplit(parsed._replace(query=urlencode(query)))
 
     @asynccontextmanager
     async def connect(self, service_id: str) -> AsyncIterator[McpConnection]:
         config = self._get_config(service_id)
         sdk_client = Client(
-            config.url,
+            self._authenticated_url(config),
             raise_exceptions=False,
             read_timeout_seconds=config.timeout_seconds,
             mode="auto",

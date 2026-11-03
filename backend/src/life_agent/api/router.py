@@ -7,6 +7,7 @@ from life_agent.api.routes import (
 	chat,
 	conversations,
 	health,
+	maps,
 	runs,
 	shopping_adjustments,
 	tasks,
@@ -20,3 +21,4 @@ api_router.include_router(chat.router, tags=["chat"])
 api_router.include_router(tasks.router, tags=["tasks"])
 api_router.include_router(runs.router, tags=["runs"])
 api_router.include_router(shopping_adjustments.router, tags=["shopping-adjustments"])
+api_router.include_router(maps.router, tags=["maps"])

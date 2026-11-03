@@ -49,7 +49,7 @@
 | 015 | [教师奖品采买候选与结构化方案](015-shopping-candidates-and-plan.md) | 已完成；候选快照、服务端复算、版本隔离和网页刷新验收见[报告](../reports/015-shopping-candidates-and-plan-report.md) |
 | 016 | [已选购物任务的方案调整与条件一致性](016-shopping-plan-adjustment.md) | 已完成；不可变调整、并发/幂等/权限、真实外部/浏览器闭环，以及 017 补齐的目标冲突提示与 Run 前门禁均已验收，见[报告](../reports/016-shopping-plan-adjustment-report.md) |
 | 017 | [任务目标与结构化条件一致性](017-task-goal-consistency.md) | 已完成；目标快照、冲突 409、双入口 Run 前门禁、迁移、浏览器冲突处理与真实 DeepSeek/MCP 新 Run 闭环均通过，见[报告](../reports/017-task-goal-consistency-report.md) |
-| 018 | [真实地图 MCP 地点查询最小接入](018-map-mcp-place-search.md) | 待执行；P4 首项外部地点服务，真实验收需要服务凭据 |
+| 018 | [真实地图 MCP 地点查询最小接入](018-map-mcp-place-search.md) | 部分完成；真实高德 MCP 握手、工具发现和上海 POI 查询通过；仅提供认证 API，网页、选定任务内入口、条件路由与错误细分未实现，见[报告](../reports/018-map-mcp-place-search-report.md) |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
