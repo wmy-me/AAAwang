@@ -14,7 +14,7 @@
 
 ## 2. 开始前阅读
 
-先读 `CLAUDE.md`、[进度](../progress.md)、[路线图](../roadmap.md)、[任务索引](README.md)、[开发指南](../guides/development.md)、[认证](../../contracts/rest/auth.md)、[私有对话](../../contracts/rest/conversations.md)、[任务版本](../../contracts/rest/tasks.md)、[Run](../../contracts/rest/runs.md)及[事件 SSE](../../contracts/rest/run-events.md)契约。检查 `web/src/App.tsx`、现有 CSS、Vite 代理、`web/src/api/health.ts` 和后端实际路由/响应。012 的真实委派验收只证明已记录的样例，不能代替本次浏览器验证；直接回答和追问当时主要由替身测试覆盖。
+先读根目录 `AGENTS.md`、`CLAUDE.md`、[数据保护与幂等规则](../design/security-and-idempotency.md)、[进度](../progress.md)、[路线图](../roadmap.md)、[任务索引](README.md)、[开发指南](../guides/development.md)、[认证](../../contracts/rest/auth.md)、[私有对话](../../contracts/rest/conversations.md)、[任务版本](../../contracts/rest/tasks.md)、[Run](../../contracts/rest/runs.md)及[事件 SSE](../../contracts/rest/run-events.md)契约。检查 `web/src/App.tsx`、现有 CSS、Vite 代理、`web/src/api/health.ts` 和后端实际路由/响应。012 的真实委派验收只证明已记录的样例，不能代替本次浏览器验证；直接回答和追问当时主要由替身测试覆盖。
 
 ## 3. 实施范围
 
@@ -27,7 +27,7 @@
 ## 4. 数据与可靠性约束
 
 - **事实来源**：`conversations` / `tasks` / `runs` / `shopping_run_results` 的服务端 API；浏览器内存状态仅作展示缓存。刷新后以当前用户重新拉取；不能从 localStorage 复原私有回答或凭空生成历史消息。历史结果按 Run ID 与所属 task 呈现。
-- **并发**：创建 Run 时用 task 当前 revision，收到 409 显示冲突并刷新；修订条件不改变已创建 Run 的旧快照。每次新运行使用新幂等键，重试同一次请求复用原键；取消后不能把迟到 SSE 误显示为新的成功。
+- **并发与幂等**：创建 Run 时用 task 当前 revision，收到 409 显示冲突并刷新；修订条件不改变已创建 Run 的旧快照。每次新运行使用新幂等键，重试同一次请求复用原键；客户端请求超时后以原键重试同一 Run 请求或查询已有 Run，不在不确定时生成新键。取消后不能把迟到 SSE 误显示为新的成功。对话/任务创建目前没有服务端幂等键，本轮不得自动重试其不确定请求；先刷新列表供用户核对，并在报告中记录剩余风险。若要支持这些创建操作自动重试，须先补服务端幂等契约和数据库唯一约束；前端禁用按钮不是服务端保证。
 - **权限与输入**：写请求沿用可信 Origin，输入长度与数值按现有服务端 schema 校验；前端校验仅作用户提示。网页不直连 shopping-mcp，也不缓存 API Key 或自行绕过后端身份。答复作为文本安全渲染，不能把模型或 MCP 返回正文作为可信 HTML。
 - **后端范围**：优先复用 004–012 API；确需修复契约与实现之间的小差异时加最小回归。此次不增加自然语言自动建任务、自动识别意图、助手消息写入、方案/候选业务表或新 MCP 工具。图状态及 Worker 继续由现有后端处理。
 - **配置**：根目录 `.env` 的项目 PostgreSQL、DeepSeek 和 MCP 保持本机配置；本次不需要 MySQL、Redis、MinIO 或其他服务密钥。所有真实测试记录用隔离账户创建并清理，保留项目命名卷。

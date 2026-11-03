@@ -6,7 +6,7 @@
 
 1. [项目定位与主线](overview/project.md)：做什么、为谁做、Java 模拟服务的定位。
 2. [开发路线图](roadmap.md)：按能力递进的阶段、交付物与验收目标。
-3. [Agent、Tools、RAG 与意图设计](design/README.md)：本次讨论的专题结论与待评估参数。
+3. [Agent、Tools、RAG 与意图设计](design/README.md)：专题结论与待评估参数；新增字段或写操作另读[数据保护与幂等规则](design/security-and-idempotency.md)。
 4. [当前进度](progress.md)：核对代码后的状态、证据与当前待讨论事项。
 5. [AI 执行任务入口](vibe%20coding/README.md)：Claude、Codex 开始工作时应读取的规则。
 6. [开发指南](guides/development.md)：安装、启动与环境问题。
