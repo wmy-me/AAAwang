@@ -93,11 +93,12 @@
 - 真实双Worker竞争、数据库模拟租约接管、旧fencing拒绝、无幽灵终态事件及SSE `after=1`断线补读均通过。
 - ORM用户删除与数据库父表直接 `DELETE` 均已验证级联清理Run和事件，另一用户数据保留；详见[009报告](reports/009-run-deletion-events-regression-report.md)。
 
-## 开发数据库配置的当前差异
+## 011 开发数据库配置收敛
 
 - 010 的真实 DeepSeek→shopping-mcp→PostgreSQL 已通过隔离临时数据库验收，但测试卷随后清理；这不证明用户本机项目库已长期运行。
 - 010 提交后 `infra/compose.yaml` 默认含 PostgreSQL、MySQL、Redis、MinIO；后面三项尚无业务使用。两个 env 示例及 Compose fallback 的 PostgreSQL 用户/密码存在不一致，默认宿主 5432 与用户已有服务可能冲突。
-- 依据用户决定，后续本地开发以项目专用 PostgreSQL Compose + 持久化卷为标准环境，其他已有容器保持独立；[011 项目数据库开发环境与配置收敛](vibe%20coding/011-dev-database-config.md) 为待执行任务。它只整理可复现开发配置，不声称已经完成应用一键部署。
+- 011 已将根目录 `.env.example` 作为本地配置模板，后端从根目录 `.env` 读取并保留显式环境变量覆盖；默认 Compose 仅启动项目 PostgreSQL，宿主默认端口为 55432、默认用户为 `life_buy`，MySQL/Redis/MinIO 使用 `optional` profile。普通 `down` 保留项目命名卷，未触碰用户已有容器或卷。
+- 项目真实卷已完成非破坏性角色对齐、`alembic upgrade head` 到 `20261103_0007`、隔离测试写入和普通 `down`/`up` 持久化验证；测试记录已删除，卷保留，用户其他容器未修改。详见 [011报告](reports/011-dev-database-config-report.md)。
 
 ## 每次读取最新 GitHub 时的检查方式
 
@@ -112,9 +113,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。下一步执行待实施的 [011 开发数据库与配置收敛](vibe%20coding/011-dev-database-config.md)，让项目专用 PostgreSQL 默认可复现、单源配置且方便开发查表；完整主从 Agent 和网页另拆任务。
+截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证；完整主从 Agent 和网页另拆任务。
 
-[001](vibe%20coding/001-llm-connection.md)至[010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)均已完成；010 的真实外部闭环与中断恢复已验收；011 尚未实施；P2 的网页对话和完整 Agent 接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[011 开发数据库与配置收敛](vibe%20coding/011-dev-database-config.md)均已完成；010 的真实外部闭环与中断恢复已验收；P2 的网页对话和完整 Agent 接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 

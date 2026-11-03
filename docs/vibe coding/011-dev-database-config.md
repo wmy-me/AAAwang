@@ -1,6 +1,6 @@
 # 011：项目数据库开发环境与配置收敛
 
-- 状态：待执行；只定义下一步，不表示已经修改配置或启动用户本地容器
+- 状态：已完成；配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化已验证；未删除卷，未修改用户其他容器和卷
 - 所属阶段：P2 开发环境收敛，为 P3 和最终一键部署提供可复现基线
 - 起始分支与代码提交：`main` / `87d46c26bf4cadcd5a668f0aad24c077f6c9cf85`；执行前核对最新 HEAD
 - 前置：[010 购物 Run 真实闭环报告](../reports/010-shopping-run-execution-report.md)已提交；本任务不重做 010 的业务逻辑
@@ -35,4 +35,4 @@
 
 ## 4. 完成后停止
 
-提交 `docs/reports/011-dev-database-config-report.md`，同步 [进度](../progress.md)、[任务索引](README.md)、根 README、`infra/README.md` 和开发指南；说明真实项目卷是否已验证及未验证项。完成 011 后再为主从 Agent 的最小委派/网页对话制定独立任务，不因此宣称 P2 或 P7 全面完成。
+提交 [011 配置收敛报告](../reports/011-dev-database-config-report.md)，同步 [进度](../progress.md)、[任务索引](README.md)、根 README、`infra/README.md` 和开发指南；说明真实项目卷是否已验证及未验证项。完成 011 后再为主从 Agent 的最小委派/网页对话制定独立任务，不因此宣称 P2 或 P7 全面完成。

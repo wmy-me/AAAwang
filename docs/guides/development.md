@@ -9,7 +9,7 @@
 | `backend/` | Python 主系统 | FastAPI 健康、认证、私有对话、任务版本与持久化 run API、PostgreSQL/Alembic、DeepSeek、通用 MCP 及有限工具循环；LangGraph 仅安装依赖 |
 | `web/` | React 网页 | 初始化说明页与真实健康检查按钮；Vite 开发代理 |
 | `mcp-services/` | 三个 Java 服务 | shopping 提供模拟 MCP 查询；travel 与 local-life 保持健康检查骨架 |
-| `infra/` | 本地基础服务 | PostgreSQL 容器；Python 认证模块连接 |
+| `infra/` | 本地基础服务 | 项目专用 PostgreSQL Compose；MySQL、Redis、MinIO 为 optional profile |
 | `contracts/` | 协议契约 | 包含认证、私有对话、任务版本 REST 与 shopping 模拟 MCP 工具约定 |
 | `mobile/android/` | Android 扩展端 | 仅说明，未生成工程 |
 
@@ -40,8 +40,8 @@
 ### 3.1 Python API
 
 ```bash
-cp -n infra/.env.example infra/.env
-docker compose --env-file infra/.env -f infra/compose.yaml up -d --wait
+cp -n .env.example .env
+docker compose --env-file .env -f infra/compose.yaml up -d postgres --wait
 cd backend
 uv sync --locked
 uv run alembic upgrade head
@@ -51,7 +51,7 @@ uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 - 健康检查：<http://127.0.0.1:8000/api/health>
 - 接口文档：<http://127.0.0.1:8000/docs>
 
-将 `backend/.env.example` 复制为 `backend/.env`，并使 `DATABASE_URL` 与 infra 配置一致。应用导入和健康接口不连接数据库；认证请求按需连接。数据库结构必须显式运行 Alembic 迁移，应用不自动建表。
+数据库配置统一来自仓库根目录 `.env`；不要再把数据库密码复制到 `backend/.env` 或 `infra/.env`。宿主 API 使用 `DATABASE_URL` 的 `127.0.0.1:55432`，显式环境变量仍可覆盖它。应用导入和健康接口不连接数据库；认证请求按需连接。数据库结构必须显式运行 Alembic 迁移，应用不自动建表。
 
 认证接口为 `POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/logout` 和 `GET /api/me`。私有对话提供创建、列表、读取、改标题和用户消息；任务接口提供独立目标、完整条件快照及乐观并发修订。本地 Vite 代理来源在 `TRUSTED_ORIGINS` 中；生产环境必须使用 HTTPS 并设置 `SESSION_COOKIE_SECURE=true`。完整字段与状态码见 `contracts/rest/`。
 
@@ -77,7 +77,7 @@ cd backend && uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 cd backend && uv run python -m life_agent.worker.runner
 ```
 
-并在仅存在于本机的 `backend/.env` 中配置 `LLM_API_KEY`、`DATABASE_URL` 和 `MCP_SERVICES`。若5432被占用，给Compose设置其他宿主端口并让 `DATABASE_URL` 使用同一端口。缺少Key、MCP不可用或外部调用失败会使购物Run进入安全失败状态，不应把历史003脚本成功当作010真实闭环证据。
+并在仅存在于本机的根目录 `.env` 中配置 `LLM_API_KEY`、`DATABASE_URL` 和 `MCP_SERVICES`。缺少Key、MCP不可用或外部调用失败会使购物Run进入安全失败状态，不应把历史003脚本成功当作010真实闭环证据。
 
 ### 3.3 DeepSeek 连通检查
 
@@ -213,7 +213,10 @@ uv run python scripts/check_conversations.py
 cd backend
 uv run alembic upgrade head
 uv run alembic check
-uv run python scripts/check_tasks.py
+| PostgreSQL（项目 Compose） | 55432 | 127.0.0.1 | 容器 `pg_isready` |
+| MySQL（optional profile） | 3306 | 127.0.0.1 | `mysqladmin ping` |
+| Redis（optional profile） | 6379 | 127.0.0.1 | `redis-cli ping` |
+| MinIO API/控制台（optional profile） | 9000/9001 | 127.0.0.1 | MinIO health/控制台 |
 ```
 
 `check_tasks.py` 只接受真实 PostgreSQL psycopg URL，使用随机账号验证同对话双任务、历史快照、新客户端读取、双用户隔离，以及两个请求基于同一版本时真实产生一个 201 和一个 409。脚本结束时删除测试用户。

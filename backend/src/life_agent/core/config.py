@@ -1,10 +1,13 @@
 """Application settings loaded from environment variables and ``.env``."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
 
 class McpServiceConfig(BaseModel):
@@ -28,7 +31,7 @@ class Settings(BaseSettings):
     """Basic application settings with development-friendly defaults."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -37,7 +40,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     database_url: SecretStr = SecretStr(
-        "postgresql+psycopg://life_buy:dev_only_change_me@127.0.0.1:5432/"
+        "postgresql+psycopg://life_buy:postgres@127.0.0.1:55432/"
         "life_buy_agent"
     )
     session_cookie_name: str = "life_agent_session"

@@ -9,7 +9,7 @@
 - **Python 主后端**：FastAPI 提供健康、认证、私有对话、用户消息、任务与条件版本、持久化 Run/结果/事件接口；已有 DeepSeek、通用 MCP、有限工具循环、后台 Worker、PostgreSQL/Alembic 与服务端 Cookie 会话；LangGraph 尚无状态图或 Agent。
 - **网页**：React + TypeScript + Vite，只展示项目名称、初始化说明和“检查后端连接”按钮。
 - **Java 服务**：shopping-mcp 已提供 Streamable HTTP `/mcp` 与只读模拟商品查询；travel-mcp、local-life-mcp 仍只有健康检查骨架。
-- **数据库**：`infra/compose.yaml` 提供 PostgreSQL；Python 通过正式迁移持久化用户、登录会话、私有对话、用户消息、任务、条件版本、Run、Run 事件和购物结果，Java 不连接该数据库。
+- **数据库**：`infra/compose.yaml` 默认提供项目专用 pgvector PostgreSQL（宿主 `55432`）；MySQL、Redis、MinIO 仅在 `optional` profile 启用。Python 通过正式迁移持久化用户、登录会话、私有对话、用户消息、任务、条件版本、Run、Run 事件和购物结果，Java 不连接该数据库。
 - **未实现**：网页登录页、网页模型对话、助手消息生成、完整 Agent、方案、投稿和订单等业务模块。
 
 ## 技术栈与版本
@@ -79,9 +79,9 @@ cd mcp-services
 ### 4. 可选的本地 PostgreSQL
 
 ```bash
-cp -n infra/.env.example infra/.env
-docker compose --env-file infra/.env -f infra/compose.yaml up -d
-docker compose --env-file infra/.env -f infra/compose.yaml ps
+cp -n .env.example .env
+docker compose --env-file .env -f infra/compose.yaml up -d postgres
+docker compose --env-file .env -f infra/compose.yaml ps
 ```
 
 Python 认证、私有对话与任务接口需要该数据库并先执行 Alembic 迁移；健康接口与应用导入不主动连接数据库。
@@ -95,7 +95,7 @@ Python 认证、私有对话与任务接口需要该数据库并先执行 Alembi
 | shopping-mcp | <http://127.0.0.1:8101> | `/actuator/health` |
 | travel-mcp | <http://127.0.0.1:8102> | `/actuator/health` |
 | local-life-mcp | <http://127.0.0.1:8103> | `/actuator/health` |
-| PostgreSQL（可选） | `127.0.0.1:5432` | 容器自身 `pg_isready` |
+| PostgreSQL（可选） | `127.0.0.1:55432` | 容器自身 `pg_isready` |
 
 所有服务默认只绑定回环地址，不对外网开放。
 
