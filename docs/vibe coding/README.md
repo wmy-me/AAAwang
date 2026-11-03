@@ -48,6 +48,7 @@
 | 014 | [已选购物任务的多轮对话与助手消息持久化](014-shopping-task-chat.md) | 已完成；两轮真实 Worker/DeepSeek/MCP、assistant 消息唯一持久化、幂等、跨账号和浏览器刷新重读均通过，见[报告](../reports/014-shopping-task-chat-report.md) |
 | 015 | [教师奖品采买候选与结构化方案](015-shopping-candidates-and-plan.md) | 已完成；候选快照、服务端复算、版本隔离和网页刷新验收见[报告](../reports/015-shopping-candidates-and-plan-report.md) |
 | 016 | [已选购物任务的方案调整与条件一致性](016-shopping-plan-adjustment.md) | 手动调整与真实外部/浏览器闭环已验收；目标文本与结构化条件冲突提示未实现，见[报告](../reports/016-shopping-plan-adjustment-report.md) |
+| 017 | [任务目标与结构化条件一致性](017-task-goal-consistency.md) | 待执行；补 016 §3.4 的目标版本、冲突确认和 Run 前门禁 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收，但条件冲突提示仍待补。
 
