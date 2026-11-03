@@ -371,3 +371,70 @@ class ShoppingPlanItem(Base):
     subtotal: Mapped[object] = mapped_column(Numeric(12, 2))
     plan: Mapped[ShoppingPlan] = relationship(back_populates="items")
     candidate: Mapped[ShoppingCandidate] = relationship()
+
+
+class ShoppingPlanAdjustment(Base):
+    __tablename__ = "shopping_plan_adjustments"
+    __table_args__ = (
+        UniqueConstraint("task_id", "version", name="uq_plan_adjustments_task_version"),
+        UniqueConstraint(
+            "task_id", "client_request_id", name="uq_plan_adjustments_task_request"
+        ),
+        Index("ix_plan_adjustments_task_current", "task_id", "is_current"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_revisions.id", ondelete="CASCADE")
+    )
+    base_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="RESTRICT")
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    client_request_id: Mapped[str] = mapped_column(String(128))
+    request_fingerprint: Mapped[str] = mapped_column(String(64))
+    source: Mapped[str] = mapped_column(String(32), default="manual_adjustment")
+    status: Mapped[str] = mapped_column(String(32), default="valid")
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+    people: Mapped[int] = mapped_column(Integer)
+    covered_people: Mapped[int] = mapped_column(Integer)
+    budget: Mapped[object] = mapped_column(Numeric(12, 2))
+    total: Mapped[object] = mapped_column(Numeric(12, 2))
+    remaining: Mapped[object] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str] = mapped_column(String(3))
+    unknown_fees: Mapped[bool] = mapped_column(Boolean, default=True)
+    note: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    items: Mapped[list["ShoppingPlanAdjustmentItem"]] = relationship(
+        back_populates="adjustment", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class ShoppingPlanAdjustmentItem(Base):
+    __tablename__ = "shopping_plan_adjustment_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "adjustment_id", "candidate_id", name="uq_plan_adjustment_items_candidate"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    adjustment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("shopping_plan_adjustments.id", ondelete="CASCADE"), index=True
+    )
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("shopping_candidates.id", ondelete="RESTRICT")
+    )
+    package_quantity: Mapped[int] = mapped_column(Integer)
+    covered_people: Mapped[int] = mapped_column(Integer)
+    subtotal: Mapped[object] = mapped_column(Numeric(12, 2))
+    adjustment: Mapped[ShoppingPlanAdjustment] = relationship(back_populates="items")
+    candidate: Mapped[ShoppingCandidate] = relationship()

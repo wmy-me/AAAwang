@@ -113,6 +113,40 @@ export interface ShoppingArtifacts {
   plan: ShoppingPlan | null
 }
 
+export interface ShoppingAdjustment {
+  id: string
+  owner_id: string
+  task_id: string
+  task_revision_id: string
+  base_run_id: string
+  version: number
+  client_request_id: string
+  source: string
+  status: string
+  is_current: boolean
+  people: number
+  covered_people: number
+  budget: string
+  total: string
+  remaining: string
+  currency: string
+  unknown_fees: boolean
+  note: string
+  created_at: string
+  items: Array<{
+    candidate_id: string
+    package_quantity: number
+    covered_people: number
+    subtotal: string
+    candidate: ShoppingCandidate
+  }>
+}
+
+export interface ShoppingAdjustmentList {
+  items: ShoppingAdjustment[]
+  current_version: number
+}
+
 export interface Message {
   id: string
   conversation_id: string
@@ -209,6 +243,25 @@ export const api = {
   result: (runId: string) => request<RunResult>(`/runs/${runId}/result`),
   shoppingArtifacts: (runId: string) =>
     request<ShoppingArtifacts>(`/runs/${runId}/shopping-artifacts`),
+  shoppingAdjustments: (taskId: string) =>
+    request<ShoppingAdjustmentList>(`/tasks/${taskId}/shopping-adjustments`),
+  createShoppingAdjustment: (
+    taskId: string,
+    baseRunId: string,
+    revision: number,
+    expectedVersion: number,
+    items: Array<{ candidate_id: string; package_quantity: number }>,
+  ) =>
+    request<ShoppingAdjustment>(
+      `/tasks/${taskId}/shopping-adjustments`,
+      json({
+        base_run_id: baseRunId,
+        expected_revision: revision,
+        expected_adjustment_version: expectedVersion,
+        client_request_id: crypto.randomUUID(),
+        items,
+      }),
+    ),
   submitTurn: (
     conversationId: string,
     taskId: string,

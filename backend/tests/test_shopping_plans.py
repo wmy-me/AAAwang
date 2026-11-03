@@ -6,6 +6,7 @@ from decimal import Decimal
 from life_agent.modules.shopping_plans.service import (
     build_artifacts,
     build_candidate_drafts,
+    build_manual_plan_draft,
     build_plan_draft,
     validated_plan_answer,
 )
@@ -102,3 +103,34 @@ def test_validated_answer_uses_server_quantity_and_money() -> None:
     assert "商品小计 ¥6.90" in answer
     assert "预算 ¥180.00" in answer
     assert "余量 ¥173.10" in answer
+
+
+def test_manual_plan_recalculates_multiple_candidates_server_side() -> None:
+    candidates = build_candidate_drafts(
+        source(
+            [
+                product(product_id="small", unit_price="4.20", distributable_units=2),
+                product(product_id="large", unit_price="8.50", distributable_units=5),
+            ]
+        ),
+        datetime.now(UTC),
+    )
+
+    plan = build_manual_plan_draft(
+        candidates,
+        {"people": 9, "budget": 30},
+        [("small", 2), ("large", 1)],
+    )
+
+    assert plan is not None
+    assert plan.covered_people == 9
+    assert plan.total == Decimal("16.90")
+    assert [item.subtotal for item in plan.items] == [Decimal("8.40"), Decimal("8.50")]
+
+
+def test_manual_plan_rejects_duplicate_or_invalid_selection() -> None:
+    candidates = build_candidate_drafts(source([product(product_id="one")]), datetime.now(UTC))
+
+    assert build_manual_plan_draft(candidates, {"people": 1, "budget": 20}, [("one", 1), ("one", 1)]) is None
+    assert build_manual_plan_draft(candidates, {"people": 1, "budget": 20}, [("one", 0)]) is None
+    assert build_manual_plan_draft(candidates, {"people": 1, "budget": 1}, [("one", 1)]) is None

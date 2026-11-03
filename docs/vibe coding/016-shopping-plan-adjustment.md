@@ -1,6 +1,6 @@
 # 016：已选购物任务的方案调整与条件一致性
 
-- 状态：待执行；规划文档，不代表实现或验收
+- 状态：不可变调整与真实 DeepSeek/MCP/Worker/浏览器闭环已验收；目标文本与结构化条件冲突提示未实现，整体未完成
 - 所属阶段：P3 首条采买闭环的方案调整
 - 起始分支与提交：`main` / `493d577384b68d03272af5658a6f791c1626fe47`；执行前重新核对 HEAD
 - 前置：[015 报告](../reports/015-shopping-candidates-and-plan-report.md)、[015 任务](015-shopping-candidates-and-plan.md)

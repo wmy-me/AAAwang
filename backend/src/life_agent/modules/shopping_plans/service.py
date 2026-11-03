@@ -37,6 +37,15 @@ class PlanDraft:
     currency: str
     unknown_fees: bool
     note: str
+    items: tuple["PlanItemDraft", ...] = ()
+
+
+@dataclass(frozen=True)
+class PlanItemDraft:
+    candidate_product_id: str
+    package_quantity: int
+    covered_people: int
+    subtotal: Decimal
 
 
 def _money(value: object) -> Decimal:
@@ -134,6 +143,12 @@ def build_plan_draft(
     total, candidate, quantity, covered = min(
         feasible, key=lambda item: (item[0], item[1].product_id)
     )
+    item = PlanItemDraft(
+        candidate_product_id=candidate.product_id,
+        package_quantity=quantity,
+        covered_people=covered,
+        subtotal=total,
+    )
     return PlanDraft(
         candidate_product_id=candidate.product_id,
         package_quantity=quantity,
@@ -145,6 +160,64 @@ def build_plan_draft(
         currency="CNY",
         unknown_fees=True,
         note="商品金额已由服务端复算；运费、税费与优惠未知，未计入总额。",
+        items=(item,),
+    )
+
+
+def build_manual_plan_draft(
+    candidates: list[CandidateDraft],
+    conditions: dict[str, object],
+    selections: list[tuple[str, int]],
+) -> PlanDraft | None:
+    try:
+        people = int(conditions["people"])
+        budget = _money(conditions["budget"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if people < 1 or budget <= 0 or not selections:
+        return None
+    by_id = {candidate.product_id: candidate for candidate in candidates}
+    if len(by_id) != len(candidates) or len({product_id for product_id, _ in selections}) != len(selections):
+        return None
+    items: list[PlanItemDraft] = []
+    total = Decimal("0.00")
+    covered = 0
+    for product_id, package_quantity in selections:
+        candidate = by_id.get(product_id)
+        if candidate is None or package_quantity < 1:
+            return None
+        if candidate.currency != "CNY" or "有货" not in candidate.availability:
+            return None
+        subtotal = (candidate.unit_price * package_quantity).quantize(
+            MONEY, rounding=ROUND_HALF_UP
+        )
+        item_covered = candidate.distributable_units * package_quantity
+        items.append(
+            PlanItemDraft(
+                candidate_product_id=product_id,
+                package_quantity=package_quantity,
+                covered_people=item_covered,
+                subtotal=subtotal,
+            )
+        )
+        total += subtotal
+        covered += item_covered
+    total = total.quantize(MONEY, rounding=ROUND_HALF_UP)
+    if total > budget or covered < people:
+        return None
+    first = items[0]
+    return PlanDraft(
+        candidate_product_id=first.candidate_product_id,
+        package_quantity=first.package_quantity,
+        covered_people=covered,
+        people=people,
+        budget=budget,
+        total=total,
+        remaining=(budget - total).quantize(MONEY, rounding=ROUND_HALF_UP),
+        currency="CNY",
+        unknown_fees=True,
+        note="商品金额已由服务端复算；运费、税费与优惠未知，未计入总额。",
+        items=tuple(items),
     )
 
 
