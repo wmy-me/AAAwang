@@ -32,13 +32,13 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     sessions: Mapped[list["LoginSession"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
     )
     conversations: Mapped[list["Conversation"]] = relationship(
-        back_populates="owner", cascade="all, delete-orphan"
+        back_populates="owner", cascade="all, delete-orphan", passive_deletes=True
     )
     runs: Mapped[list["Run"]] = relationship(
-        back_populates="owner", cascade="all, delete-orphan"
+        back_populates="owner", cascade="all, delete-orphan", passive_deletes=True
     )
 
 
@@ -82,10 +82,10 @@ class Conversation(Base):
     )
     owner: Mapped[User] = relationship(back_populates="conversations")
     messages: Mapped[list["Message"]] = relationship(
-        back_populates="conversation", cascade="all, delete-orphan"
+        back_populates="conversation", cascade="all, delete-orphan", passive_deletes=True
     )
     tasks: Mapped[list["Task"]] = relationship(
-        back_populates="conversation", cascade="all, delete-orphan"
+        back_populates="conversation", cascade="all, delete-orphan", passive_deletes=True
     )
 
 
@@ -144,10 +144,10 @@ class Task(Base):
     )
     conversation: Mapped[Conversation] = relationship(back_populates="tasks")
     revisions: Mapped[list["TaskRevision"]] = relationship(
-        back_populates="task", cascade="all, delete-orphan"
+        back_populates="task", cascade="all, delete-orphan", passive_deletes=True
     )
     runs: Mapped[list["Run"]] = relationship(
-        back_populates="task", cascade="all, delete-orphan"
+        back_populates="task", cascade="all, delete-orphan", passive_deletes=True
     )
 
 
@@ -189,7 +189,7 @@ class Run(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     task_revision_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("task_revisions.id", ondelete="RESTRICT")
+        ForeignKey("task_revisions.id", ondelete="CASCADE")
     )
     revision: Mapped[int]
     conditions: Mapped[dict[str, object]] = mapped_column(JSON)
@@ -208,9 +208,10 @@ class Run(Base):
     diagnostic: Mapped[dict[str, object] | None] = mapped_column(JSON)
     error_summary: Mapped[str | None] = mapped_column(String(500))
     task: Mapped[Task] = relationship(back_populates="runs")
+    task_revision: Mapped[TaskRevision] = relationship()
     owner: Mapped[User] = relationship(back_populates="runs")
     events: Mapped[list["RunEvent"]] = relationship(
-        back_populates="run", cascade="all, delete-orphan"
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
     )
 
 

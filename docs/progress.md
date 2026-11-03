@@ -83,7 +83,15 @@
 - Alembic `20261103_0005` 创建 `run_events`，状态转换与事件同事务；提供私有增量补读和 SSE 游标重连。报告记录 Python 全量 **41 passed**、Ruff、编译、锁文件检查通过。
 - [008 报告](reports/008-run-events-sse-report.md)已经记录真实 PostgreSQL 17 从空库升级至 0005、重复升级、`alembic check`、真实 API 的 queued/cancelled 事件与两个独立 Worker 的 007 基础回归。此前根 `CLAUDE.md` 的“008 真实 PostgreSQL 联调仍需补做”与报告矛盾，现以报告为准。
 - 报告也明确：**真实双 Worker 的完整事件序列与无缺失检查尚未单独验收**；旧租约接管、fencing 的事件约束在自动测试中覆盖。用户 ORM 级联删除与 `runs.task_revision_id ON DELETE RESTRICT` 在临时数据清理中发生冲突，不能视为已解决。
-- 新建 [009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md) 为下一步；修复删除链并补齐真实库事件验收后再接 Agent/网页。
+- 以上未验证项已由 [009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md) 完成修复与验收；后续再按新任务决定是否接入Agent/网页。
+
+## 009 已完成结果与验收边界
+
+- 新增 `20261103_0006`，将 `runs.task_revision_id` 改为 `ON DELETE CASCADE`；相关ORM关系使用 `passive_deletes=True`，不改写已发布迁移。
+- 自动测试已覆盖ORM删除链和跨用户隔离；Python全量测试 **42 passed**。
+- 真实 PostgreSQL 17 已验证0005存量升级到0006不丢失Run、事件和revision关联，重复升级与 `alembic check` 通过。
+- 真实双Worker竞争、数据库模拟租约接管、旧fencing拒绝、无幽灵终态事件及SSE `after=1`断线补读均通过。
+- ORM用户删除与数据库父表直接 `DELETE` 均已验证级联清理Run和事件，另一用户数据保留；详见[009报告](reports/009-run-deletion-events-regression-report.md)。
 
 ## 每次读取最新 GitHub 时的检查方式
 
@@ -98,9 +106,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03 已核对最新功能提交 `d2c28f16453b5b832f466f6ff03e5ca0e0401ce0`：008 事件持久化、私有补读与 SSE 已提交。报告记录了真实 PostgreSQL 迁移、部分事件和 Worker 回归，不等于已完成真实双 Worker 的完整事件并发验收；删除用户的 ORM 级联与 run→revision 外键还存在已发现的冲突。下一步执行待实施的 [009 删除链与事件回归](vibe%20coding/009-run-deletion-events-regression.md)，其后再接持久化 run 的 Agent 执行与网页对话。本次未重新运行检查。
+截至 2026-11-03，009 已完成删除链修复、存量迁移兼容、真实双Worker事件回归和断线补读验收。下一步再按新任务决定是否把现有有限 DeepSeek/MCP 工具循环接入持久化run；本轮不自动进入010或完整Agent开发。
 
-[001](vibe%20coding/001-llm-connection.md)至[008 持久化 Run 事件与 SSE](vibe%20coding/008-run-events-sse.md)均已完成；008证据见[报告](reports/008-run-events-sse-report.md)。P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化 run、事件与私有 SSE；009 修复与验收未实施，网页对话和 Agent 接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)均已完成；P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化run、事件与私有SSE。网页对话和Agent接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 

@@ -12,7 +12,7 @@ import httpx
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 
-from life_agent.db.models import Run, User
+from life_agent.db.models import Run, RunEvent, User
 from life_agent.db.session import get_session_factory
 from life_agent.modules.runs.service import claim_run, complete_claim
 
@@ -79,6 +79,16 @@ def main() -> int:
                 raise RuntimeError(f"worker status={run.status_code} {run.text}")
             if run.json()["diagnostic"]["message"] != "尚未运行 Agent 规划。":
                 raise RuntimeError("diagnostic runner message missing")
+            events = client.get(f"/api/runs/{run_id}/events").json()["items"]
+            if [event["event_type"] for event in events] != [
+                "run.queued",
+                "run.running",
+                "run.completed",
+            ]:
+                raise RuntimeError(f"worker event sequence={events}")
+            replay = client.get(f"/api/runs/{run_id}/events/stream?after=1")
+            if replay.status_code != 200 or "id: 1" in replay.text or "id: 2" not in replay.text:
+                raise RuntimeError("SSE cursor replay returned an invalid event range")
 
             second = client.post(
                 f"/api/tasks/{task_id}/runs",
@@ -111,6 +121,22 @@ def main() -> int:
                 raise RuntimeError("expired worker was not fenced")
             if not complete_claim(db, recovery_claim, {"runner": "diagnostic"}):
                 raise RuntimeError("recovery worker could not complete run")
+            recovered_events = list(
+                db.scalars(
+                    select(RunEvent)
+                    .where(RunEvent.run_id == crashed_id)
+                    .order_by(RunEvent.sequence)
+                )
+            )
+            if [event.event_type for event in recovered_events] != [
+                "run.queued",
+                "run.running",
+                "run.running",
+                "run.completed",
+            ]:
+                raise RuntimeError("recovery event sequence is inconsistent")
+            if sum(event.event_type == "run.completed" for event in recovered_events) != 1:
+                raise RuntimeError("fenced worker created a ghost completion event")
         print("真实 PostgreSQL runs: 创建与幂等成功")
         print("独立 Worker 竞争: 两个进程仅一个领取并完成")
         print("诊断 runner: 未运行 Agent 规划")

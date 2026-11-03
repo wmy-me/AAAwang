@@ -7,13 +7,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from life_agent.core.config import Settings, get_settings
 from life_agent.db.base import Base
-from life_agent.db.models import Run, Task, User
+from life_agent.db.models import Run, RunEvent, Task, User
 from life_agent.db.session import get_db
 from life_agent.main import app
 from life_agent.modules.runs.service import claim_run, complete_claim
@@ -28,6 +28,10 @@ def run_context() -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    @event.listens_for(engine, "connect")
+    def enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     settings = Settings(
@@ -241,3 +245,41 @@ def test_completed_run_events_can_be_replayed_over_sse(
 
     replay = client.get(f"/api/runs/{run_id}/events/stream?after=2")
     assert replay.status_code == 200
+
+
+def test_deleting_user_cascades_runs_and_events_without_cross_user_delete(
+    run_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    alice, factory = run_context
+    register_and_login(alice, "alice")
+    alice_task = create_task(alice)
+    alice_run = alice.post(
+        f"/api/tasks/{alice_task['id']}/runs",
+        json={"expected_revision": 1, "idempotency_key": "delete-alice"},
+    ).json()
+    assert alice.post(f"/api/runs/{alice_run['id']}/cancel").status_code == 200
+
+    with TestClient(app, base_url="http://testserver") as bob:
+        register_and_login(bob, "bob")
+        bob_task = create_task(bob)
+        bob_run = bob.post(
+            f"/api/tasks/{bob_task['id']}/runs",
+            json={"expected_revision": 1, "idempotency_key": "keep-bob"},
+        ).json()
+
+    with factory() as db:
+        before_runs = list(db.scalars(select(Run).order_by(Run.created_at)))
+        assert len(before_runs) == 2
+        assert {run.owner_id for run in before_runs}.__len__() == 2
+        assert {str(run.id) for run in before_runs} == {alice_run["id"], bob_run["id"]}
+        assert len({run.task_id for run in before_runs}) == 2
+        assert len({run.task_revision_id for run in before_runs}) == 2
+        alice_user = db.scalar(select(User).where(User.username == "alice"))
+        assert alice_user is not None
+        db.delete(alice_user)
+        db.commit()
+        assert db.scalar(select(Run).where(Run.id == uuid.UUID(alice_run["id"]))) is None
+        assert db.scalar(
+            select(RunEvent).where(RunEvent.run_id == uuid.UUID(alice_run["id"]))
+        ) is None
+        assert db.scalar(select(Run).where(Run.id == uuid.UUID(bob_run["id"]))) is not None

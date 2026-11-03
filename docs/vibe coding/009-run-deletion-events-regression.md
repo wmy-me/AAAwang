@@ -1,6 +1,6 @@
 # 009：Run 删除链修复与事件真实并发回归
 
-- 状态：待执行；本文件为下一步任务，不表示已有修复
+- 状态：已完成；实现与验收见[报告](../reports/009-run-deletion-events-regression-report.md)
 - 所属阶段：P2 任务与对话基础（数据生命周期与事件验收收尾）
 - 起始分支与代码提交：`main` / `d2c28f16453b5b832f466f6ff03e5ca0e0401ce0`；实施前核对最新 HEAD
 - 前置：[007 Run 与 Worker](007-persistent-runs-worker.md)、[008 事件与 SSE](008-run-events-sse.md)已提交；阅读 [008 报告](../reports/008-run-events-sse-report.md)中的未验证项
