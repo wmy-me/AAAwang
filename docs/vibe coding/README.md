@@ -47,6 +47,7 @@
 | 013 | [网页登录与购物 Agent Run 可视化](013-shopping-web-workbench.md) | 已完成；网页工作台、真实 Worker/MCP completed 结果、刷新恢复、双用户隔离、登出后刷新和独立 SSE 终态补读均通过，见[报告](../reports/013-shopping-web-workbench-report.md) |
 | 014 | [已选购物任务的多轮对话与助手消息持久化](014-shopping-task-chat.md) | 已完成；两轮真实 Worker/DeepSeek/MCP、assistant 消息唯一持久化、幂等、跨账号和浏览器刷新重读均通过，见[报告](../reports/014-shopping-task-chat-report.md) |
 | 015 | [教师奖品采买候选与结构化方案](015-shopping-candidates-and-plan.md) | 已完成；候选快照、服务端复算、版本隔离和网页刷新验收见[报告](../reports/015-shopping-candidates-and-plan-report.md) |
+| 016 | [已选购物任务的方案调整与条件一致性](016-shopping-plan-adjustment.md) | 待执行；候选选择、数量调整、服务端复算与历史版本 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。
 
