@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     run_worker_lease_seconds: int = Field(default=30, gt=0)
     run_worker_poll_seconds: float = Field(default=1.0, gt=0)
     run_worker_max_attempts: int = Field(default=3, ge=1, le=20)
+    shopping_agent_total_timeout_seconds: float = Field(default=180.0, gt=0, le=180.0)
     run_events_poll_seconds: float = Field(default=1.0, gt=0)
     run_events_heartbeat_seconds: float = Field(default=15.0, gt=0)
     run_events_batch_size: int = Field(default=100, ge=1, le=500)

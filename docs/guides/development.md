@@ -143,7 +143,14 @@ cd mcp-services
 
 分别访问 `http://127.0.0.1:8101/actuator/health`、`8102`、`8103`。shopping 另有 `/mcp`；其余服务仍只有健康端点。
 
-### 3.7 可选 PostgreSQL
+### 3.7 015 候选与方案
+
+执行 `uv run alembic upgrade head` 后，`shopping_agent` Run 会在同一终态事务中保存
+shopping-mcp 的候选快照和服务端复算方案。通过认证的 `GET /api/runs/{run_id}/shopping-artifacts`
+读取候选与方案；旧 revision 仍可读取，跨账号返回 404。方案金额使用 Decimal，按包装可
+分份数向上取整；运费、税费和优惠以 `unknown_fees=true` 展示，不代表最终成交价。
+
+### 3.8 可选 PostgreSQL
 
 ```bash
 cp -n infra/.env.example infra/.env

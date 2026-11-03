@@ -38,6 +38,10 @@ Run 由当前用户明确为一个 task 的明确 revision 创建。身份只来
 
 运行中取消在 Worker 检查点落为 `cancelled`，不是强杀线程。数据库不可用时 API 返回安全 `503`，不泄露连接信息或 Worker 堆栈。
 
+## 候选与方案
+
+`GET /api/runs/{run_id}/shopping-artifacts` 仅返回当前用户所属 shopping Run 的候选快照和服务端校验方案；越权、非购物 Run 或不存在的 Run 统一返回 `404`。候选保存每次实际 MCP 查询采用的 `product_id`、Decimal 单价、币种、包装可分份数、可用性、报价时间、查询时间、来源服务和 `simulated` 标记。方案按同一 Run 唯一保存 `people`、覆盖人数、预算、总额、余量、币种、未知费用提示和候选引用；金额由服务端使用 `Decimal` 复算，不信任模型合计。
+
 ## 状态码
 
 | 状态 | 含义 |

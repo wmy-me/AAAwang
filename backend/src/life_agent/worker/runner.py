@@ -66,7 +66,23 @@ def run_once(worker_id: str) -> bool:
                         },
                     )
             if claim.execution_type == "shopping_agent":
+                started = time.monotonic()
                 result = _run_shopping_agent_with_lease(settings, claim)
+                from life_agent.modules.shopping_plans.service import (
+                    build_artifacts,
+                    validated_plan_answer,
+                )
+
+                source = dict(result.source)
+                source.update(
+                    {
+                        "delegations": 1 if result.delegated else 0,
+                        "elapsed_seconds": round(time.monotonic() - started, 3),
+                        "stop_reason": "completed",
+                    }
+                )
+                artifacts = build_artifacts(source, claim.conditions)
+                answer = validated_plan_answer(artifacts) or result.answer
                 with get_session_factory()() as result_db:
                     if is_cancel_requested(result_db, claim):
                         return cancel_claim(result_db, claim)
@@ -74,13 +90,14 @@ def run_once(worker_id: str) -> bool:
                         result_db,
                         claim,
                         shopping_result={
-                            "answer": result.answer[:12_000],
-                            "source": result.source,
-                            "execution_version": "012-v1",
+                            "answer": answer[:12_000],
+                            "source": source,
+                            "execution_version": "015-v1",
                             "decision_type": result.decision_type,
                             "delegated": result.delegated,
                             "mcp_call_count": result.mcp_call_count,
                         },
+                        shopping_artifacts=artifacts,
                     )
             return complete_claim(
                 db,
@@ -132,7 +149,17 @@ def _run_shopping_agent_with_lease(settings, claim):
         goal = claim.goal
         if claim.input_message:
             goal = f"{goal}\n本轮用户消息：{claim.input_message}"
-        result = asyncio.run(run_shopping_agent(settings, goal, claim.conditions))
+        try:
+            result = asyncio.run(
+                asyncio.wait_for(
+                    run_shopping_agent(settings, goal, claim.conditions),
+                    timeout=settings.shopping_agent_total_timeout_seconds,
+                )
+            )
+        except TimeoutError as exc:
+            raise ToolLoopError(
+                "购物Agent超过总执行时限，结果不会提交；请创建新的 run 重试。"
+            ) from exc
         if lease_lost.is_set():
             raise ToolLoopError("购物Agent执行租约丢失，结果不会提交；请创建新的 run 重试。")
         return result

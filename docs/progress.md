@@ -1,6 +1,6 @@
 # 当前进度
 
-核对日期：2026-11-03。以下按 001–014 的对应执行报告和最新源码归档；013 的规划基线为 `main` 提交 `ba69c6e7180c700333d9fd6ea15d1a614796f8b3`，014 在其后的工作区变更上完成并已在真实 PostgreSQL、真实 Worker/DeepSeek/MCP 和浏览器中重新验收。
+核对日期：2026-11-03。以下按 001–015 的对应执行报告和最新源码归档；013 的规划基线为 `main` 提交 `ba69c6e7180c700333d9fd6ea15d1a614796f8b3`，014 和015在其后的工作区变更上完成并已在真实 PostgreSQL、真实 Worker/DeepSeek/MCP 和浏览器中重新验收。
 
 ## 代码现状
 
@@ -122,6 +122,14 @@
 - 幂等同键重试返回原 Run/assistant，同键异内容 409；第二账号读取任务、Run、消息、结果均为 404；浏览器刷新后 4 条消息、REV 3 和两个 completed Run 与刷新前一致。
 - 模型决策解析增加容错和一次有界纠正重试，Worker 失败摘要保留真实 LLM 错误；0010 已完成降级/重升级，`alembic check` 无新增操作。Python `51 passed`，前端 lint/build 通过。
 - 本轮隔离测试账号已删除，013 保留账号与数据库卷未删除；详见 [014 报告](reports/014-shopping-task-chat-report.md)。
+
+## 015 教师奖品采买候选与结构化方案
+
+- 0011 迁移创建 `shopping_candidates`、`shopping_plans` 和 `shopping_plan_items`；候选以 `(run_id, product_id)` 去重，方案以 `run_id` 唯一，均绑定 owner、task、revision 和 run。
+- `shopping_agent` 完成后在同一终态事务中写入候选快照、服务端复算方案、Run 结果、assistant 消息和 completed 事件；`GET /api/runs/{run_id}/shopping-artifacts` 按 owner 读取，越权统一 404。
+- 规划使用 `Decimal`、CNY、包装可分份数和 `ceil(people / distributable_units)`；未知运费、税费和优惠不当作零，结果标记 `unknown_fees=true`。有效方案回答由服务端按已校验数量和金额生成。
+- 真实验收：教师奖品任务由真实 DeepSeek、Java `shopping-mcp`、独立 Worker 和 PostgreSQL 完成；1 次 MCP、4 次模型请求、1 次委派，保存 2 个模拟候选。REV 1 方案为贴纸 1 包、覆盖 25 人、总额 `6.90`、余量 `193.10`；预算改为 180 元生成 REV 3，旧 REV 1 仍可读取。REV 2 的人数与目标文本冲突，Agent 返回 clarification 且未写入方案。
+- Python 全量 `57 passed`、Java `6 passed`、前端 build、Ruff、compileall、Alembic check 均通过；新增终态事务、重放幂等、候选方案权限测试，真实第二账号读取 artifacts 返回 404。真实来源仍为 Java 模拟商品，不代表实时库存、报价或下单。
 
 ## 每次读取最新 GitHub 时的检查方式
 

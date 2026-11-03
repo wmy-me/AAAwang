@@ -1,6 +1,7 @@
 package dev.lifebuy.shopping;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
@@ -16,10 +17,11 @@ public class ProductSearchTool {
     private static final int MAX_KEYWORD_LENGTH = 50;
 
     private static final List<Product> PRODUCTS = List.of(
-            new Product("mock-pencil-set", "彩色铅笔套装", new BigDecimal("12.80"), "CNY", "12支/盒"),
-            new Product("mock-notebook", "线圈笔记本", new BigDecimal("8.50"), "CNY", "A5/本"),
-            new Product("mock-sticker-pack", "奖励贴纸包", new BigDecimal("6.90"), "CNY", "100枚/包"),
-            new Product("mock-water-bottle", "儿童水杯", new BigDecimal("29.90"), "CNY", "500ml/个"));
+            new Product("mock-prize-stationery", "学生奖品文具套装", new BigDecimal("6.50"), "CNY", "1套/包", 1, "模拟有货", Instant.parse("2026-11-03T00:00:00Z"), List.of("奖品", "文具", "学生", "小礼品")),
+            new Product("mock-pencil-set", "彩色铅笔套装", new BigDecimal("12.80"), "CNY", "12支/盒", 1, "模拟有货", Instant.parse("2026-11-03T00:00:00Z"), List.of("彩色铅笔", "铅笔")),
+            new Product("mock-notebook", "线圈笔记本", new BigDecimal("8.50"), "CNY", "A5/本", 1, "模拟有货", Instant.parse("2026-11-03T00:00:00Z"), List.of("笔记本", "本子")),
+            new Product("mock-sticker-pack", "奖励贴纸包", new BigDecimal("6.90"), "CNY", "100枚/包", 25, "模拟有货", Instant.parse("2026-11-03T00:00:00Z"), List.of("奖励", "贴纸", "奖品")),
+            new Product("mock-water-bottle", "儿童水杯", new BigDecimal("29.90"), "CNY", "500ml/个", 1, "模拟有货", Instant.parse("2026-11-03T00:00:00Z"), List.of("水杯", "儿童")));
 
     @McpTool(
             name = "search_products",
@@ -39,7 +41,7 @@ public class ProductSearchTool {
         }
 
         List<Product> matches = PRODUCTS.stream()
-                .filter(product -> product.name().toLowerCase(Locale.ROOT).contains(normalizedKeyword))
+                .filter(product -> matchesKeyword(product, normalizedKeyword))
             .filter(product -> max_price == null || product.unit_price().compareTo(max_price) <= 0)
                 .limit(effectiveLimit)
                 .toList();
@@ -57,6 +59,12 @@ public class ProductSearchTool {
         return normalized;
     }
 
+    private boolean matchesKeyword(Product product, String keyword) {
+        String normalizedName = product.name().toLowerCase(Locale.ROOT);
+        return normalizedName.contains(keyword)
+                || product.search_terms().stream().anyMatch(keyword::contains);
+    }
+
     public record SearchProductsResult(
             List<Product> products,
             String source_type,
@@ -68,6 +76,10 @@ public class ProductSearchTool {
             String name,
             BigDecimal unit_price,
             String currency,
-            String unit) {
+            String unit,
+            int distributable_units,
+            String availability,
+            Instant quoted_at,
+            List<String> search_terms) {
     }
 }

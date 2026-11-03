@@ -20,6 +20,9 @@ from life_agent.modules.runs.schemas import (
     RunEventResponse,
     RunList,
     RunResponse,
+    ShoppingArtifactsResponse,
+    ShoppingCandidateResponse,
+    ShoppingPlanResponse,
     ShoppingRunResultResponse,
 )
 from life_agent.modules.runs.service import (
@@ -29,6 +32,7 @@ from life_agent.modules.runs.service import (
     cancel_run,
     create_run,
     get_run,
+    get_shopping_artifacts,
     get_shopping_result,
     list_events,
     list_runs,
@@ -144,6 +148,22 @@ def result(
     except SQLAlchemyError as exc:
         raise _storage_unavailable() from exc
     return ShoppingRunResultResponse.model_validate(value)
+
+
+@router.get("/runs/{run_id}/shopping-artifacts", response_model=ShoppingArtifactsResponse)
+def shopping_artifacts(
+    run_id: uuid.UUID, db: Database, current_user: CurrentUser
+) -> ShoppingArtifactsResponse:
+    try:
+        candidates, plan = get_shopping_artifacts(db, current_user.id, run_id)
+    except RunNotFoundError as exc:
+        raise _not_found() from exc
+    except SQLAlchemyError as exc:
+        raise _storage_unavailable() from exc
+    return ShoppingArtifactsResponse(
+        candidates=[ShoppingCandidateResponse.model_validate(item) for item in candidates],
+        plan=ShoppingPlanResponse.model_validate(plan) if plan is not None else None,
+    )
 
 
 @router.get("/runs/{run_id}/events", response_model=RunEventList)

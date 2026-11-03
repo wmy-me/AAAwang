@@ -9,6 +9,8 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -235,6 +237,12 @@ class Run(Base):
     events: Mapped[list["RunEvent"]] = relationship(
         back_populates="run", cascade="all, delete-orphan", passive_deletes=True
     )
+    shopping_candidates: Mapped[list["ShoppingCandidate"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
+    shopping_plan: Mapped["ShoppingPlan | None"] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class RunEvent(Base):
@@ -273,3 +281,93 @@ class ShoppingRunResult(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     run: Mapped[Run] = relationship(back_populates="shopping_result")
+
+
+class ShoppingCandidate(Base):
+    __tablename__ = "shopping_candidates"
+    __table_args__ = (
+        UniqueConstraint("run_id", "product_id", name="uq_candidates_run_product"),
+        Index("ix_candidates_task_revision", "task_id", "revision"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_revisions.id", ondelete="CASCADE")
+    )
+    revision: Mapped[int] = mapped_column(Integer)
+    product_id: Mapped[str] = mapped_column(String(128))
+    name: Mapped[str] = mapped_column(String(240))
+    unit_price: Mapped[object] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str] = mapped_column(String(3))
+    unit: Mapped[str] = mapped_column(String(120))
+    distributable_units: Mapped[int] = mapped_column(Integer)
+    source_type: Mapped[str] = mapped_column(String(32))
+    source_service: Mapped[str] = mapped_column(String(64))
+    simulated: Mapped[bool] = mapped_column(Boolean)
+    availability: Mapped[str] = mapped_column(String(120))
+    quoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    queried_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    run: Mapped[Run] = relationship(back_populates="shopping_candidates")
+
+
+class ShoppingPlan(Base):
+    __tablename__ = "shopping_plans"
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_revisions.id", ondelete="CASCADE")
+    )
+    revision: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(32))
+    people: Mapped[int] = mapped_column(Integer)
+    covered_people: Mapped[int] = mapped_column(Integer)
+    budget: Mapped[object] = mapped_column(Numeric(12, 2))
+    total: Mapped[object] = mapped_column(Numeric(12, 2))
+    remaining: Mapped[object] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str] = mapped_column(String(3))
+    unknown_fees: Mapped[bool] = mapped_column(Boolean, default=True)
+    note: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    run: Mapped[Run] = relationship(back_populates="shopping_plan")
+    items: Mapped[list["ShoppingPlanItem"]] = relationship(
+        back_populates="plan", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class ShoppingPlanItem(Base):
+    __tablename__ = "shopping_plan_items"
+    __table_args__ = (
+        UniqueConstraint("run_id", "candidate_id", name="uq_plan_items_candidate"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("shopping_plans.run_id", ondelete="CASCADE"), index=True
+    )
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("shopping_candidates.id", ondelete="RESTRICT")
+    )
+    package_quantity: Mapped[int] = mapped_column(Integer)
+    covered_people: Mapped[int] = mapped_column(Integer)
+    subtotal: Mapped[object] = mapped_column(Numeric(12, 2))
+    plan: Mapped[ShoppingPlan] = relationship(back_populates="items")
+    candidate: Mapped[ShoppingCandidate] = relationship()

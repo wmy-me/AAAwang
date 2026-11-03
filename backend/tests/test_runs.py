@@ -7,16 +7,25 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from life_agent.core.config import Settings, get_settings
 from life_agent.db.base import Base
-from life_agent.db.models import Run, RunEvent, ShoppingRunResult, Task, User
+from life_agent.db.models import (
+    Run,
+    RunEvent,
+    ShoppingCandidate,
+    ShoppingPlan,
+    ShoppingRunResult,
+    Task,
+    User,
+)
 from life_agent.db.session import get_db
 from life_agent.main import app
 from life_agent.modules.runs.service import claim_run, complete_claim
+from life_agent.modules.shopping_plans.service import build_artifacts
 
 PASSWORD = f"test-only-{secrets.token_urlsafe(18)}"
 
@@ -61,7 +70,9 @@ def register_and_login(client: TestClient, username: str) -> None:
     ).status_code == 200
 
 
-def create_task(client: TestClient) -> dict[str, object]:
+def create_task(
+    client: TestClient, conditions: dict[str, object] | None = None
+) -> dict[str, object]:
     conversation = client.post("/api/conversations", json={"title": "Planning"})
     assert conversation.status_code == 201
     response = client.post(
@@ -69,7 +80,7 @@ def create_task(client: TestClient) -> dict[str, object]:
         json={
             "domain": "shopping",
             "goal": "Buy class prizes",
-            "conditions": {"budget": 300, "quantity": 20},
+            "conditions": conditions or {"budget": 300, "quantity": 20},
         },
     )
     assert response.status_code == 201
@@ -269,6 +280,79 @@ def test_shopping_result_is_private(
     with TestClient(app, base_url="http://testserver") as bob:
         register_and_login(bob, "bob")
         assert bob.get(f"/api/runs/{run_id}/result").status_code == 404
+
+
+def test_shopping_artifacts_are_atomic_idempotent_and_private(
+    run_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    alice, factory = run_context
+    register_and_login(alice, "alice")
+    conditions = {
+        "item": "学生奖品",
+        "people": 25,
+        "budget": 200,
+        "quantity": 25,
+    }
+    task = create_task(alice, conditions)
+    created = alice.post(
+        f"/api/tasks/{task['id']}/runs",
+        json={
+            "expected_revision": 1,
+            "idempotency_key": "artifacts-private",
+            "execution_type": "shopping_agent",
+        },
+    ).json()
+    run_id = uuid.UUID(created["id"])
+    source = {
+        "service_id": "shopping",
+        "simulated": True,
+        "tool_result": {
+            "products": [
+                {
+                    "product_id": "mock-prize-stationery",
+                    "name": "学生奖品文具套装",
+                    "unit_price": "6.50",
+                    "currency": "CNY",
+                    "unit": "1套/包",
+                    "distributable_units": 1,
+                    "availability": "模拟有货",
+                    "quoted_at": "2026-11-03T00:00:00Z",
+                }
+            ],
+            "source_type": "mock",
+            "source_service": "shopping-mcp",
+        },
+    }
+    with factory() as db:
+        claim = claim_run(db, "worker-one", 30, 3)
+        assert claim is not None
+        assert complete_claim(
+            db,
+            claim,
+            shopping_result={
+                "answer": "模拟候选",
+                "source": source,
+                "execution_version": "015-v1",
+                "decision_type": "delegated_discovery",
+                "delegated": True,
+                "mcp_call_count": 1,
+            },
+            shopping_artifacts=build_artifacts(source, conditions),
+        )
+        assert complete_claim(db, claim, {"late": True}) is False
+        assert db.scalar(select(func.count()).select_from(ShoppingCandidate)) == 1
+        assert db.scalar(select(func.count()).select_from(ShoppingPlan)) == 1
+
+    artifacts = alice.get(f"/api/runs/{run_id}/shopping-artifacts")
+    assert artifacts.status_code == 200
+    assert artifacts.json()["candidates"][0]["product_id"] == "mock-prize-stationery"
+    assert artifacts.json()["plan"]["revision"] == 1
+    assert artifacts.json()["plan"]["total"] == "162.50"
+    assert artifacts.json()["plan"]["covered_people"] == 25
+
+    with TestClient(app, base_url="http://testserver") as bob:
+        register_and_login(bob, "bob")
+        assert bob.get(f"/api/runs/{run_id}/shopping-artifacts").status_code == 404
 
 
 def test_run_events_are_ordered_private_and_idempotent(

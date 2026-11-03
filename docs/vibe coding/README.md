@@ -46,8 +46,8 @@
 | 012 | [购物主 Agent 与信息发现 Agent 的最小委派](012-shopping-agent-delegation.md) | 已完成；LangGraph 主从委派、shopping_agent、0008迁移、真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读均通过，见[报告](../reports/012-shopping-agent-delegation-report.md) |
 | 013 | [网页登录与购物 Agent Run 可视化](013-shopping-web-workbench.md) | 已完成；网页工作台、真实 Worker/MCP completed 结果、刷新恢复、双用户隔离、登出后刷新和独立 SSE 终态补读均通过，见[报告](../reports/013-shopping-web-workbench-report.md) |
 | 014 | [已选购物任务的多轮对话与助手消息持久化](014-shopping-task-chat.md) | 已完成；两轮真实 Worker/DeepSeek/MCP、assistant 消息唯一持久化、幂等、跨账号和浏览器刷新重读均通过，见[报告](../reports/014-shopping-task-chat-report.md) |
-| 015 | [教师奖品采买候选与结构化方案](015-shopping-candidates-and-plan.md) | 待执行；以 014 为前置，规划候选快照、金额复算、方案持久化和网页展示 |
+| 015 | [教师奖品采买候选与结构化方案](015-shopping-candidates-and-plan.md) | 已完成；候选快照、服务端复算、版本隔离和网页刷新验收见[报告](../reports/015-shopping-candidates-and-plan-report.md) |
 
-P1 的 001–003 和 P2 的 004–014 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化均已验收；015 为待执行的 P3 首条采买方案任务。
+P1 的 001–003、P2 的 004–014 和 P3 的 015 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。

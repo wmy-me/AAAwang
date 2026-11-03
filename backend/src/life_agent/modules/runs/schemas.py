@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
@@ -60,6 +61,57 @@ class ShoppingRunResultResponse(BaseModel):
     ] = "delegated_discovery"
     delegated: bool = False
     mcp_call_count: int = 0
+
+
+class ShoppingCandidateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    product_id: str
+    name: str
+    unit_price: Decimal
+    currency: str
+    unit: str
+    distributable_units: int
+    source_type: str
+    source_service: str
+    simulated: bool
+    availability: str
+    quoted_at: datetime | None
+    queried_at: datetime
+
+
+class ShoppingPlanItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    candidate_id: uuid.UUID
+    package_quantity: int
+    covered_people: int
+    subtotal: Decimal
+    candidate: ShoppingCandidateResponse
+
+
+class ShoppingPlanResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    run_id: uuid.UUID
+    revision: int
+    status: str
+    people: int
+    covered_people: int
+    budget: Decimal
+    total: Decimal
+    remaining: Decimal
+    currency: str
+    unknown_fees: bool
+    note: str
+    created_at: datetime
+    items: list[ShoppingPlanItemResponse]
+
+
+class ShoppingArtifactsResponse(BaseModel):
+    candidates: list[ShoppingCandidateResponse]
+    plan: ShoppingPlanResponse | None
 
 
 class RunList(BaseModel):

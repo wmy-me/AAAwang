@@ -70,6 +70,49 @@ export interface RunResult {
   mcp_call_count: number
 }
 
+export interface ShoppingCandidate {
+  id: string
+  product_id: string
+  name: string
+  unit_price: string
+  currency: string
+  unit: string
+  distributable_units: number
+  source_type: string
+  source_service: string
+  simulated: boolean
+  availability: string
+  quoted_at: string | null
+  queried_at: string
+}
+
+export interface ShoppingPlan {
+  run_id: string
+  revision: number
+  status: string
+  people: number
+  covered_people: number
+  budget: string
+  total: string
+  remaining: string
+  currency: string
+  unknown_fees: boolean
+  note: string
+  created_at: string
+  items: Array<{
+    candidate_id: string
+    package_quantity: number
+    covered_people: number
+    subtotal: string
+    candidate: ShoppingCandidate
+  }>
+}
+
+export interface ShoppingArtifacts {
+  candidates: ShoppingCandidate[]
+  plan: ShoppingPlan | null
+}
+
 export interface Message {
   id: string
   conversation_id: string
@@ -164,6 +207,8 @@ export const api = {
   getRun: (runId: string) => request<Run>(`/runs/${runId}`),
   cancelRun: (runId: string) => request<Run>(`/runs/${runId}/cancel`, { method: 'POST' }),
   result: (runId: string) => request<RunResult>(`/runs/${runId}/result`),
+  shoppingArtifacts: (runId: string) =>
+    request<ShoppingArtifacts>(`/runs/${runId}/shopping-artifacts`),
   submitTurn: (
     conversationId: string,
     taskId: string,

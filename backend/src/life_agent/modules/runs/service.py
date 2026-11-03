@@ -5,13 +5,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from life_agent.db.models import (
     Conversation,
     Message,
     Run,
     RunEvent,
+    ShoppingCandidate,
+    ShoppingPlan,
+    ShoppingPlanItem,
     ShoppingRunResult,
     Task,
     TaskRevision,
@@ -252,6 +255,7 @@ def _finish_claim(
     diagnostic: dict[str, object] | None = None,
     error_summary: str | None = None,
     shopping_result: dict[str, object] | None = None,
+    shopping_artifacts: dict[str, object] | None = None,
 ) -> bool:
     now = datetime.now(UTC)
     run = db.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
@@ -296,6 +300,60 @@ def _finish_claim(
                         run_id=run.id,
                     )
                 )
+        if shopping_artifacts is not None:
+            candidates_by_product: dict[str, ShoppingCandidate] = {}
+            for draft in shopping_artifacts.get("candidates", []):
+                candidate = ShoppingCandidate(
+                    run_id=run.id,
+                    owner_id=run.owner_id,
+                    task_id=run.task_id,
+                    task_revision_id=run.task_revision_id,
+                    revision=run.revision,
+                    product_id=draft.product_id,
+                    name=draft.name,
+                    unit_price=draft.unit_price,
+                    currency=draft.currency,
+                    unit=draft.unit,
+                    distributable_units=draft.distributable_units,
+                    source_type=draft.source_type,
+                    source_service=draft.source_service,
+                    simulated=draft.simulated,
+                    availability=draft.availability,
+                    quoted_at=draft.quoted_at,
+                    queried_at=draft.queried_at,
+                )
+                db.add(candidate)
+                candidates_by_product[draft.product_id] = candidate
+            plan_draft = shopping_artifacts.get("plan")
+            if plan_draft is not None:
+                candidate = candidates_by_product[plan_draft.candidate_product_id]
+                db.flush()
+                db.add(
+                    ShoppingPlan(
+                        run_id=run.id,
+                        owner_id=run.owner_id,
+                        task_id=run.task_id,
+                        task_revision_id=run.task_revision_id,
+                        revision=run.revision,
+                        status="valid",
+                        people=plan_draft.people,
+                        covered_people=plan_draft.covered_people,
+                        budget=plan_draft.budget,
+                        total=plan_draft.total,
+                        remaining=plan_draft.remaining,
+                        currency=plan_draft.currency,
+                        unknown_fees=plan_draft.unknown_fees,
+                        note=plan_draft.note,
+                        items=[
+                            ShoppingPlanItem(
+                                candidate_id=candidate.id,
+                                package_quantity=plan_draft.package_quantity,
+                                covered_people=plan_draft.covered_people,
+                                subtotal=plan_draft.total,
+                            )
+                        ],
+                    )
+                )
     _append_event(db, run, f"run.{status}", now)
     db.commit()
     return True
@@ -306,6 +364,7 @@ def complete_claim(
     claim: RunClaim,
     diagnostic: dict[str, object] | None = None,
     shopping_result: dict[str, object] | None = None,
+    shopping_artifacts: dict[str, object] | None = None,
 ) -> bool:
     return _finish_claim(
         db,
@@ -313,6 +372,7 @@ def complete_claim(
         "completed",
         diagnostic=diagnostic,
         shopping_result=shopping_result,
+        shopping_artifacts=shopping_artifacts,
     )
 
 
@@ -437,3 +497,27 @@ def get_shopping_result(
     if result is None:
         raise RunNotFoundError
     return result
+
+
+def get_shopping_artifacts(
+    db: Session, owner_id: uuid.UUID, run_id: uuid.UUID
+) -> tuple[list[ShoppingCandidate], ShoppingPlan | None]:
+    _owned_run(db, owner_id, run_id)
+    candidates = list(
+        db.scalars(
+            select(ShoppingCandidate)
+            .where(
+                ShoppingCandidate.run_id == run_id,
+                ShoppingCandidate.owner_id == owner_id,
+            )
+            .order_by(ShoppingCandidate.unit_price, ShoppingCandidate.product_id)
+        )
+    )
+    plan = db.scalar(
+        select(ShoppingPlan)
+        .where(ShoppingPlan.run_id == run_id, ShoppingPlan.owner_id == owner_id)
+        .options(
+            selectinload(ShoppingPlan.items).selectinload(ShoppingPlanItem.candidate)
+        )
+    )
+    return candidates, plan
