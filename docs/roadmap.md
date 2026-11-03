@@ -19,7 +19,7 @@
 
 ## 下一步讨论的范围
 
-[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)均已完成；[010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)已完成真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收，外部调用不承诺 exactly-once，不因此进入主从Agent协作或网页对话。无需先完成三个Java平台的业务后台。
+[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)均已完成；[010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)已完成真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收，外部调用不承诺 exactly-once，不因此进入主从Agent协作或网页对话。当前优先完成 [011 项目数据库开发环境与配置收敛](vibe%20coding/011-dev-database-config.md)（待执行），再安排主从 Agent 委派与网页对话。最终一键部署和数据备份恢复属于 P7；本轮只收敛开发数据库。无需先完成三个 Java 平台的业务后台。
 
 ## 任务与阶段的关系
 

@@ -1,6 +1,6 @@
 # 当前进度
 
-核对日期：2026-11-03。以下按 001–009 的对应执行报告和最新源码归档；本次规划基线为 `main` 提交 `adbe1314fb006bb19828267f0ed163845cfa2478`，未重新运行测试或数据库。
+核对日期：2026-11-03。以下按 001–010 的对应执行报告和最新源码归档；本次规划基线为 `main` 提交 `87d46c26bf4cadcd5a668f0aad24c077f6c9cf85`，未重新运行测试或用户本地数据库。
 
 ## 代码现状
 
@@ -93,6 +93,12 @@
 - 真实双Worker竞争、数据库模拟租约接管、旧fencing拒绝、无幽灵终态事件及SSE `after=1`断线补读均通过。
 - ORM用户删除与数据库父表直接 `DELETE` 均已验证级联清理Run和事件，另一用户数据保留；详见[009报告](reports/009-run-deletion-events-regression-report.md)。
 
+## 开发数据库配置的当前差异
+
+- 010 的真实 DeepSeek→shopping-mcp→PostgreSQL 已通过隔离临时数据库验收，但测试卷随后清理；这不证明用户本机项目库已长期运行。
+- 010 提交后 `infra/compose.yaml` 默认含 PostgreSQL、MySQL、Redis、MinIO；后面三项尚无业务使用。两个 env 示例及 Compose fallback 的 PostgreSQL 用户/密码存在不一致，默认宿主 5432 与用户已有服务可能冲突。
+- 依据用户决定，后续本地开发以项目专用 PostgreSQL Compose + 持久化卷为标准环境，其他已有容器保持独立；[011 项目数据库开发环境与配置收敛](vibe%20coding/011-dev-database-config.md) 为待执行任务。它只整理可复现开发配置，不声称已经完成应用一键部署。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -106,9 +112,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03，009 已完成删除链修复、存量迁移兼容、真实双Worker事件回归和断线补读验收。010 已完成受控购物执行类型、结果持久化、租约续期、失败边界、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once，不因此进入完整主从 Agent、网页或 P3。
+截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。下一步执行待实施的 [011 开发数据库与配置收敛](vibe%20coding/011-dev-database-config.md)，让项目专用 PostgreSQL 默认可复现、单源配置且方便开发查表；完整主从 Agent 和网页另拆任务。
 
-[001](vibe%20coding/001-llm-connection.md)至[010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)均已完成；010 的真实外部闭环与中断恢复已验收；P2 的网页对话和完整Agent接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)均已完成；010 的真实外部闭环与中断恢复已验收；011 尚未实施；P2 的网页对话和完整 Agent 接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 
