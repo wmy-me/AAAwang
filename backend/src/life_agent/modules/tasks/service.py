@@ -8,6 +8,10 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from life_agent.db.models import Conversation, Task, TaskRevision
+from life_agent.modules.tasks.consistency import (
+    check_goal_consistency,
+    resolve_goal,
+)
 from life_agent.modules.tasks.schemas import Conditions
 
 
@@ -25,6 +29,10 @@ class RevisionConflictError(ValueError):
 class TaskView:
     task: Task
     conditions: Conditions
+    goal: str
+    goal_conflicts: list[dict[str, object]]
+    goal_resolution: str | None
+    goal_legacy: bool
 
 
 def _get_owned_conversation(
@@ -74,6 +82,7 @@ def create_task(
     change_note: str | None,
 ) -> TaskView:
     _get_owned_conversation(db, owner_id, conversation_id)
+    consistency = check_goal_consistency(goal, conditions)
     task = Task(
         conversation_id=conversation_id,
         domain=domain,
@@ -87,6 +96,10 @@ def create_task(
         TaskRevision(
             task_id=task.id,
             revision=1,
+            goal=goal,
+            goal_conflicts=consistency.conflicts or None,
+            goal_resolution=None,
+            goal_legacy=False,
             conditions=conditions,
             change_note=change_note,
             created_at=datetime.now(UTC),
@@ -94,13 +107,27 @@ def create_task(
     )
     db.commit()
     db.refresh(task)
-    return TaskView(task=task, conditions=conditions)
+    return TaskView(
+        task=task,
+        conditions=conditions,
+        goal=goal,
+        goal_conflicts=consistency.conflicts,
+        goal_resolution=None,
+        goal_legacy=False,
+    )
 
 
 def get_task(db: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> TaskView:
     task = _get_owned_task(db, owner_id, task_id)
     snapshot = _get_revision(db, task.id, task.current_revision)
-    return TaskView(task=task, conditions=snapshot.conditions)
+    return TaskView(
+        task=task,
+        conditions=snapshot.conditions,
+        goal=snapshot.goal,
+        goal_conflicts=(snapshot.goal_conflicts or check_goal_consistency(snapshot.goal, snapshot.conditions).conflicts),
+        goal_resolution=snapshot.goal_resolution,
+        goal_legacy=snapshot.goal_legacy,
+    )
 
 
 def list_tasks(
@@ -122,16 +149,26 @@ def list_tasks(
     )
     if not tasks:
         return []
-    snapshots = {
-        (snapshot.task_id, snapshot.revision): snapshot.conditions
+    revisions = {
+        (snapshot.task_id, snapshot.revision): snapshot
         for snapshot in db.scalars(
             select(TaskRevision).where(TaskRevision.task_id.in_([task.id for task in tasks]))
         )
     }
-    return [
-        TaskView(task=task, conditions=snapshots[(task.id, task.current_revision)])
-        for task in tasks
-    ]
+    views: list[TaskView] = []
+    for task in tasks:
+        snapshot = revisions[(task.id, task.current_revision)]
+        views.append(
+            TaskView(
+                task=task,
+                conditions=snapshot.conditions,
+                goal=snapshot.goal,
+                goal_conflicts=(snapshot.goal_conflicts or check_goal_consistency(snapshot.goal, snapshot.conditions).conflicts),
+                goal_resolution=snapshot.goal_resolution,
+                goal_legacy=snapshot.goal_legacy,
+            )
+        )
+    return views
 
 
 def list_revisions(
@@ -154,10 +191,20 @@ def create_revision(
     owner_id: uuid.UUID,
     task_id: uuid.UUID,
     expected_revision: int,
+    goal: str | None,
     conditions: Conditions,
     change_note: str | None,
+    confirm_goal_conflict: bool = False,
 ) -> TaskRevision:
     task = _get_owned_task(db, owner_id, task_id)
+    current_snapshot = _get_revision(db, task.id, expected_revision)
+    effective_goal = (goal or current_snapshot.goal).strip()
+    consistency = check_goal_consistency(effective_goal, conditions)
+    resolution = None
+    if consistency.has_conflict and confirm_goal_conflict:
+        effective_goal = resolve_goal(effective_goal, conditions, consistency)
+        consistency = check_goal_consistency(effective_goal, conditions)
+        resolution = "confirmed_structured_conditions"
     new_revision = expected_revision + 1
     now = datetime.now(UTC)
     result = db.execute(
@@ -172,11 +219,16 @@ def create_revision(
     snapshot = TaskRevision(
         task_id=task.id,
         revision=new_revision,
+        goal=effective_goal,
+        goal_conflicts=consistency.conflicts or None,
+        goal_resolution=resolution,
+        goal_legacy=False,
         conditions=conditions,
         change_note=change_note,
         created_at=now,
     )
     db.add(snapshot)
+    task.goal = effective_goal
     db.commit()
     db.refresh(snapshot)
     return snapshot

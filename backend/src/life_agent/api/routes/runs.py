@@ -37,6 +37,7 @@ from life_agent.modules.runs.service import (
     list_events,
     list_runs,
 )
+from life_agent.modules.tasks.consistency import GoalConflictError
 
 router = APIRouter()
 PageOffset = Annotated[int, Query(ge=0, le=1_000_000)]
@@ -81,6 +82,11 @@ def create(
         raise HTTPException(
             status_code=409,
             detail={"message": "任务条件版本冲突。", "current_revision": exc.current_revision},
+        ) from exc
+    except GoalConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"message": str(exc), "goal_conflicts": exc.conflicts},
         ) from exc
     except IdempotencyConflictError as exc:
         raise HTTPException(status_code=409, detail="幂等键已用于其他 run 请求。") from exc

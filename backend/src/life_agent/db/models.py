@@ -180,6 +180,10 @@ class TaskRevision(Base):
         ForeignKey("tasks.id", ondelete="CASCADE")
     )
     revision: Mapped[int]
+    goal: Mapped[str] = mapped_column(String(500))
+    goal_conflicts: Mapped[list[dict[str, object]] | None] = mapped_column(JSON)
+    goal_resolution: Mapped[str | None] = mapped_column(String(32))
+    goal_legacy: Mapped[bool] = mapped_column(Boolean, default=False)
     conditions: Mapped[dict[str, object]] = mapped_column(JSON)
     change_note: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
@@ -212,6 +216,7 @@ class Run(Base):
         ForeignKey("messages.id", ondelete="SET NULL"), index=True
     )
     revision: Mapped[int]
+    goal: Mapped[str] = mapped_column(String(500))
     conditions: Mapped[dict[str, object]] = mapped_column(JSON)
     idempotency_key: Mapped[str] = mapped_column(String(128))
     execution_type: Mapped[str] = mapped_column(String(32), default="diagnostic")

@@ -19,6 +19,10 @@ from life_agent.db.models import (
     Task,
     TaskRevision,
 )
+from life_agent.modules.tasks.consistency import (
+    GoalConflictError,
+    check_goal_consistency,
+)
 
 RUN_TERMINAL = {"completed", "failed", "cancelled"}
 RUN_EVENT_TYPES = {
@@ -133,11 +137,15 @@ def create_run(
     )
     if snapshot is None:
         raise RunNotFoundError
+    consistency = check_goal_consistency(snapshot.goal, snapshot.conditions)
+    if consistency.has_conflict:
+        raise GoalConflictError(consistency.conflicts)
     run = Run(
         task_id=task.id,
         owner_id=owner_id,
         task_revision_id=snapshot.id,
         revision=snapshot.revision,
+        goal=snapshot.goal,
         conditions=dict(snapshot.conditions),
         idempotency_key=idempotency_key,
         input_message_id=input_message_id,
@@ -220,7 +228,7 @@ def claim_run(
         _append_event(db, run, "run.cancelled", now)
         db.commit()
         return None
-    goal = run.task.goal
+    goal = run.goal
     input_message = (
         db.scalar(select(Message.content).where(Message.id == run.input_message_id))
         if run.input_message_id is not None

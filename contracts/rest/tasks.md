@@ -4,9 +4,9 @@
 
 ## 数据模型
 
-任务包含稳定 `id`、`conversation_id`、`domain`、`goal`、`current_revision`、当前完整 `conditions` 以及创建/更新时间。`domain` 首版仅允许 `shopping` 和 `travel`，`goal` 去除首尾空白后长度为 1–500。
+任务包含稳定 `id`、`conversation_id`、`domain`、当前 revision 的 `goal`、`current_revision`、当前完整 `conditions`、`goal_conflicts`、`goal_resolution`、`goal_legacy` 以及创建/更新时间。`domain` 首版仅允许 `shopping` 和 `travel`，`goal` 去除首尾空白后长度为 1–500。兼容字段 `Task.goal` 只作为当前 revision 投影。
 
-每个 revision 是不可原地修改的完整条件快照，包含 `id`、`task_id`、单调递增的 `revision`、`conditions`、可空 `change_note` 和创建时间。创建任务时原子创建 revision 1。
+每个 revision 是不可原地修改的完整目标与条件快照，包含 `id`、`task_id`、单调递增的 `revision`、`goal`、`conditions`、可空 `goal_conflicts`、`goal_resolution`、`goal_legacy`、`change_note` 和创建时间。创建任务时原子创建 revision 1。
 
 ## 条件规则
 
@@ -43,12 +43,27 @@
 ```json
 {
   "expected_revision": 2,
+  "goal": "给 25 人购买奖品，总预算 180 元",
   "conditions": {"budget": 500, "quantity": 20},
-  "change_note": "提高预算"
+  "change_note": "提高预算",
+  "confirm_goal_conflict": false
 }
 ```
 
 `conditions` 是完整替换快照，不是 patch。即使新条件与当前版本相同，明确提交仍创建下一版本。服务端以 `expected_revision` 做数据库条件更新；两个请求同时基于同一版本时至多一个成功。
+
+目标中明确识别的人数或预算与结构化条件冲突时，未确认的修订仍可保存并在任务卡展示冲突，但创建 Run 或任务聊天 turn 返回：
+
+```json
+{
+  "detail": {
+    "message": "任务目标与结构化条件存在明确冲突。",
+    "goal_conflicts": [{"field": "budget", "goal_value": 200, "condition_value": 180, "fragment": "预算 200 元"}]
+  }
+}
+```
+
+提交 `confirm_goal_conflict: true` 时，服务端按结构化条件修正已识别冲突并记录 `goal_resolution`。无法可靠识别的数字只保留为不确定，不据此判断一致。结构化 `budget` 始终是复算依据。
 
 过期版本返回：
 

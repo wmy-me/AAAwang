@@ -95,8 +95,20 @@ class TaskCreate(StrictRequest):
 
 class TaskRevisionCreate(StrictRequest):
     expected_revision: int = Field(ge=1)
+    goal: str | None = Field(default=None, min_length=1, max_length=500)
     conditions: Conditions
     change_note: str | None = Field(default=None, max_length=500)
+    confirm_goal_conflict: bool = False
+
+    @model_validator(mode="after")
+    def normalize_goal(self) -> "TaskRevisionCreate":
+        if self.goal is not None:
+            self.goal = self.goal.strip()
+            if not self.goal:
+                raise ValueError("任务目标不能只包含空白字符。")
+        if self.change_note is not None:
+            self.change_note = self.change_note.strip() or None
+        return self
 
 
 class TaskRevisionResponse(BaseModel):
@@ -105,6 +117,10 @@ class TaskRevisionResponse(BaseModel):
     id: uuid.UUID
     task_id: uuid.UUID
     revision: int
+    goal: str
+    goal_conflicts: list[dict[str, object]] | None
+    goal_resolution: str | None
+    goal_legacy: bool
     conditions: Conditions
     change_note: str | None
     created_at: datetime
@@ -117,6 +133,9 @@ class TaskResponse(BaseModel):
     goal: str
     current_revision: int
     conditions: Conditions
+    goal_conflicts: list[dict[str, object]] | None = None
+    goal_resolution: str | None = None
+    goal_legacy: bool = False
     created_at: datetime
     updated_at: datetime
 

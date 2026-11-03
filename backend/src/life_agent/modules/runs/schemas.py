@@ -35,6 +35,7 @@ class RunResponse(BaseModel):
     owner_id: uuid.UUID
     task_revision_id: uuid.UUID
     revision: int
+    goal: str
     conditions: dict[str, object]
     idempotency_key: str
     execution_type: RunExecutionType

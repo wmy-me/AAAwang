@@ -15,6 +15,7 @@ from life_agent.modules.chat.service import (
 )
 from life_agent.modules.conversations.schemas import MessageResponse
 from life_agent.modules.runs.schemas import RunResponse
+from life_agent.modules.tasks.consistency import GoalConflictError
 from life_agent.modules.tasks.schemas import TaskResponse
 
 router = APIRouter(prefix="/conversations")
@@ -30,9 +31,12 @@ def _task_response(turn) -> TaskResponse:
             "id": turn.task.id,
             "conversation_id": turn.task.conversation_id,
             "domain": turn.task.domain,
-            "goal": turn.task.goal,
+            "goal": turn.goal,
             "current_revision": turn.task.current_revision,
             "conditions": turn.conditions,
+            "goal_conflicts": turn.goal_conflicts or None,
+            "goal_resolution": turn.goal_resolution,
+            "goal_legacy": turn.goal_legacy,
             "created_at": turn.task.created_at,
             "updated_at": turn.task.updated_at,
         }
@@ -82,6 +86,12 @@ def submit(
         raise HTTPException(
             status_code=409,
             detail="回合幂等键、任务版本或消息状态发生冲突，请读取最新任务后重试。",
+        ) from exc
+    except GoalConflictError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={"message": str(exc), "goal_conflicts": exc.conflicts},
         ) from exc
     except SQLAlchemyError as exc:
         db.rollback()

@@ -32,6 +32,9 @@ export interface Task {
   goal: string
   current_revision: number
   conditions: Conditions
+  goal_conflicts: Array<Record<string, unknown>> | null
+  goal_resolution: string | null
+  goal_legacy: boolean
   created_at: string
   updated_at: string
 }
@@ -224,12 +227,14 @@ export const api = {
   updateTask: (
     taskId: string,
     expectedRevision: number,
+    goal: string,
     conditions: Conditions,
     changeNote: string,
+    confirmGoalConflict: boolean,
   ) =>
     request<{ revision: number }>(
       `/tasks/${taskId}/revisions`,
-      json({ expected_revision: expectedRevision, conditions, change_note: changeNote || undefined }),
+      json({ expected_revision: expectedRevision, goal, conditions, change_note: changeNote || undefined, confirm_goal_conflict: confirmGoalConflict }),
     ),
   getTask: (taskId: string) => request<Task>(`/tasks/${taskId}`),
   runs: (taskId: string) => request<Page<Run>>(`/tasks/${taskId}/runs?limit=100`),

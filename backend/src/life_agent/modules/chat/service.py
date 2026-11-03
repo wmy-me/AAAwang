@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session
 
 from life_agent.db.models import Conversation, Message, Run, Task, TaskRevision
 from life_agent.modules.runs.service import create_run
+from life_agent.modules.tasks.consistency import (
+    GoalConflictError,
+    check_goal_consistency,
+)
 from life_agent.modules.tasks.schemas import Conditions, validate_conditions
 
 
@@ -27,6 +31,10 @@ class ChatTurn:
     run: object
     task: Task
     conditions: Conditions
+    goal: str
+    goal_conflicts: list[dict[str, object]]
+    goal_resolution: str | None
+    goal_legacy: bool
     assistant_message: Message | None
     created: bool
 
@@ -99,6 +107,10 @@ def _existing_turn(
         run=run,
         task=task,
         conditions=dict(snapshot.conditions),
+        goal=snapshot.goal,
+        goal_conflicts=check_goal_consistency(snapshot.goal, snapshot.conditions).conflicts,
+        goal_resolution=snapshot.goal_resolution,
+        goal_legacy=snapshot.goal_legacy,
         assistant_message=assistant,
         created=False,
     )
@@ -165,6 +177,9 @@ def submit_turn(
         raise ChatTurnNotFoundError
     current = dict(snapshot.conditions)
     conditions = _infer_conditions(content, current, _latest_assistant(db, task.id))
+    consistency = check_goal_consistency(snapshot.goal, conditions)
+    if consistency.has_conflict:
+        raise GoalConflictError(consistency.conflicts)
     if conditions != current:
         now = datetime.now(UTC)
         new_revision = expected_revision + 1
@@ -178,6 +193,10 @@ def submit_turn(
         snapshot = TaskRevision(
             task_id=task.id,
             revision=new_revision,
+            goal=snapshot.goal,
+            goal_conflicts=None,
+            goal_resolution=None,
+            goal_legacy=False,
             conditions=conditions,
             change_note="通过购物任务对话补充条件",
             created_at=now,
@@ -220,6 +239,10 @@ def submit_turn(
         run=run,
         task=task,
         conditions=conditions,
+        goal=snapshot.goal,
+        goal_conflicts=[],
+        goal_resolution=snapshot.goal_resolution,
+        goal_legacy=snapshot.goal_legacy,
         assistant_message=None,
         created=True,
     )

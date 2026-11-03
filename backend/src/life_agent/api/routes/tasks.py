@@ -48,9 +48,12 @@ def _task_response(view: TaskView) -> TaskResponse:
         id=task.id,
         conversation_id=task.conversation_id,
         domain=task.domain,
-        goal=task.goal,
+        goal=view.goal,
         current_revision=task.current_revision,
         conditions=view.conditions,
+        goal_conflicts=view.goal_conflicts or None,
+        goal_resolution=view.goal_resolution,
+        goal_legacy=view.goal_legacy,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -154,8 +157,10 @@ def revise(
             current_user.id,
             task_id,
             body.expected_revision,
+            body.goal,
             conditions,
             change_note,
+            body.confirm_goal_conflict,
         )
     except TaskNotFoundError as exc:
         raise _not_found() from exc
