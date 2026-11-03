@@ -181,3 +181,63 @@ def test_run_input_and_cross_site_write_are_rejected(
     with _factory() as db:
         assert db.scalar(select(User).where(User.username == "alice")) is not None
         assert db.scalar(select(Task).where(Task.id == uuid.UUID(task["id"]))) is not None
+
+
+def test_run_events_are_ordered_private_and_idempotent(
+    run_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    alice, factory = run_context
+    register_and_login(alice, "alice")
+    task = create_task(alice)
+    created = alice.post(
+        f"/api/tasks/{task['id']}/runs",
+        json={"expected_revision": 1, "idempotency_key": "events"},
+    )
+    run_id = created.json()["id"]
+    assert alice.post(f"/api/runs/{run_id}/cancel").json()["status"] == "cancelled"
+    assert alice.post(f"/api/runs/{run_id}/cancel").status_code == 200
+
+    listed = alice.get(f"/api/runs/{run_id}/events?after=0&limit=1")
+    assert listed.status_code == 200
+    assert listed.json()["items"][0]["event_type"] == "run.queued"
+    cursor = listed.json()["next_after"]
+    remaining = alice.get(f"/api/runs/{run_id}/events?after={cursor}")
+    assert [item["event_type"] for item in remaining.json()["items"]] == [
+        "run.cancelled"
+    ]
+    assert remaining.json()["next_after"] == 2
+    with factory() as db:
+        assert db.scalar(select(Run).where(Run.id == uuid.UUID(run_id))).status == "cancelled"
+
+    with TestClient(app, base_url="http://testserver") as bob:
+        register_and_login(bob, "bob")
+        assert bob.get(f"/api/runs/{run_id}/events").status_code == 404
+
+
+def test_completed_run_events_can_be_replayed_over_sse(
+    run_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = run_context
+    register_and_login(client, "alice")
+    task = create_task(client)
+    created = client.post(
+        f"/api/tasks/{task['id']}/runs",
+        json={"expected_revision": 1, "idempotency_key": "sse"},
+    )
+    run_id = created.json()["id"]
+    with factory() as db:
+        claim = claim_run(db, "worker-one", 30, 3)
+        assert claim is not None
+        assert complete_claim(db, claim, {"runner": "diagnostic"})
+
+    with client.stream("GET", f"/api/runs/{run_id}/events/stream") as response:
+        assert response.status_code == 200
+        body = response.read().decode()
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "event: run.queued" in body
+    assert "event: run.running" in body
+    assert "event: run.completed" in body
+    assert "id: 3" in body
+
+    replay = client.get(f"/api/runs/{run_id}/events/stream?after=2")
+    assert replay.status_code == 200

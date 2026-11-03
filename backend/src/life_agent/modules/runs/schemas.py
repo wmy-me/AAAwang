@@ -7,6 +7,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
 RunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+RunEventType = Literal[
+    "run.queued",
+    "run.running",
+    "run.cancel_requested",
+    "run.completed",
+    "run.failed",
+    "run.cancelled",
+]
 
 
 class RunCreate(BaseModel):
@@ -40,6 +48,24 @@ class RunList(BaseModel):
     items: list[RunResponse]
     offset: int
     limit: int
+
+
+class RunEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    run_id: uuid.UUID
+    sequence: int
+    event_type: RunEventType
+    occurred_at: datetime
+    payload: dict[str, object]
+
+
+class RunEventList(BaseModel):
+    items: list[RunEventResponse]
+    after: int
+    limit: int
+    next_after: int
 
 
 class RunConflictDetail(BaseModel):

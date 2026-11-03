@@ -1,6 +1,6 @@
 # 008：持久化 Run 事件与 SSE
 
-- 状态：待执行；本文件仅是下一步执行任务，尚无实现或报告
+- 状态：已完成；实现与验收见[报告](../reports/008-run-events-sse-report.md)
 - 所属阶段：P2 任务与对话基础
 - 起始分支与代码提交：`main` / `98e00bf77038719bdb81708f8d82a88845dc9f03`；执行前核对最新 HEAD
 - 前置：[007 持久化 Run 与最小 Worker](007-persistent-runs-worker.md)已有代码和[报告](../reports/007-persistent-runs-worker-report.md)

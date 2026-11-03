@@ -12,7 +12,7 @@
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | PostgreSQL 17 Compose；Python 认证模块通过 SQLAlchemy/psycopg 连接，Alembic 管理迁移 |
 | Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；仍无 LangGraph 图或 Agent |
-| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务、条件版本和版本绑定 run；尚无 SSE、方案、投稿、知识库、实际出行规划或交易实现 |
+| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务、条件版本、版本绑定 run、持久化 Run 事件和私有 SSE；尚无方案、投稿、知识库、实际出行规划或交易实现 |
 | Android | 只有说明文件 |
 
 ## 完成证据与限制
@@ -76,7 +76,7 @@
 - 独立 Worker 使用 PostgreSQL 行锁、`SKIP LOCKED`、租约、attempt 和 fencing token；诊断 runner 只记录 task/revision 与“尚未运行 Agent 规划”，不调用 LLM、MCP 或写消息。
 - SQLite 聚焦测试 4 项，Python 全量测试 **39 passed**；Ruff、compileall 通过。
 - 真实 PostgreSQL 17 从 006 head 升级、重复升级、`alembic current` 和 `alembic check` 通过；API + 两个独立 Worker 验证幂等、单次领取完成、排队取消、租约过期接管和旧 Worker 迟到写入拒绝。
-- 未验证真实外部服务、SSE、网页、LangGraph 或 Agent 规划；本轮 `completed` 仅代表无副作用诊断 runner 完成。
+- 未验证真实外部服务、网页、LangGraph 或 Agent 规划；008已完成自动SSE验证，真实PostgreSQL事件迁移联调待补做；本轮 `completed` 仅代表无副作用诊断 runner 完成。
 
 ## 每次读取最新 GitHub 时的检查方式
 
@@ -91,9 +91,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03 核对 `main` 最新功能提交 `98e00bf77038719bdb81708f8d82a88845dc9f03`：007 的 run 模型、迁移、四个私有接口、独立诊断 Worker 和报告均已提交。报告记载 Python 全量 39 passed、真实 PostgreSQL 的双 Worker 领取、租约接管与 fencing；进程中断恢复是在真实数据库上模拟旧租约过期，不能据此宣称完成了实际杀进程实验。本次只审阅仓库和报告，未重新运行数据库、模型或测试。下一步 [008 持久化 Run 事件与 SSE](vibe%20coding/008-run-events-sse.md) 已建为待执行任务；网页对话和 Agent 真正执行继续分开实施。
+截至 2026-11-03，008已在007基础上完成：新增 `run_events` 迁移、状态事件事务、私有补读接口和SSE断线续传，自动测试6项通过。真实PostgreSQL迁移、双Worker与租约接管的008联调尚未重新执行；网页对话和Agent真正执行继续分开实施。
 
-[001](vibe%20coding/001-llm-connection.md)至[007 持久化 Run 与最小 Worker](vibe%20coding/007-persistent-runs-worker.md)均已完成；006 和 007 证据分别见[报告](reports/006-task-revisions-report.md)与[007 报告](reports/007-persistent-runs-worker-report.md)。P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化 run 和最小 Worker；008 的事件与 SSE 尚未实现，网页对话和 Agent 接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[008 持久化 Run 事件与 SSE](vibe%20coding/008-run-events-sse.md)均已完成；008证据见[报告](reports/008-run-events-sse-report.md)。P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化run、事件与私有SSE；网页对话和Agent接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 

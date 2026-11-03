@@ -209,3 +209,26 @@ class Run(Base):
     error_summary: Mapped[str | None] = mapped_column(String(500))
     task: Mapped[Task] = relationship(back_populates="runs")
     owner: Mapped[User] = relationship(back_populates="runs")
+    events: Mapped[list["RunEvent"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class RunEvent(Base):
+    __tablename__ = "run_events"
+    __table_args__ = (
+        UniqueConstraint("run_id", "sequence", name="uq_run_events_run_sequence"),
+        Index("ix_run_events_run_sequence", "run_id", "sequence"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
+    sequence: Mapped[int]
+    event_type: Mapped[str] = mapped_column(String(32))
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    payload: Mapped[dict[str, object]] = mapped_column(JSON)
+    run: Mapped[Run] = relationship(back_populates="events")

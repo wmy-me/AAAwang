@@ -4,12 +4,20 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from life_agent.db.models import Conversation, Run, Task, TaskRevision
+from life_agent.db.models import Conversation, Run, RunEvent, Task, TaskRevision
 
 RUN_TERMINAL = {"completed", "failed", "cancelled"}
+RUN_EVENT_TYPES = {
+    "run.queued",
+    "run.running",
+    "run.cancel_requested",
+    "run.completed",
+    "run.failed",
+    "run.cancelled",
+}
 
 
 class RunNotFoundError(LookupError):
@@ -48,8 +56,21 @@ def _owned_task(db: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> Task:
     return task
 
 
-def _owned_run(db: Session, owner_id: uuid.UUID, run_id: uuid.UUID) -> Run:
-    run = db.scalar(select(Run).where(Run.id == run_id, Run.owner_id == owner_id))
+def _lease_expired(lease_until: datetime | None, now: datetime) -> bool:
+    if lease_until is None:
+        return True
+    if lease_until.tzinfo is None:
+        lease_until = lease_until.replace(tzinfo=UTC)
+    return lease_until <= now
+
+
+def _owned_run(
+    db: Session, owner_id: uuid.UUID, run_id: uuid.UUID, *, for_update: bool = False
+) -> Run:
+    query = select(Run).where(Run.id == run_id, Run.owner_id == owner_id)
+    if for_update:
+        query = query.with_for_update()
+    run = db.scalar(query)
     if run is None:
         raise RunNotFoundError
     return run
@@ -100,6 +121,8 @@ def create_run(
         cancel_requested=False,
     )
     db.add(run)
+    db.flush()
+    _append_event(db, run, "run.queued", datetime.now(UTC))
     db.commit()
     db.refresh(run)
     return run
@@ -125,14 +148,17 @@ def list_runs(
 
 
 def cancel_run(db: Session, owner_id: uuid.UUID, run_id: uuid.UUID) -> Run:
-    run = _owned_run(db, owner_id, run_id)
+    run = _owned_run(db, owner_id, run_id, for_update=True)
     now = datetime.now(UTC)
     if run.status == "queued":
         run.status = "cancelled"
         run.finished_at = now
         run.cancel_requested = True
+        _append_event(db, run, "run.cancelled", now)
     elif run.status == "running":
-        run.cancel_requested = True
+        if not run.cancel_requested:
+            run.cancel_requested = True
+            _append_event(db, run, "run.cancel_requested", now)
     db.commit()
     db.refresh(run)
     return run
@@ -163,6 +189,7 @@ def claim_run(
     if run.cancel_requested:
         run.status = "cancelled"
         run.finished_at = now
+        _append_event(db, run, "run.cancelled", now)
         db.commit()
         return None
     run.status = "running"
@@ -171,6 +198,7 @@ def claim_run(
     run.started_at = run.started_at or now
     run.attempt += 1
     run.fencing_token += 1
+    _append_event(db, run, "run.running", now)
     db.commit()
     return RunClaim(
         run_id=run.id,
@@ -191,25 +219,24 @@ def _finish_claim(
     error_summary: str | None = None,
 ) -> bool:
     now = datetime.now(UTC)
-    result = db.execute(
-        update(Run)
-        .where(
-            Run.id == claim.run_id,
-            Run.status == "running",
-            Run.worker_id == claim.worker_id,
-            Run.fencing_token == claim.fencing_token,
-            Run.lease_until > now,
-        )
-        .values(
-            status=status,
-            finished_at=now,
-            lease_until=None,
-            diagnostic=diagnostic,
-            error_summary=error_summary,
-        )
-    )
+    run = db.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
+    if (
+        run is None
+        or run.status != "running"
+        or run.worker_id != claim.worker_id
+        or run.fencing_token != claim.fencing_token
+        or _lease_expired(run.lease_until, now)
+    ):
+        db.rollback()
+        return False
+    run.status = status
+    run.finished_at = now
+    run.lease_until = None
+    run.diagnostic = diagnostic
+    run.error_summary = error_summary
+    _append_event(db, run, f"run.{status}", now)
     db.commit()
-    return result.rowcount == 1
+    return True
 
 
 def complete_claim(
@@ -237,19 +264,74 @@ def is_cancel_requested(db: Session, claim: RunClaim) -> bool:
 
 
 def fail_exhausted_runs(db: Session, max_attempts: int) -> int:
-    result = db.execute(
-        update(Run)
-        .where(
-            Run.status == "running",
-            Run.lease_until <= datetime.now(UTC),
-            Run.attempt >= max_attempts,
-        )
-        .values(
-            status="failed",
-            finished_at=datetime.now(UTC),
-            lease_until=None,
-            error_summary="worker lease expired after maximum attempts",
+    now = datetime.now(UTC)
+    runs = list(
+        db.scalars(
+            select(Run)
+            .where(
+                Run.status == "running",
+                Run.lease_until <= now,
+                Run.attempt >= max_attempts,
+            )
+            .with_for_update(skip_locked=True)
         )
     )
+    for run in runs:
+        run.status = "failed"
+        run.finished_at = now
+        run.lease_until = None
+        run.error_summary = "worker lease expired after maximum attempts"
+        _append_event(db, run, "run.failed", now)
     db.commit()
-    return result.rowcount
+    return len(runs)
+
+
+def _append_event(db: Session, run: Run, event_type: str, occurred_at: datetime) -> RunEvent:
+    if event_type not in RUN_EVENT_TYPES:
+        raise ValueError(f"unsupported run event: {event_type}")
+    sequence = db.scalar(
+        select(func.coalesce(func.max(RunEvent.sequence), 0)).where(
+            RunEvent.run_id == run.id
+        )
+    ) + 1
+    payload: dict[str, object] = {
+        "run_id": str(run.id),
+        "status": run.status,
+        "revision": run.revision,
+        "occurred_at": occurred_at.isoformat(),
+    }
+    if run.diagnostic is not None:
+        payload["diagnostic"] = run.diagnostic
+    if run.error_summary is not None:
+        payload["error_summary"] = run.error_summary
+    event = RunEvent(
+        run_id=run.id,
+        sequence=sequence,
+        event_type=event_type,
+        occurred_at=occurred_at,
+        payload=payload,
+    )
+    db.add(event)
+    return event
+
+
+def list_events(
+    db: Session, owner_id: uuid.UUID, run_id: uuid.UUID, after: int, limit: int
+) -> list[RunEvent]:
+    _owned_run(db, owner_id, run_id)
+    return list(
+        db.scalars(
+            select(RunEvent)
+            .where(RunEvent.run_id == run_id, RunEvent.sequence > after)
+            .order_by(RunEvent.sequence)
+            .limit(limit)
+        )
+    )
+
+
+def get_event_cursor(db: Session, run_id: uuid.UUID) -> int:
+    return db.scalar(
+        select(func.coalesce(func.max(RunEvent.sequence), 0)).where(
+            RunEvent.run_id == run_id
+        )
+    )
