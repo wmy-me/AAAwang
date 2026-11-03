@@ -248,6 +248,9 @@ class ShoppingRunResult(Base):
     answer: Mapped[str] = mapped_column(Text)
     source: Mapped[dict[str, object]] = mapped_column(JSON)
     execution_version: Mapped[str] = mapped_column(String(32))
+    decision_type: Mapped[str] = mapped_column(String(32), default="delegated_discovery")
+    delegated: Mapped[bool] = mapped_column(Boolean, default=False)
+    mcp_call_count: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

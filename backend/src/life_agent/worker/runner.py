@@ -65,6 +65,23 @@ def run_once(worker_id: str) -> bool:
                             "execution_version": "010-v1",
                         },
                     )
+            if claim.execution_type == "shopping_agent":
+                result = _run_shopping_agent_with_lease(settings, claim)
+                with get_session_factory()() as result_db:
+                    if is_cancel_requested(result_db, claim):
+                        return cancel_claim(result_db, claim)
+                    return complete_claim(
+                        result_db,
+                        claim,
+                        shopping_result={
+                            "answer": result.answer[:12_000],
+                            "source": result.source,
+                            "execution_version": "012-v1",
+                            "decision_type": result.decision_type,
+                            "delegated": result.delegated,
+                            "mcp_call_count": result.mcp_call_count,
+                        },
+                    )
             return complete_claim(
                 db,
                 claim,
@@ -88,6 +105,37 @@ def _shopping_prompt(goal: str, conditions: dict[str, object]) -> str:
         f"购物目标：{goal}\n已知条件：{known}\n"
         "只查询并回答模拟商品候选。未提供的预算、物品、数量必须明确写为未知，不能猜测。"
     )
+
+
+def _run_shopping_agent_with_lease(settings, claim):
+    from life_agent.agents.shopping import run_shopping_agent
+
+    stop = threading.Event()
+    lease_lost = threading.Event()
+
+    def renew() -> None:
+        interval = max(0.5, settings.run_worker_lease_seconds / 3)
+        while not stop.wait(interval):
+            try:
+                with get_session_factory()() as lease_db:
+                    if not renew_claim(lease_db, claim, settings.run_worker_lease_seconds):
+                        lease_lost.set()
+                        return
+            except Exception:
+                logger.exception("run lease renewal failed for %s", claim.run_id)
+                lease_lost.set()
+                return
+
+    heartbeat = threading.Thread(target=renew, name="run-lease-renewal", daemon=True)
+    heartbeat.start()
+    try:
+        result = asyncio.run(run_shopping_agent(settings, claim.goal, claim.conditions))
+        if lease_lost.is_set():
+            raise ToolLoopError("购物Agent执行租约丢失，结果不会提交；请创建新的 run 重试。")
+        return result
+    finally:
+        stop.set()
+        heartbeat.join(timeout=2)
 
 
 def _run_shopping_with_lease(settings, claim):

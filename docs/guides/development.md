@@ -81,7 +81,7 @@ cd backend && uv run python -m life_agent.worker.runner
 
 ### 3.3 DeepSeek 连通检查
 
-在 `backend/.env` 中设置 `LLM_API_KEY`。密钥只保留在本机，不要写入命令、对话、报告或提交。模型默认使用已由官方文档确认的 `deepseek-flash` 和 `https://api.deepseek.com`。
+在仓库根目录 `.env` 中设置 `LLM_API_KEY`。密钥只保留在本机，不要写入命令、对话、报告或提交。模型默认使用已由官方文档确认的 `deepseek-flash` 和 `https://api.deepseek.com`。
 
 ```bash
 cd backend
@@ -110,7 +110,7 @@ uv run python scripts/check_mcp.py --service shopping
 
 ### 3.4 LLM 与 MCP 工具闭环
 
-先按 3.3 启动 shopping-mcp，并在 `backend/.env` 配置 `LLM_API_KEY`：
+先按 3.3 启动 shopping-mcp，并在仓库根目录 `.env` 配置 `LLM_API_KEY`：
 
 ```bash
 cd backend
@@ -213,10 +213,7 @@ uv run python scripts/check_conversations.py
 cd backend
 uv run alembic upgrade head
 uv run alembic check
-| PostgreSQL（项目 Compose） | 55432 | 127.0.0.1 | 容器 `pg_isready` |
-| MySQL（optional profile） | 3306 | 127.0.0.1 | `mysqladmin ping` |
-| Redis（optional profile） | 6379 | 127.0.0.1 | `redis-cli ping` |
-| MinIO API/控制台（optional profile） | 9000/9001 | 127.0.0.1 | MinIO health/控制台 |
+uv run python scripts/check_tasks.py
 ```
 
 `check_tasks.py` 只接受真实 PostgreSQL psycopg URL，使用随机账号验证同对话双任务、历史快照、新客户端读取、双用户隔离，以及两个请求基于同一版本时真实产生一个 201 和一个 409。脚本结束时删除测试用户。
@@ -256,7 +253,7 @@ shopping-mcp 包含查询边界和 Origin 过滤测试；另外两个模块仍�
 | 现象 | 排查与处理 |
 | --- | --- |
 | `uv sync --locked` 提示锁文件过期 | 不要手工改锁文件；在确认依赖变更后运行 `uv lock`，再提交 `uv.lock` |
-| 模型检查提示缺少 `LLM_API_KEY` | 将 DeepSeek API Key 写入被忽略的 `backend/.env`；不要写入 `.env.example` |
+| 模型检查提示缺少 `LLM_API_KEY` | 将 DeepSeek API Key 写入被忽略的仓库根目录 `.env`；不要写入 `.env.example` |
 | 模型检查认证、模型或超时失败 | 分别核对本地密钥、DeepSeek 当前模型 ID、网络和 `LLM_TIMEOUT_SECONDS`；脚本不会自动重试 |
 | MCP 检查初始化失败或超时 | 确认 shopping-mcp 已启动、8101 未被占用，并核对 `MCP_SERVICES` 中的 URL 与超时 |
 | 工具闭环提示模型未调用工具 | 使用明确要求查询模拟商品的问题；这不是成功证据，脚本不会无界重试 |

@@ -1,10 +1,10 @@
 # 012：购物主 Agent 与信息发现 Agent 的最小委派
 
-- 状态：待执行；本文只定义任务，尚未实现或验收
+- 状态：已完成；真实 API/Worker/PostgreSQL 闭环、空结果/候选结果、用户隔离和 SSE 终态补读已验收
 - 所属阶段：P2 Agent 执行基础；为 P3 首条采买闭环提供委派能力
 - 起始分支与代码提交：`main` / `83e95161cb69bc31d63d7b0c12eb5b391a0af3a2`；执行前重新核对 HEAD，保留期间已有改动
 - 前置任务：[010 购物 Run 报告](../reports/010-shopping-run-execution-report.md)和[011 数据库配置报告](../reports/011-dev-database-config-report.md)
-- 对应报告：`docs/reports/012-shopping-agent-delegation-report.md`
+- 对应报告：[012 执行报告](../reports/012-shopping-agent-delegation-report.md)
 
 ## 1. 问题与目标
 

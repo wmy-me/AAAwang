@@ -101,9 +101,9 @@ def create_run(
     )
     if task is None:
         raise RunNotFoundError
-    if execution_type not in {"diagnostic", "shopping_research"}:
+    if execution_type not in {"diagnostic", "shopping_research", "shopping_agent"}:
         raise ValueError("unsupported run execution type")
-    if execution_type == "shopping_research" and task.domain != "shopping":
+    if execution_type in {"shopping_research", "shopping_agent"} and task.domain != "shopping":
         raise ValueError("shopping execution requires a shopping task")
     existing = db.scalar(
         select(Run).where(Run.task_id == task_id, Run.idempotency_key == idempotency_key)
@@ -263,6 +263,9 @@ def _finish_claim(
                 answer=str(shopping_result["answer"]),
                 source=dict(shopping_result["source"]),
                 execution_version=str(shopping_result["execution_version"]),
+                decision_type=str(shopping_result.get("decision_type", "delegated_discovery")),
+                delegated=bool(shopping_result.get("delegated", False)),
+                mcp_call_count=int(shopping_result.get("mcp_call_count", 0)),
             )
         )
     _append_event(db, run, f"run.{status}", now)
@@ -398,7 +401,7 @@ def get_shopping_result(
     db: Session, owner_id: uuid.UUID, run_id: uuid.UUID
 ) -> ShoppingRunResult:
     run = _owned_run(db, owner_id, run_id)
-    if run.execution_type != "shopping_research":
+    if run.execution_type not in {"shopping_research", "shopping_agent"}:
         raise RunNotFoundError
     result = db.scalar(
         select(ShoppingRunResult).where(ShoppingRunResult.run_id == run_id)

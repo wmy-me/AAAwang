@@ -42,10 +42,11 @@ uv run pytest -q
 
 ## 配置
 
-复制模板并按需修改（模板不包含任何真实密钥）：
+复制仓库根目录模板并按需修改（模板不包含任何真实密钥）。后端只读取根目录 `.env`，不读取 `backend/.env`：
 
 ```bash
-cp .env.example .env
+cd ..
+cp -n .env.example .env
 ```
 
 | 变量 | 默认值 | 说明 |
@@ -62,7 +63,7 @@ cp .env.example .env
 | `LLM_PROVIDER` | `deepseek` | 本轮唯一支持的供应商 |
 | `LLM_MODEL` | `deepseek-flash` | DeepSeek 官方模型 ID |
 | `LLM_BASE_URL` | `https://api.deepseek.com` | DeepSeek OpenAI 格式 API 地址 |
-| `LLM_API_KEY` | 无 | 模型检查必需；只写入本地 `.env` |
+| `LLM_API_KEY` | 无 | 模型检查必需；只写入被忽略的仓库根目录 `.env` |
 | `LLM_TIMEOUT_SECONDS` | `60` | 单次请求超时秒数 |
 | `MCP_SERVICES` | shopping 本地映射 | 按服务 ID 配置 URL、传输、超时、启用状态和可选认证 token 的 JSON 对象 |
 

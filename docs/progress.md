@@ -1,18 +1,18 @@
 # 当前进度
 
-核对日期：2026-11-03。以下按 001–010 的对应执行报告和最新源码归档；本次规划基线为 `main` 提交 `87d46c26bf4cadcd5a668f0aad24c077f6c9cf85`，未重新运行测试或用户本地数据库。
+核对日期：2026-11-03。以下按 001–012 的对应执行报告和最新源码归档；本次规划基线为 `main` 提交 `87d46c26bf4cadcd5a668f0aad24c077f6c9cf85`，未重新运行测试或用户本地数据库。
 
 ## 代码现状
 
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |
-| Python | 提供健康、认证、私有对话、用户消息、私有任务、条件版本与持久化 run API；已有服务端会话、DeepSeek、通用 MCP、有限工具循环和独立诊断 Worker；LangGraph 仍仅安装依赖 |
+| Python | 提供健康、认证、私有对话、用户消息、私有任务、条件版本与持久化 run API；已有服务端会话、DeepSeek、通用 MCP、有限工具循环和独立 Worker；LangGraph 已有最小 `shopping_agent` 主从委派图，无检查点或完整多 Agent |
 | 网页 | 初始化说明和真实健康检查按钮，没有业务界面 |
 | Java | shopping-mcp 提供 Streamable HTTP `/mcp` 和一个只读模拟查询工具；另外两个服务保持健康检查骨架 |
 | 基础设施 | PostgreSQL 17 Compose；Python 认证模块通过 SQLAlchemy/psycopg 连接，Alembic 管理迁移 |
-| Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；仍无 LangGraph 图或 Agent |
-| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务、条件版本、版本绑定 run、持久化 Run 事件和私有 SSE；尚无方案、投稿、知识库、实际出行规划或交易实现 |
+| Agent 与工具 | 已验证 LLM 根据发现 schema 调用一个允许的只读 MCP 工具并依据结果回答；已有最小 LangGraph `shopping_agent` 主从委派图；仍无完整多 Agent、自动意图路由或长期记忆 |
+| 业务能力 | 已有账号、登录会话、私有对话、手工用户消息、私有任务、条件版本、版本绑定 run、持久化 Run 事件、私有 SSE 和 shopping_agent 决策结果；尚无方案、投稿、知识库、实际出行规划或交易实现 |
 | Android | 只有说明文件 |
 
 ## 完成证据与限制
@@ -100,6 +100,14 @@
 - 011 已将根目录 `.env.example` 作为本地配置模板，后端从根目录 `.env` 读取并保留显式环境变量覆盖；默认 Compose 仅启动项目 PostgreSQL，宿主默认端口为 55432、默认用户为 `life_buy`，MySQL/Redis/MinIO 使用 `optional` profile。普通 `down` 保留项目命名卷，未触碰用户已有容器或卷。
 - 项目真实卷已完成非破坏性角色对齐、`alembic upgrade head` 到 `20261103_0007`、隔离测试写入和普通 `down`/`up` 持久化验证；测试记录已删除，卷保留，用户其他容器未修改。详见 [011报告](reports/011-dev-database-config-report.md)。
 
+## 012 主 Agent 与信息发现委派
+
+- 新增 `shopping_agent` Run 类型、LangGraph `supervisor -> discovery -> finalize` 图和 0008 决策元数据迁移；旧 `diagnostic`/`shopping_research` 语义保留。
+- 真实项目 PostgreSQL、真实 API、真实 Worker 和真实 Java shopping-mcp 完成端到端：Run `completed`，`delegated_discovery`，1 次 MCP 调用，4 次模型请求，`simulated=true`，结果通过私有接口重读。
+- 空候选 Run 正确报告“模拟空结果”而不编造价格；明确关键词 Run 返回“彩色铅笔套装”12.8 元并标记模拟。
+- 第二个用户读取 Run/结果/事件均为 404；SSE 终态补读 `queued -> running -> completed`；根配置缺少密钥的首次尝试安全失败且无结果。
+- 验收后删除隔离测试用户及其级联数据，项目库恢复为 0 用户/0 Run；API/shopping-mcp 已停止，数据库卷保留。补齐前次的 API/Worker/PostgreSQL 缺口。
+
 ## 每次读取最新 GitHub 时的检查方式
 
 1. 明确默认分支或用户指定分支，读取最新提交 SHA，并与本页基线比较。
@@ -113,9 +121,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证；完整主从 Agent 和网页另拆任务。
+截至 2026-11-03，010 已完成受控购物执行、结果持久化、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once。011 已完成项目专用 PostgreSQL 默认可复现、单源配置收敛、旧卷角色对齐、0007 迁移和 down/up 持久化验证。012 已完成主从 Agent 代码、0008 迁移、真实 API/Worker/PostgreSQL 闭环、用户隔离和 SSE 终态补读。
 
-[001](vibe%20coding/001-llm-connection.md)至[011 开发数据库与配置收敛](vibe%20coding/011-dev-database-config.md)均已完成。下一步执行[012 购物主 Agent 与信息发现 Agent 的最小委派](vibe%20coding/012-shopping-agent-delegation.md)（待执行，尚未实现）；网页对话和完整采买规划仍待后续任务。
+[001](vibe%20coding/001-llm-connection.md)至[012 购物主 Agent 与信息发现 Agent 的最小委派](vibe%20coding/012-shopping-agent-delegation.md)均已完成；012 的真实外部闭环、隔离和 SSE 已验收；网页对话和完整采买规划仍待后续任务。
 
 ## 2026-11-02 架构讨论归档
 

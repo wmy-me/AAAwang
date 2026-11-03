@@ -2,11 +2,11 @@
 
 基于大语言模型与 MCP 的多场景生活服务智能体，围绕日常采买、美食发现、出行规划和经营采购，提供有来源、可调整的推荐方案。Java 服务用于模拟外部 MCP、验证接入方式，为后续扩展其他 MCP 服务做准备。
 
-**当前阶段：P1 最小能力验证已完成，P2 正在建设。** 001–003 验证模型与 MCP；004–006 完成认证、私有对话与任务条件版本；007–010 完成持久化 Run、Worker、事件/SSE，以及真实 DeepSeek→shopping-mcp→PostgreSQL 购物 Run 闭环和中断恢复。完整 Agent、网页对话、方案和投稿仍未实现。
+**当前阶段：P1 最小能力验证已完成，P2 正在建设。** 001–003 验证模型与 MCP；004–006 完成认证、私有对话与任务条件版本；007–010 完成持久化 Run、Worker、事件/SSE，以及真实 DeepSeek→shopping-mcp→PostgreSQL 购物 Run 闭环和中断恢复；011 完成开发数据库配置收敛；012 完成最小 LangGraph `shopping_agent` 主从委派及真实 API/Worker/PostgreSQL 闭环。完整多 Agent、网页对话、方案和投稿仍未实现。
 
 ## 当前实现边界
 
-- **Python 主后端**：FastAPI 提供健康、认证、私有对话、用户消息、任务与条件版本、持久化 Run/结果/事件接口；已有 DeepSeek、通用 MCP、有限工具循环、后台 Worker、PostgreSQL/Alembic 与服务端 Cookie 会话；LangGraph 尚无状态图或 Agent。
+- **Python 主后端**：FastAPI 提供健康、认证、私有对话、用户消息、任务与条件版本、持久化 Run/结果/事件接口；已有 DeepSeek、通用 MCP、有限工具循环、后台 Worker、PostgreSQL/Alembic 与服务端 Cookie 会话；LangGraph 已有最小 `shopping_agent` 主从委派图，无检查点或完整多 Agent。
 - **网页**：React + TypeScript + Vite，只展示项目名称、初始化说明和“检查后端连接”按钮。
 - **Java 服务**：shopping-mcp 已提供 Streamable HTTP `/mcp` 与只读模拟商品查询；travel-mcp、local-life-mcp 仍只有健康检查骨架。
 - **数据库**：`infra/compose.yaml` 默认提供项目专用 pgvector PostgreSQL（宿主 `55432`）；MySQL、Redis、MinIO 仅在 `optional` profile 启用。Python 通过正式迁移持久化用户、登录会话、私有对话、用户消息、任务、条件版本、Run、Run 事件和购物结果，Java 不连接该数据库。

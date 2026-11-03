@@ -203,6 +203,16 @@ def test_shopping_execution_type_is_scoped_to_shopping_tasks(
     )
     assert created.status_code == 201
     assert created.json()["execution_type"] == "shopping_research"
+    agent_created = client.post(
+        f"/api/tasks/{task['id']}/runs",
+        json={
+            "expected_revision": 1,
+            "idempotency_key": "shopping-agent",
+            "execution_type": "shopping_agent",
+        },
+    )
+    assert agent_created.status_code == 201
+    assert agent_created.json()["execution_type"] == "shopping_agent"
     assert client.post(
         f"/api/tasks/{task['id']}/runs",
         json={

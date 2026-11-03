@@ -6,8 +6,8 @@
 
 ## 当前执行边界
 
-- 依据用户指定的编号任务执行；001–010 已完成，010 的真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复已验收；外部调用不承诺 exactly-once。不自动实施完整 Agent 或采买业务。
-- 后端已有健康、认证、私有对话、手工消息、私有任务、条件版本、持久化 run、Run 事件与私有 SSE 及最小 Worker 接口。商品、投稿和订单接口留待后续编号任务。
+- 依据用户指定的编号任务执行；001–012 已完成，010 的真实购物闭环与中断恢复、011 的数据库配置收敛、012 的最小主从委派端到端均已验收；外部调用不承诺 exactly-once。不自动实施完整 Agent 或采买业务。
+- 后端已有健康、认证、私有对话、手工消息、私有任务、条件版本、持久化 run、Run 事件与私有 SSE、最小 Worker 及 `shopping_agent` 决策结果接口。商品、投稿和订单接口留待后续编号任务。
 - 网页只有项目名称、初始化说明和真实健康检查按钮。不要新增路由、聊天界面、管理后台、商品卡片或模拟业务列表。
 - shopping-mcp 已提供标准 Streamable HTTP `/mcp`、`search_products` 只读模拟工具与 `/actuator/health`；travel-mcp、local-life-mcp 仍为健康检查骨架。不建设业务后台。
 - 003 已复用 002 的模拟商品完成真实模型工具调用联调并保留来源标记；该有限执行器不是完整 Agent 或业务对话。
@@ -16,7 +16,7 @@
 ## 已确定的技术方向
 
 - Python 是主系统，一个 uv 工程；未来 API 与 Worker 共享，不为每个 Agent 建服务。
-- Python 使用 FastAPI，LangGraph 只装基础依赖（当前无图、无检查点）。
+- Python 使用 FastAPI，LangGraph 已有最小 `shopping_agent` 主从委派图（无检查点、无长期记忆，不代表完整多 Agent）。
 - 网页使用 React + TypeScript + Vite。
 - 三个 Java 服务（shopping / travel / local-life）用于模拟外部 MCP 服务，验证通用接入机制，后续可接入其他 MCP；目前仅 shopping 提供 MCP 工具。
 - 主体为一个仓库、多个子工程；根目录不建立 npm 或 uv workspace，不引入 Nx、Turborepo。
@@ -71,7 +71,7 @@ cd mcp-services && ./mvnw -B -ntp verify
 
 先读 [文档导航](docs/README.md)、[当前进度](docs/progress.md)，再读用户本次指定的 [AI 执行任务](docs/vibe%20coding/README.md)。每个具体实施步骤先有编号任务文档，完成后有对应报告与进度更新。当前阶段约束描述初始化范围；收到明确的新任务后，以新任务确定的范围为准，不把旧初始化文档当作永久禁止业务开发的规则。
 
-路线图和初始设计包是参考，不自动执行其中所有阶段；000 为已执行历史任务。核对最新代码后再判断状态，区分“规划”“已实现”“已验证”。P1 的 001–003 与 P2 的 004–010 均已有实现和报告；010 的真实 DeepSeek→shopping-mcp→DB 闭环与中断恢复已验收，外部调用不承诺 exactly-once。完整 Agent 另行规划。
+路线图和初始设计包是参考，不自动执行其中所有阶段；000 为已执行历史任务。核对最新代码后再判断状态，区分“规划”“已实现”“已验证”。P1 的 001–003 与 P2 的 004–012 均已有实现和报告；010 的真实购物闭环与中断恢复、012 的真实主从委派、隔离和 SSE 已验收，外部调用不承诺 exactly-once。完整 Agent 另行规划。
 
 ## Agent、工具与知识检索设计
 

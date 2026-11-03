@@ -1,0 +1,148 @@
+"""Focused checks for the 012 supervisor/discovery LangGraph."""
+
+import asyncio
+import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
+from typing import Any
+
+from mcp.types import CallToolResult, TextContent, Tool
+from pydantic import SecretStr
+
+from life_agent.agents.shopping import run_shopping_agent
+from life_agent.core.config import Settings
+from life_agent.core.llm.tool_loop import _model_tool_name
+from life_agent.tools.mcp import DiscoveredTool, McpCallResult
+
+
+class FakeCompletions:
+    def __init__(self, messages: list[SimpleNamespace]) -> None:
+        self.messages = iter(messages)
+        self.requests: list[dict[str, Any]] = []
+
+    async def create(self, **kwargs: Any) -> SimpleNamespace:
+        self.requests.append(kwargs)
+        return SimpleNamespace(choices=[SimpleNamespace(message=next(self.messages))])
+
+
+class FakeModel:
+    def __init__(self, messages: list[SimpleNamespace]) -> None:
+        completions = FakeCompletions(messages)
+        self.completions = completions
+        self.chat = SimpleNamespace(completions=completions)
+
+
+class FakeConnection:
+    protocol_version = "2025-11-25"
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def list_tools(self) -> list[DiscoveredTool]:
+        schema = {
+            "type": "object",
+            "properties": {"keyword": {"type": "string"}, "limit": {"type": "integer"}},
+            "required": ["keyword"],
+            "additionalProperties": False,
+        }
+        return [
+            DiscoveredTool(
+                "shopping",
+                "search_products",
+                Tool(name="search_products", description="search", inputSchema=schema),
+            )
+        ]
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> McpCallResult:
+        self.calls.append((name, arguments))
+        return McpCallResult(
+            "shopping",
+            name,
+            CallToolResult(
+                content=[TextContent(type="text", text="mock")],
+                structuredContent={
+                    "products": [{"name": "彩色铅笔套装", "unit_price": 12.8}],
+                    "source_type": "mock",
+                },
+                isError=False,
+            ),
+        )
+
+
+class FakeMcp:
+    def __init__(self, connection: FakeConnection) -> None:
+        self.connection = connection
+
+    @asynccontextmanager
+    async def connect(self, _service_id: str) -> AsyncIterator[FakeConnection]:
+        yield self.connection
+
+
+def message(content: str | None = None, *, tool: str | None = None, arguments: str = "{}") -> SimpleNamespace:
+    calls = None
+    if tool is not None:
+        calls = [SimpleNamespace(id="delegate-1", function=SimpleNamespace(name=tool, arguments=arguments))]
+    return SimpleNamespace(content=content, tool_calls=calls)
+
+
+def settings() -> Settings:
+    return Settings(llm_api_key=SecretStr("test-key"))
+
+
+def test_direct_answer_does_not_delegate_or_call_mcp() -> None:
+    supervisor = FakeModel([message(json.dumps({"decision_type": "direct_answer", "answer": "可以直接回答。"}))])
+    connection = FakeConnection()
+    result = asyncio.run(
+        run_shopping_agent(settings(), "什么是预算", {}, model_client=supervisor, mcp_client=FakeMcp(connection))
+    )
+    assert result.decision_type == "direct_answer"
+    assert result.delegated is False
+    assert result.mcp_call_count == 0
+    assert connection.calls == []
+
+
+def test_clarification_does_not_delegate_or_call_mcp() -> None:
+    supervisor = FakeModel([message(json.dumps({"decision_type": "clarification", "answer": "请补充要买什么。"}))])
+    connection = FakeConnection()
+    result = asyncio.run(
+        run_shopping_agent(settings(), "帮我买东西", {}, model_client=supervisor, mcp_client=FakeMcp(connection))
+    )
+    assert result.decision_type == "clarification"
+    assert result.mcp_call_count == 0
+    assert connection.calls == []
+
+
+def test_delegation_uses_only_discovery_tool_and_persists_source_facts() -> None:
+    supervisor = FakeModel(
+        [
+            message(
+                tool="delegate_shopping_discovery",
+                arguments=json.dumps({"keyword": "彩色铅笔", "limit": 2}),
+            ),
+            message("已根据模拟商品查询结果整理回复。"),
+        ]
+    )
+    discovery = FakeModel(
+        [
+            message(tool=_model_tool_name("shopping:search_products"), arguments=json.dumps({"keyword": "彩色铅笔", "limit": 2})),
+            message("模拟候选：彩色铅笔套装，12.8 元。"),
+        ]
+    )
+    connection = FakeConnection()
+    result = asyncio.run(
+        run_shopping_agent(
+            settings(),
+            "买一盒彩色铅笔",
+            {"budget": 15},
+            model_client=supervisor,
+            discovery_model_client=discovery,
+            mcp_client=FakeMcp(connection),
+        )
+    )
+    assert result.decision_type == "delegated_discovery"
+    assert result.delegated is True
+    assert result.mcp_call_count == 1
+    assert connection.calls == [("search_products", {"keyword": "彩色铅笔", "limit": 2})]
+    assert result.source["simulated"] is True
+    assert result.source["tool"] == "shopping:search_products"
