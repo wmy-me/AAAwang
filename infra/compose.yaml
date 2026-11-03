@@ -2,7 +2,7 @@ name: life-buy-agent-infra
 
 services:
   postgres:
-    image: postgres:17
+    image: pgvector/pgvector:pg17
     container_name: life-buy-agent-postgres
     restart: unless-stopped
     environment:
@@ -22,6 +22,66 @@ services:
       retries: 5
       start_period: 10s
 
+  mysql:
+    image: mysql:8.0
+    container_name: life-buy-agent-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-life_buy_agent}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:latest
+    container_name: life-buy-agent-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: life-buy-agent-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-admin123}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   postgres-data:
     name: ${POSTGRES_VOLUME_NAME:-life-buy-agent-postgres-data}
+  mysql-data:
+    name: ${MYSQL_VOLUME_NAME:-life-buy-agent-mysql-data}
+  redis-data:
+    name: ${REDIS_VOLUME_NAME:-life-buy-agent-redis-data}
+  minio-data:
+    name: ${MINIO_VOLUME_NAME:-life-buy-agent-minio-data}

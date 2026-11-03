@@ -39,8 +39,8 @@
 | 007 | [持久化 Run 与最小 Worker](007-persistent-runs-worker.md) | 已完成；版本绑定、幂等入队、独立 Worker 领取、取消、租约回收与 fencing 已通过真实 PostgreSQL，见[报告](../reports/007-persistent-runs-worker-report.md) |
 | 008 | [持久化 Run 事件与 SSE](008-run-events-sse.md) | 已完成；[报告](../reports/008-run-events-sse-report.md)记录事件事务、私有补读、SSE 和真实 PostgreSQL 部分联调；完整并发事件与删除链另见 009 |
 | 009 | [Run 删除链修复与事件真实并发回归](009-run-deletion-events-regression.md) | 已完成；[报告](../reports/009-run-deletion-events-regression-report.md)记录外键修复、存量迁移、删除链和真实事件并发验收 |
-| 010 | [购物任务 Run 接入有限模型与 MCP 查询](010-shopping-run-execution.md) | 待执行；复用 003 闭环，使 Worker 保存私有回答和模拟来源 |
+| 010 | [购物任务 Run 接入有限模型与 MCP 查询](010-shopping-run-execution.md) | 已完成；[报告](../reports/010-shopping-run-execution-report.md)记录受控执行、结果持久化、租约续期、真实 DeepSeek→shopping-mcp→PostgreSQL 闭环和外部调用中断恢复；外部调用不承诺 exactly-once |
 
-P1 的 001–003 和 P2 的 004–009 均有实现与报告；010 为下一步；完整主从 Agent 与网页对话后续拆分。
+P1 的 001–003 和 P2 的 004–010 均有实现与报告；010 真实外部闭环和中断恢复已验收；完整主从 Agent 与网页对话后续拆分。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。

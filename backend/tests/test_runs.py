@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from life_agent.core.config import Settings, get_settings
 from life_agent.db.base import Base
-from life_agent.db.models import Run, RunEvent, Task, User
+from life_agent.db.models import Run, RunEvent, ShoppingRunResult, Task, User
 from life_agent.db.session import get_db
 from life_agent.main import app
 from life_agent.modules.runs.service import claim_run, complete_claim
@@ -185,6 +185,80 @@ def test_run_input_and_cross_site_write_are_rejected(
     with _factory() as db:
         assert db.scalar(select(User).where(User.username == "alice")) is not None
         assert db.scalar(select(Task).where(Task.id == uuid.UUID(task["id"]))) is not None
+
+
+def test_shopping_execution_type_is_scoped_to_shopping_tasks(
+    run_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, _factory = run_context
+    register_and_login(client, "alice")
+    task = create_task(client)
+    created = client.post(
+        f"/api/tasks/{task['id']}/runs",
+        json={
+            "expected_revision": 1,
+            "idempotency_key": "shopping-execution",
+            "execution_type": "shopping_research",
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["execution_type"] == "shopping_research"
+    assert client.post(
+        f"/api/tasks/{task['id']}/runs",
+        json={
+            "expected_revision": 1,
+            "idempotency_key": "shopping-execution",
+        },
+    ).status_code == 409
+
+    conversation = client.post("/api/conversations", json={"title": "Travel"}).json()
+    travel = client.post(
+        f"/api/conversations/{conversation['id']}/tasks",
+        json={"domain": "travel", "goal": "Visit Shanghai", "conditions": {}},
+    ).json()
+    rejected = client.post(
+        f"/api/tasks/{travel['id']}/runs",
+        json={
+            "expected_revision": 1,
+            "idempotency_key": "travel-shopping",
+            "execution_type": "shopping_research",
+        },
+    )
+    assert rejected.status_code == 422
+
+
+def test_shopping_result_is_private(
+    run_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    alice, factory = run_context
+    register_and_login(alice, "alice")
+    task = create_task(alice)
+    created = alice.post(
+        f"/api/tasks/{task['id']}/runs",
+        json={
+            "expected_revision": 1,
+            "idempotency_key": "result-private",
+            "execution_type": "shopping_research",
+        },
+    ).json()
+    run_id = uuid.UUID(created["id"])
+    with factory() as db:
+        db.add(
+            ShoppingRunResult(
+                run_id=run_id,
+                answer="模拟候选",
+                source={"service_id": "shopping", "simulated": True},
+                execution_version="010-v1",
+            )
+        )
+        db.commit()
+    result = alice.get(f"/api/runs/{run_id}/result")
+    assert result.status_code == 200
+    assert result.json()["answer"] == "模拟候选"
+
+    with TestClient(app, base_url="http://testserver") as bob:
+        register_and_login(bob, "bob")
+        assert bob.get(f"/api/runs/{run_id}/result").status_code == 404
 
 
 def test_run_events_are_ordered_private_and_idempotent(

@@ -7,7 +7,14 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from life_agent.db.models import Conversation, Run, RunEvent, Task, TaskRevision
+from life_agent.db.models import (
+    Conversation,
+    Run,
+    RunEvent,
+    ShoppingRunResult,
+    Task,
+    TaskRevision,
+)
 
 RUN_TERMINAL = {"completed", "failed", "cancelled"}
 RUN_EVENT_TYPES = {
@@ -41,6 +48,8 @@ class RunClaim:
     task_revision_id: uuid.UUID
     revision: int
     conditions: dict[str, object]
+    goal: str
+    execution_type: str
     worker_id: str
     fencing_token: int
 
@@ -82,6 +91,7 @@ def create_run(
     task_id: uuid.UUID,
     expected_revision: int,
     idempotency_key: str,
+    execution_type: str = "diagnostic",
 ) -> Run:
     task = db.scalar(
         select(Task)
@@ -91,11 +101,19 @@ def create_run(
     )
     if task is None:
         raise RunNotFoundError
+    if execution_type not in {"diagnostic", "shopping_research"}:
+        raise ValueError("unsupported run execution type")
+    if execution_type == "shopping_research" and task.domain != "shopping":
+        raise ValueError("shopping execution requires a shopping task")
     existing = db.scalar(
         select(Run).where(Run.task_id == task_id, Run.idempotency_key == idempotency_key)
     )
     if existing is not None:
-        if existing.owner_id != owner_id or existing.revision != expected_revision:
+        if (
+            existing.owner_id != owner_id
+            or existing.revision != expected_revision
+            or existing.execution_type != execution_type
+        ):
             raise IdempotencyConflictError
         return existing
     if task.current_revision != expected_revision:
@@ -115,6 +133,7 @@ def create_run(
         revision=snapshot.revision,
         conditions=dict(snapshot.conditions),
         idempotency_key=idempotency_key,
+        execution_type=execution_type,
         status="queued",
         attempt=0,
         fencing_token=0,
@@ -206,6 +225,8 @@ def claim_run(
         task_revision_id=run.task_revision_id,
         revision=run.revision,
         conditions=dict(run.conditions),
+        goal=run.task.goal,
+        execution_type=run.execution_type,
         worker_id=worker_id,
         fencing_token=run.fencing_token,
     )
@@ -217,6 +238,7 @@ def _finish_claim(
     status: str,
     diagnostic: dict[str, object] | None = None,
     error_summary: str | None = None,
+    shopping_result: dict[str, object] | None = None,
 ) -> bool:
     now = datetime.now(UTC)
     run = db.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
@@ -234,15 +256,33 @@ def _finish_claim(
     run.lease_until = None
     run.diagnostic = diagnostic
     run.error_summary = error_summary
+    if shopping_result is not None:
+        db.add(
+            ShoppingRunResult(
+                run_id=run.id,
+                answer=str(shopping_result["answer"]),
+                source=dict(shopping_result["source"]),
+                execution_version=str(shopping_result["execution_version"]),
+            )
+        )
     _append_event(db, run, f"run.{status}", now)
     db.commit()
     return True
 
 
 def complete_claim(
-    db: Session, claim: RunClaim, diagnostic: dict[str, object]
+    db: Session,
+    claim: RunClaim,
+    diagnostic: dict[str, object] | None = None,
+    shopping_result: dict[str, object] | None = None,
 ) -> bool:
-    return _finish_claim(db, claim, "completed", diagnostic=diagnostic)
+    return _finish_claim(
+        db,
+        claim,
+        "completed",
+        diagnostic=diagnostic,
+        shopping_result=shopping_result,
+    )
 
 
 def fail_claim(db: Session, claim: RunClaim, error_summary: str) -> bool:
@@ -261,6 +301,23 @@ def cancel_claim(db: Session, claim: RunClaim) -> bool:
 def is_cancel_requested(db: Session, claim: RunClaim) -> bool:
     run = db.scalar(select(Run).where(Run.id == claim.run_id))
     return run is None or run.cancel_requested
+
+
+def renew_claim(db: Session, claim: RunClaim, lease_seconds: int) -> bool:
+    now = datetime.now(UTC)
+    run = db.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
+    if (
+        run is None
+        or run.status != "running"
+        or run.worker_id != claim.worker_id
+        or run.fencing_token != claim.fencing_token
+        or _lease_expired(run.lease_until, now)
+    ):
+        db.rollback()
+        return False
+    run.lease_until = now + timedelta(seconds=lease_seconds)
+    db.commit()
+    return True
 
 
 def fail_exhausted_runs(db: Session, max_attempts: int) -> int:
@@ -335,3 +392,17 @@ def get_event_cursor(db: Session, run_id: uuid.UUID) -> int:
             RunEvent.run_id == run_id
         )
     )
+
+
+def get_shopping_result(
+    db: Session, owner_id: uuid.UUID, run_id: uuid.UUID
+) -> ShoppingRunResult:
+    run = _owned_run(db, owner_id, run_id)
+    if run.execution_type != "shopping_research":
+        raise RunNotFoundError
+    result = db.scalar(
+        select(ShoppingRunResult).where(ShoppingRunResult.run_id == run_id)
+    )
+    if result is None:
+        raise RunNotFoundError
+    return result

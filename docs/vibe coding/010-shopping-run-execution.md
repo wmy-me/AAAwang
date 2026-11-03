@@ -1,6 +1,6 @@
 # 010：购物任务 Run 接入有限模型与 MCP 查询
 
-- 状态：待执行；本文件定义下一步，尚无实现或报告
+- 状态：已完成；真实 DeepSeek→shopping-mcp→PostgreSQL 购物 Run 闭环与外部调用中断恢复已实测，外部调用不承诺 exactly-once；见[报告](../reports/010-shopping-run-execution-report.md)
 - 所属阶段：P2 持久化执行接入；为 P3 首条采买闭环提供基础
 - 起始分支与代码提交：`main` / `adbe1314fb006bb19828267f0ed163845cfa2478`；实施前核对最新 HEAD
 - 前置：[003 有限 LLM/MCP 闭环](003-llm-mcp-tool-loop.md)、[007 Run/Worker](007-persistent-runs-worker.md)、[008 事件/SSE](008-run-events-sse.md)、[009 删除链与并发回归](009-run-deletion-events-regression.md)均已提交

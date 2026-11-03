@@ -106,9 +106,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03，009 已完成删除链修复、存量迁移兼容、真实双Worker事件回归和断线补读验收。下一步已建待执行 [010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)：在购物任务的明确条件版本上复用已有 003 查询链路，由 Worker 保存私有回答和模拟来源，补足超时、租约、取消及费用边界。010 尚未实现或验证；不因创建文档而进入完整主从 Agent、网页或 P3。
+截至 2026-11-03，009 已完成删除链修复、存量迁移兼容、真实双Worker事件回归和断线补读验收。010 已完成受控购物执行类型、结果持久化、租约续期、失败边界、真实 PostgreSQL 0007 迁移，以及真实 DeepSeek→shopping-mcp→PostgreSQL 闭环与外部调用中断恢复验收；外部调用不承诺 exactly-once，不因此进入完整主从 Agent、网页或 P3。
 
-[001](vibe%20coding/001-llm-connection.md)至[009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)均已完成；P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化run、事件与私有SSE。010 待执行；网页对话和完整 Agent 接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)均已完成；010 的真实外部闭环与中断恢复已验收；P2 的网页对话和完整Agent接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 

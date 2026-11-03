@@ -1,6 +1,6 @@
 # 开发说明
 
-本文描述现有工程的安装、启动和验证方式。P1 已完成模型与 MCP 最小闭环；P2 已完成认证、私有对话、用户消息及任务条件版本基础。
+本文描述现有工程的安装、启动和验证方式。P1 已完成模型与 MCP 最小闭环；P2 已完成认证、私有对话、用户消息、任务条件版本、持久化Run事件和有限购物执行基础。
 
 ## 1. 各子工程的职责与边界
 
@@ -66,7 +66,18 @@ uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 uv run python -m life_agent.worker.runner
 ```
 
-Worker 通过 PostgreSQL 行锁和 `SKIP LOCKED` 领取 run，使用租约与 fencing token 防止旧进程覆盖新持有者；`--once` 适合单次验收。默认租约为 30 秒、轮询为 1 秒、最多 3 次尝试，可用 `RUN_WORKER_LEASE_SECONDS`、`RUN_WORKER_POLL_SECONDS` 和 `RUN_WORKER_MAX_ATTEMPTS` 调整。当前 runner 只做无副作用诊断，`completed` 不代表已有 Agent 规划或采购/出行方案。契约见 `contracts/rest/runs.md`。
+Worker 通过 PostgreSQL 行锁和 `SKIP LOCKED` 领取 run，使用租约、后台续租和 fencing token 防止慢模型期间重复执行或旧进程覆盖新持有者；`--once` 适合单次验收。默认租约为 30 秒、轮询为 1 秒、最多 3 次尝试，可用 `RUN_WORKER_LEASE_SECONDS`、`RUN_WORKER_POLL_SECONDS` 和 `RUN_WORKER_MAX_ATTEMPTS` 调整。诊断Run仍无副作用；明确创建 `shopping_research` 的购物Run才会调用 DeepSeek 和受信 shopping-mcp。外部调用不承诺 exactly-once，调用历史不确定时用新幂等键人工重试。结果通过 `GET /api/runs/{run_id}/result` 读取。契约见 `contracts/rest/runs.md`。
+
+购物Run本地联调需要同时启动 PostgreSQL、shopping-mcp、API和Worker：
+
+```bash
+cd mcp-services && ./mvnw -pl shopping-mcp spring-boot:run
+cd backend && uv run alembic upgrade head
+cd backend && uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
+cd backend && uv run python -m life_agent.worker.runner
+```
+
+并在仅存在于本机的 `backend/.env` 中配置 `LLM_API_KEY`、`DATABASE_URL` 和 `MCP_SERVICES`。若5432被占用，给Compose设置其他宿主端口并让 `DATABASE_URL` 使用同一端口。缺少Key、MCP不可用或外部调用失败会使购物Run进入安全失败状态，不应把历史003脚本成功当作010真实闭环证据。
 
 ### 3.3 DeepSeek 连通检查
 

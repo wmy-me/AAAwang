@@ -194,6 +194,7 @@ class Run(Base):
     revision: Mapped[int]
     conditions: Mapped[dict[str, object]] = mapped_column(JSON)
     idempotency_key: Mapped[str] = mapped_column(String(128))
+    execution_type: Mapped[str] = mapped_column(String(32), default="diagnostic")
     status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -210,6 +211,9 @@ class Run(Base):
     task: Mapped[Task] = relationship(back_populates="runs")
     task_revision: Mapped[TaskRevision] = relationship()
     owner: Mapped[User] = relationship(back_populates="runs")
+    shopping_result: Mapped["ShoppingRunResult | None"] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
     events: Mapped[list["RunEvent"]] = relationship(
         back_populates="run", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -233,3 +237,18 @@ class RunEvent(Base):
     )
     payload: Mapped[dict[str, object]] = mapped_column(JSON)
     run: Mapped[Run] = relationship(back_populates="events")
+
+
+class ShoppingRunResult(Base):
+    __tablename__ = "shopping_run_results"
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    answer: Mapped[str] = mapped_column(Text)
+    source: Mapped[dict[str, object]] = mapped_column(JSON)
+    execution_version: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    run: Mapped[Run] = relationship(back_populates="shopping_result")

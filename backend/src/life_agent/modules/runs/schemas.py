@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
 RunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+RunExecutionType = Literal["diagnostic", "shopping_research"]
 RunEventType = Literal[
     "run.queued",
     "run.running",
@@ -22,6 +23,7 @@ class RunCreate(BaseModel):
 
     expected_revision: int = Field(ge=1)
     idempotency_key: StrictStr = Field(min_length=1, max_length=128)
+    execution_type: RunExecutionType = "diagnostic"
 
 
 class RunResponse(BaseModel):
@@ -34,6 +36,7 @@ class RunResponse(BaseModel):
     revision: int
     conditions: dict[str, object]
     idempotency_key: str
+    execution_type: RunExecutionType
     status: RunStatus
     created_at: datetime
     started_at: datetime | None
@@ -42,6 +45,16 @@ class RunResponse(BaseModel):
     cancel_requested: bool
     diagnostic: dict[str, object] | None
     error_summary: str | None
+
+
+class ShoppingRunResultResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    run_id: uuid.UUID
+    answer: str
+    source: dict[str, object]
+    execution_version: str
+    created_at: datetime
 
 
 class RunList(BaseModel):

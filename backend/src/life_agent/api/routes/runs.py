@@ -20,6 +20,7 @@ from life_agent.modules.runs.schemas import (
     RunEventResponse,
     RunList,
     RunResponse,
+    ShoppingRunResultResponse,
 )
 from life_agent.modules.runs.service import (
     IdempotencyConflictError,
@@ -28,6 +29,7 @@ from life_agent.modules.runs.service import (
     cancel_run,
     create_run,
     get_run,
+    get_shopping_result,
     list_events,
     list_runs,
 )
@@ -62,7 +64,12 @@ def create(
 ) -> RunResponse:
     try:
         run = create_run(
-            db, current_user.id, task_id, body.expected_revision, body.idempotency_key
+            db,
+            current_user.id,
+            task_id,
+            body.expected_revision,
+            body.idempotency_key,
+            body.execution_type,
         )
     except RunNotFoundError as exc:
         raise _not_found() from exc
@@ -73,6 +80,8 @@ def create(
         ) from exc
     except IdempotencyConflictError as exc:
         raise HTTPException(status_code=409, detail="幂等键已用于其他 run 请求。") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="幂等键已用于其他 run 请求。") from exc
@@ -122,6 +131,19 @@ def cancel(run_id: uuid.UUID, db: Database, current_user: CurrentUser) -> RunRes
     except SQLAlchemyError as exc:
         raise _storage_unavailable() from exc
     return _response(run)
+
+
+@router.get("/runs/{run_id}/result", response_model=ShoppingRunResultResponse)
+def result(
+    run_id: uuid.UUID, db: Database, current_user: CurrentUser
+) -> ShoppingRunResultResponse:
+    try:
+        value = get_shopping_result(db, current_user.id, run_id)
+    except RunNotFoundError as exc:
+        raise _not_found() from exc
+    except SQLAlchemyError as exc:
+        raise _storage_unavailable() from exc
+    return ShoppingRunResultResponse.model_validate(value)
 
 
 @router.get("/runs/{run_id}/events", response_model=RunEventList)
