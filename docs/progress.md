@@ -91,9 +91,9 @@
 
 ## 当前状态与下一步
 
-截至 2026-11-03 已核对最新代码提交 `94450018eb881e1317b6d651d212331cdd8535b7`：007 的 run 模型、迁移、四个私有接口、独立 Worker 和报告已实现并通过真实 PostgreSQL 验收。SSE、网页对话和 Agent 接入仍拆为后续任务。
+截至 2026-11-03 核对 `main` 最新功能提交 `98e00bf77038719bdb81708f8d82a88845dc9f03`：007 的 run 模型、迁移、四个私有接口、独立诊断 Worker 和报告均已提交。报告记载 Python 全量 39 passed、真实 PostgreSQL 的双 Worker 领取、租约接管与 fencing；进程中断恢复是在真实数据库上模拟旧租约过期，不能据此宣称完成了实际杀进程实验。本次只审阅仓库和报告，未重新运行数据库、模型或测试。下一步 [008 持久化 Run 事件与 SSE](vibe%20coding/008-run-events-sse.md) 已建为待执行任务；网页对话和 Agent 真正执行继续分开实施。
 
-[001](vibe%20coding/001-llm-connection.md)至[007 持久化 Run 与最小 Worker](vibe%20coding/007-persistent-runs-worker.md)均已完成；006 和 007 证据分别见[报告](reports/006-task-revisions-report.md)与[007 报告](reports/007-persistent-runs-worker-report.md)。P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化 run 和最小 Worker；SSE、网页对话和 Agent 接入仍待后续任务验证。
+[001](vibe%20coding/001-llm-connection.md)至[007 持久化 Run 与最小 Worker](vibe%20coding/007-persistent-runs-worker.md)均已完成；006 和 007 证据分别见[报告](reports/006-task-revisions-report.md)与[007 报告](reports/007-persistent-runs-worker-report.md)。P2 已有认证、私有对话、任务条件快照、并发修改保护、持久化 run 和最小 Worker；008 的事件与 SSE 尚未实现，网页对话和 Agent 接入仍待后续任务验证。
 
 ## 2026-11-02 架构讨论归档
 

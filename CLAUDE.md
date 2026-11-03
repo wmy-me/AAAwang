@@ -6,7 +6,7 @@
 
 ## 当前执行边界
 
-- 依据用户指定的编号任务执行；001–006 已完成。不自动实施 Worker、SSE、完整 Agent 或采买业务。
+- 依据用户指定的编号任务执行；001–007 已完成。008 事件与 SSE 已建待执行文档；不自动实施完整 Agent 或采买业务。
 - 后端已有健康、认证、私有对话、手工消息、私有任务、条件版本、持久化 run 及最小 Worker 接口。SSE、商品、投稿和订单接口留待后续编号任务。
 - 网页只有项目名称、初始化说明和真实健康检查按钮。不要新增路由、聊天界面、管理后台、商品卡片或模拟业务列表。
 - shopping-mcp 已提供标准 Streamable HTTP `/mcp`、`search_products` 只读模拟工具与 `/actuator/health`；travel-mcp、local-life-mcp 仍为健康检查骨架。不建设业务后台。
@@ -39,8 +39,8 @@
 - `backend/src/life_agent/core/`：应用配置。
 - `backend/src/life_agent/agents/`：未来主协调、信息发现、采买规划、出行子图；当前仅 README 和空的 `__init__.py`。
 - `backend/src/life_agent/tools/`：已有通用 MCP 客户端；地图、搜索、知识检索仍为预留。
-- `backend/src/life_agent/modules/`：已有认证、私有对话与任务版本模块；其他业务模块待后续任务。
-- `backend/src/life_agent/db/`：已有用户、登录会话、私有对话、消息、任务和条件版本模型及请求级会话；`worker/` 仍为预留。
+- `backend/src/life_agent/modules/`：已有认证、私有对话、任务版本与 run 模块；其他业务模块待后续任务。
+- `backend/src/life_agent/db/`：已有用户、登录会话、私有对话、消息、任务、条件版本与 run 模型及请求级会话；`worker/` 已有最小诊断 runner。
 - `web/src/api/health.ts`：唯一的前端请求封装。
 - `web/src/components/`、`features/`：预留目录。
 - `mcp-services/`：Spring Boot 4.1.2 多模块，JDK 21；shopping 已提供只读模拟 MCP 工具。
