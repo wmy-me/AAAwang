@@ -38,9 +38,9 @@
 | 006 | [私有任务与条件版本](006-task-revisions.md) | 已完成；真实 PostgreSQL 任务隔离、不可变快照和并发冲突保护已通过，见[报告](../reports/006-task-revisions-report.md) |
 | 007 | [持久化 Run 与最小 Worker](007-persistent-runs-worker.md) | 已完成；版本绑定、幂等入队、独立 Worker 领取、取消、租约回收与 fencing 已通过真实 PostgreSQL，见[报告](../reports/007-persistent-runs-worker-report.md) |
 | 008 | [持久化 Run 事件与 SSE](008-run-events-sse.md) | 已完成；[报告](../reports/008-run-events-sse-report.md)记录事件事务、私有补读、SSE 和真实 PostgreSQL 部分联调；完整并发事件与删除链另见 009 |
-
 | 009 | [Run 删除链修复与事件真实并发回归](009-run-deletion-events-regression.md) | 已完成；[报告](../reports/009-run-deletion-events-regression-report.md)记录外键修复、存量迁移、删除链和真实事件并发验收 |
+| 010 | [购物任务 Run 接入有限模型与 MCP 查询](010-shopping-run-execution.md) | 待执行；复用 003 闭环，使 Worker 保存私有回答和模拟来源 |
 
-P1 的 001–003 和 P2 的 004–009 均有实现与报告；其后接持久化 run 的 Agent 执行与网页对话。
+P1 的 001–003 和 P2 的 004–009 均有实现与报告；010 为下一步；完整主从 Agent 与网页对话后续拆分。
 
 如需 Git 提交、推送或 PR，遵循本次用户指令和仓库约定；任务模板不自行授予发布权限。

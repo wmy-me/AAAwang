@@ -19,7 +19,7 @@
 
 ## 下一步讨论的范围
 
-[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)均已完成。后续将按新任务决定是否把现有 DeepSeek/MCP 工具循环接入持久化run，再分步建立网页对话和更完整的Agent协作。无需先完成三个Java平台的业务后台。
+[001 模型普通文本连通](vibe%20coding/001-llm-connection.md)至[009 Run 删除链修复与事件真实并发回归](vibe%20coding/009-run-deletion-events-regression.md)均已完成。下一步执行 [010 购物任务 Run 接入有限模型与 MCP 查询](vibe%20coding/010-shopping-run-execution.md)（待执行），先让现有查询链路产生可持久化的私有回答，再分步建立主从 Agent 协作和网页对话。无需先完成三个Java平台的业务后台。
 
 ## 任务与阶段的关系
 
