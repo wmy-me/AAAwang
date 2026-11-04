@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from life_agent.db.models import Conversation, DynamicFormProposal, Task, TaskRevision
+from life_agent.modules.forms.schemas import FormField
 from life_agent.modules.tasks.schemas import Conditions, validate_conditions
 from life_agent.modules.tasks.service import RevisionConflictError, create_revision
 
@@ -32,6 +33,14 @@ class FormFieldSpec:
     max_value: int | float | None = None
 
 
+_REGISTERED_FORM_FIELDS = {
+    "item": FormFieldSpec("item", "short_text", "想买什么", "帮助缩小商品探索范围"),
+    "people": FormFieldSpec("people", "number", "覆盖人数", "只有需要覆盖人数时才作为方案约束", "人", False, 1, 100000),
+    "quantity": FormFieldSpec("quantity", "number", "数量", "便于估算需要购买的件数", "件", False, 1, 100000),
+    "budget": FormFieldSpec("budget", "money", "目标预算", "用于预算复算；不填写时不假设默认金额", "元", False, 0.01, 100000000),
+}
+
+
 def _owned_task(db: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> Task:
     task = db.scalar(
         select(Task).join(Conversation).where(
@@ -45,13 +54,84 @@ def _owned_task(db: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> Task:
 
 def _shopping_specs(snapshot: TaskRevision) -> list[FormFieldSpec]:
     current = dict(snapshot.conditions)
-    specs = [
-        FormFieldSpec("item", "short_text", "想买什么", "帮助缩小商品探索范围"),
-        FormFieldSpec("people", "number", "覆盖人数", "只有需要覆盖人数时才作为方案约束", "人", False, 1, 100000),
-        FormFieldSpec("quantity", "number", "数量", "便于估算需要购买的件数", "件", False, 1, 100000),
-        FormFieldSpec("budget", "money", "目标预算", "用于预算复算；不填写时不假设默认金额", "元", False, 0.01, 100000000),
-    ]
+    specs = list(_REGISTERED_FORM_FIELDS.values())
     return [spec for spec in specs if spec.id not in current]
+
+
+def validate_model_schema(
+    raw_schema: object, current_conditions: Conditions
+) -> list[dict[str, object]]:
+    """Validate model suggestions against registered controls and known values."""
+    if raw_schema is None:
+        return []
+    if not isinstance(raw_schema, list) or len(raw_schema) > len(_REGISTERED_FORM_FIELDS):
+        raise FormValidationError("模型表单 schema 必须是有限字段列表。")
+    fields: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for raw_field in raw_schema:
+        try:
+            field = FormField.model_validate(raw_field)
+        except ValueError as exc:
+            raise FormValidationError("模型表单字段格式不合法。") from exc
+        if field.id in seen or field.id not in _REGISTERED_FORM_FIELDS:
+            raise FormValidationError("模型表单包含未注册或重复字段。")
+        if field.id in current_conditions:
+            raise FormValidationError("模型表单不能重复要求已确认条件。")
+        registered = _REGISTERED_FORM_FIELDS[field.id]
+        if field.control != registered.control:
+            raise FormValidationError("模型表单控件类型不匹配注册能力。")
+        if field.unit != registered.unit:
+            raise FormValidationError("模型表单单位不匹配注册能力。")
+        if field.min_value is not None and (
+            registered.min_value is None or field.min_value < registered.min_value
+        ):
+            raise FormValidationError("模型表单最小值超出注册范围。")
+        if field.max_value is not None and (
+            registered.max_value is None or field.max_value > registered.max_value
+        ):
+            raise FormValidationError("模型表单最大值超出注册范围。")
+        seen.add(field.id)
+        fields.append(field.model_dump(exclude_none=True))
+    return fields
+
+
+def persist_model_proposal(
+    db: Session,
+    task_id: uuid.UUID,
+    revision: int,
+    raw_schema: object,
+) -> DynamicFormProposal | None:
+    snapshot = db.scalar(
+        select(TaskRevision).where(
+            TaskRevision.task_id == task_id, TaskRevision.revision == revision
+        )
+    )
+    if snapshot is None:
+        raise FormNotFoundError
+    schema = validate_model_schema(raw_schema, dict(snapshot.conditions))
+    proposal = db.scalar(
+        select(DynamicFormProposal).where(
+            DynamicFormProposal.task_id == task_id,
+            DynamicFormProposal.task_revision_id == snapshot.id,
+        )
+    )
+    if proposal is not None and proposal.status == "confirmed":
+        return proposal
+    if not schema:
+        return proposal
+    if proposal is None:
+        proposal = DynamicFormProposal(
+            task_id=task_id,
+            task_revision_id=snapshot.id,
+            revision=revision,
+            client_request_id=f"proposal:{snapshot.id}",
+            created_at=datetime.now(UTC),
+        )
+        db.add(proposal)
+    proposal.schema = schema
+    proposal.source = "deepseek_structured_worker"
+    proposal.status = "pending"
+    return proposal
 
 
 def _schema(specs: list[FormFieldSpec]) -> list[dict[str, object]]:
@@ -148,6 +228,7 @@ def confirm_proposal(
     expected_revision: int,
     client_request_id: str,
     values: dict[str, object],
+    commit: bool = True,
 ) -> tuple[DynamicFormProposal, TaskRevision]:
     task = _owned_task(db, owner_id, task_id)
     proposal = db.scalar(
@@ -187,6 +268,7 @@ def confirm_proposal(
     proposal.confirmed_values = dict(values)
     proposal.client_request_id = client_request_id
     proposal.confirmed_at = datetime.now(UTC)
-    db.commit()
-    db.refresh(proposal)
+    if commit:
+        db.commit()
+        db.refresh(proposal)
     return proposal, revision

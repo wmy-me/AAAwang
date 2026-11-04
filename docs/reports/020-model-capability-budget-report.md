@@ -53,6 +53,6 @@
 - 生产决策已使用后端在 Worker 中实时获取的受信 MCP `list_tools()` 结果；真实服务关闭、工具下线或 schema 不兼容的专项联调仍待补。
 - 预算耗尽、取消、失租和超时已完成代码/SQLite 数据库专项验收；真实 Worker 进程与外部调用中的取消/失租窗口仍待逐一联调。
 - 网页已渲染 `decision`/`budget`/终止原因；真实浏览器刷新重读尚未执行。
-- 本轮未重新执行 Java `verify`。
+- 本轮已执行 `./mvnw -B -ntp verify`，shopping-mcp 的 6 个测试及 travel/local-life 模块均成功；这只证明 Java 工程构建与测试通过，不替代真实 Worker/MCP 浏览器验收。
 
 本轮没有加入新的外部服务、写操作、凭据或业务金额字段；外部 MCP 仍仅为只读调用，失败与重试不承诺 exactly-once。

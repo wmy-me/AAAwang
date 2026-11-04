@@ -287,8 +287,11 @@ def test_dynamic_form_is_bounded_idempotent_and_creates_revision(
         },
     )
     assert submitted.status_code == 201
-    assert submitted.json()["revision"] == 2
-    assert submitted.json()["conditions"] == {"people": 25, "budget": 200}
+    submitted_body = submitted.json()
+    assert submitted_body["task"]["current_revision"] == 2
+    assert submitted_body["task"]["conditions"] == {"people": 25, "budget": 200}
+    assert submitted_body["message"]["client_message_id"] == "form-1"
+    assert submitted_body["run"]["execution_type"] == "capability_decision"
 
     repeated = client.post(
         f"/api/tasks/{task['id']}/form/submit",
@@ -300,7 +303,8 @@ def test_dynamic_form_is_bounded_idempotent_and_creates_revision(
         },
     )
     assert repeated.status_code == 201
-    assert repeated.json()["id"] == submitted.json()["id"]
+    assert repeated.json()["message"]["id"] == submitted_body["message"]["id"]
+    assert repeated.json()["run"]["id"] == submitted_body["run"]["id"]
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(TaskRevision)) == 2
 

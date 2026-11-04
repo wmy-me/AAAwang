@@ -4,14 +4,14 @@
 - 能力元数据已包含输入 schema、独立超时和预算字段；聊天 Run 的决策使用注册策略、服务开关、Worker 实时 MCP `list_tools()` 发现结果、Agent 与任务域交集，模型只能从可见集选择，执行前再次发现校验。
 - `direct_answer` 已支持无工具直答和确定性追问；Run 新增 nullable `decision`/`budget` 摘要字段，迁移为 `20261104_0016`，旧 Run NULL 兼容。
 - 聊天入口先创建 `capability_decision` Run；Worker 用真实 DeepSeek 作结构化决策，后端校验能力、重复项、地图位置和共享预算，完成时写回实际 `execution_type` 与 `capability_ids`。
-- 后端聚焦与全量回归、Ruff、compileall、Alembic check、前端 lint/build 通过；前端保留既有 2 条 Hook warning。Run 详情已展示决策、能力快照、预算和终止原因，但真实浏览器刷新验收待补。
+- 后端聚焦与全量回归、Ruff、compileall、Alembic check、前端 lint/build 和 Java `verify` 通过；前端保留既有 2 条 Hook warning。Run 详情已展示决策、能力快照、预算和终止原因，但真实浏览器刷新验收待补。
 - 已用真实 DeepSeek、独立 Worker、PostgreSQL、高德 MCP、Java 模拟 MCP 验证直答、缺城市追问、纯地点、纯商品和地图+商品组合五类决策 Run，并确认第二账号隔离；动态发现和 UI 已接入代码，预算终止已完成代码/数据库专项验收；真实 Worker 终止场景、浏览器刷新和 Java verify 仍待补。详见[报告](reports/020-model-capability-budget-report.md)。
 
 ## 021 自然语言任务与动态表单（部分实现）
 
 - 已新增受限动态表单提议契约、`dynamic_form_proposals` 持久化、字段白名单/类型/范围校验、任务 revision 确认和请求幂等；网页已展示并提交 shopping 的 item/people/quantity/budget 字段。
-- 021 专项 API `6 passed`，后端全量 `125 passed`，Ruff、compileall、迁移升级、Alembic check 和前端 build 通过；前端 lint 保留 3 条 Hook warning（含本次新增 `set-state-in-effect`）。详见[报告](reports/021-dynamic-task-forms-report.md)。
-- 真实 DeepSeek 动态 schema、真实浏览器刷新/提交、表单提交与 Run 的统一语义、travel 及日期/多选/地点控件仍待后续实现和验收。
+- 021 专项 API/Worker `19 passed`，后端全量 `125 passed`，Ruff、compileall、迁移升级、Alembic check 和前端 build 通过；前端 lint 保留 3 条 Hook warning（含本次新增 `set-state-in-effect`）。表单提交现在与自然语言入口统一创建同 revision 的用户 Message 和 `capability_decision` Run，并支持相同请求重试复用消息/Run。详见[报告](reports/021-dynamic-task-forms-report.md)。
+- 真实 DeepSeek 动态 schema、真实浏览器刷新/提交和真实 Worker 终止场景仍待验收；travel 及日期/多选/地点控件仍未开放。
 
 ## 019 购物主 Agent 的受控能力路由与工具白名单
 

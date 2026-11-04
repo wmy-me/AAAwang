@@ -22,6 +22,7 @@ from life_agent.modules.capabilities import (
     has_location_scope,
     visible_capabilities,
 )
+from life_agent.modules.forms.service import persist_model_proposal
 from life_agent.modules.runs.service import (
     cancel_claim,
     claim_run,
@@ -65,6 +66,9 @@ def run_once(worker_id: str) -> bool:
                         decision.get("clarification") or "请补充必要信息后再试。"
                     )[:12_000]
                     with get_session_factory()() as result_db:
+                        persist_model_proposal(
+                            result_db, claim.task_id, claim.revision, decision.get("form_schema")
+                        )
                         return complete_claim(
                             result_db,
                             claim,
@@ -111,6 +115,9 @@ def run_once(worker_id: str) -> bool:
                 else:
                     result = _run_direct_answer_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
+                    persist_model_proposal(
+                        result_db, claim.task_id, claim.revision, decision.get("form_schema")
+                    )
                     if is_cancel_requested(result_db, claim):
                         budget.stop("cancelled")
                         return cancel_claim(result_db, claim, budget.snapshot())
@@ -133,6 +140,10 @@ def run_once(worker_id: str) -> bool:
             if claim.execution_type == "shopping_research":
                 result = _run_shopping_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
+                    persist_model_proposal(
+                        result_db, claim.task_id, claim.revision,
+                        (claim.decision or {}).get("form_schema"),
+                    )
                     if is_cancel_requested(result_db, claim):
                         budget.stop("cancelled")
                         return cancel_claim(result_db, claim, budget.snapshot())
@@ -177,6 +188,10 @@ def run_once(worker_id: str) -> bool:
                 artifacts = build_artifacts(source, claim.conditions)
                 answer = validated_plan_answer(artifacts) or result.answer
                 with get_session_factory()() as result_db:
+                    persist_model_proposal(
+                        result_db, claim.task_id, claim.revision,
+                        (claim.decision or {}).get("form_schema"),
+                    )
                     if is_cancel_requested(result_db, claim):
                         budget.stop("cancelled")
                         return cancel_claim(result_db, claim, budget.snapshot())
@@ -200,6 +215,10 @@ def run_once(worker_id: str) -> bool:
             if claim.execution_type == "map_places":
                 result = _run_map_places_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
+                    persist_model_proposal(
+                        result_db, claim.task_id, claim.revision,
+                        (claim.decision or {}).get("form_schema"),
+                    )
                     if is_cancel_requested(result_db, claim):
                         budget.stop("cancelled")
                         return cancel_claim(result_db, claim, budget.snapshot())
@@ -215,6 +234,10 @@ def run_once(worker_id: str) -> bool:
             if claim.execution_type == "capability_router":
                 result, artifacts = _run_capability_router_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
+                    persist_model_proposal(
+                        result_db, claim.task_id, claim.revision,
+                        (claim.decision or {}).get("form_schema"),
+                    )
                     if is_cancel_requested(result_db, claim):
                         budget.stop("cancelled")
                         return cancel_claim(result_db, claim, budget.snapshot())
@@ -321,7 +344,8 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
     prompt = (
         "你是购物任务主协调 Agent。只输出一个 JSON 对象，不要 Markdown。\n"
         '{"kind":"direct|clarification|capabilities",'
-        '"capability_ids":[],"clarification":null,"reason":"简短原因"}\n'
+        '"capability_ids":[],"clarification":null,"reason":"简短原因",'
+        '"form_schema":[]}\n'
         "capability_ids 只能从下列后端授权集合中选择，不能创建新 ID、URL、服务或工具：\n"
         f"{capability_lines}\n"
         f"用户消息：{claim.input_message or claim.goal}\n"
@@ -336,6 +360,8 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
         "5. 只有任务条件或历史目标提到预算、人数，而本轮没有商品或地点请求时，"
         "才不要选择能力。\n"
         "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。"
+        "form_schema 只能提出当前缺失且本轮确实有帮助的字段；没有必要时返回空数组。"
+        "budget、people、quantity 不是固定必填项；探索请求不得为了补字段而阻断。"
     )
     response = asyncio.run(call_deepseek(settings, prompt, budget=budget))
     value = _decision_json(response.text)
@@ -375,6 +401,7 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
         "capability_ids": selected,
         "clarification": clarification[:500] if kind == "clarification" else None,
         "reason": str(value.get("reason"))[:500] if value.get("reason") else None,
+        "form_schema": value.get("form_schema", []),
         "decision_source": "deepseek_structured_worker",
     }
 

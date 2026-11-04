@@ -6,6 +6,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr
 
+from life_agent.modules.conversations.schemas import MessageResponse
+from life_agent.modules.runs.schemas import RunResponse
+from life_agent.modules.tasks.schemas import TaskResponse
+
 FormControl = Literal[
     "short_text", "number", "money", "date", "single_select", "multi_select", "location"
 ]
@@ -48,3 +52,9 @@ class FormSubmit(BaseModel):
     expected_revision: int = Field(ge=1)
     client_request_id: StrictStr = Field(min_length=1, max_length=128)
     values: dict[str, FormValue]
+
+
+class FormSubmitResponse(BaseModel):
+    message: MessageResponse
+    run: RunResponse
+    task: TaskResponse

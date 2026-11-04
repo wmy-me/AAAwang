@@ -639,16 +639,24 @@ function App() {
                     onSubmit={async (values) => {
                       setBusy(true);
                       try {
-                        await api.submitDynamicForm(
+                        const submitted = await api.submitDynamicForm(
                           task.id,
                           dynamicForm.id,
                           task.current_revision,
                           values,
                         );
-                        const fresh = await api.getTask(task.id);
-                        setTask(fresh);
-                        setDynamicForm(await api.getDynamicForm(fresh.id));
-                        setNotice(`已确认动态字段，任务进入第 ${fresh.current_revision} 版。`);
+                        setMessages((items) => [
+                          ...items.filter((item) => item.id !== submitted.message.id),
+                          submitted.message,
+                        ]);
+                        setTask(submitted.task);
+                        setRuns((items) => [
+                          submitted.run,
+                          ...items.filter((item) => item.id !== submitted.run.id),
+                        ]);
+                        selectRun(submitted.run);
+                        setDynamicForm(await api.getDynamicForm(submitted.task.id));
+                        setNotice(`已确认动态字段，任务进入第 ${submitted.task.current_revision} 版。`);
                       } catch (value) {
                         handleError(value);
                       } finally {

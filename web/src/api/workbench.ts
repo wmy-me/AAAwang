@@ -212,6 +212,12 @@ export interface ChatTurnResponse {
   assistant_message: Message | null
 }
 
+export interface FormSubmitResponse {
+  message: Message
+  run: Run
+  task: Task
+}
+
 interface Page<T> {
   items: T[]
 }
@@ -287,7 +293,7 @@ export const api = {
     proposalId: string,
     expectedRevision: number,
     values: Record<string, unknown>,
-  ) => request<{ revision: number }>(
+  ) => request<FormSubmitResponse>(
     `/tasks/${taskId}/form/submit`,
     json({
       proposal_id: proposalId,
