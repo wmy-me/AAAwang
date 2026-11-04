@@ -14,8 +14,40 @@ from life_agent.db.base import Base
 from life_agent.db.models import Task, TaskRevision
 from life_agent.db.session import get_db
 from life_agent.main import app
+from life_agent.modules.forms.service import FormValidationError, validate_model_schema
 
 PASSWORD = f"test-only-{secrets.token_urlsafe(18)}"
+
+
+def test_model_form_schema_normalizes_empty_item_unit() -> None:
+    fields = validate_model_schema(
+        [
+            {
+                "id": "item",
+                "control": "short_text",
+                "label": "口味/规格",
+                "reason": "帮助筛选商品",
+                "required": False,
+                "unit": "",
+            }
+        ],
+        {},
+    )
+    assert "unit" not in fields[0]
+
+    with pytest.raises(FormValidationError, match="单位"):
+        validate_model_schema(
+            [
+                {
+                    "id": "people",
+                    "control": "number",
+                    "label": "人数",
+                    "reason": "估算份数",
+                    "unit": "件",
+                }
+            ],
+            {},
+        )
 
 
 @pytest.fixture
@@ -292,6 +324,7 @@ def test_dynamic_form_is_bounded_idempotent_and_creates_revision(
     assert submitted_body["task"]["conditions"] == {"people": 25, "budget": 200}
     assert submitted_body["message"]["client_message_id"] == "form-1"
     assert submitted_body["run"]["execution_type"] == "capability_decision"
+    assert submitted_body["run"]["goal"] == "Buy gifts"
 
     repeated = client.post(
         f"/api/tasks/{task['id']}/form/submit",
@@ -307,6 +340,40 @@ def test_dynamic_form_is_bounded_idempotent_and_creates_revision(
     assert repeated.json()["run"]["id"] == submitted_body["run"]["id"]
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(TaskRevision)) == 2
+
+
+def test_dynamic_form_merges_confirmed_values_with_existing_conditions(
+    task_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, _factory = task_context
+    register_and_login(client, "alice")
+    conversation_id = create_conversation(client)
+    task = create_task(
+        client,
+        conversation_id,
+        "shopping",
+        "Buy gifts",
+        {"item": "彩色铅笔", "people": 25},
+    )
+    proposal = client.get(f"/api/tasks/{task['id']}/form").json()
+    assert {field["id"] for field in proposal["schema"]} == {"quantity", "budget"}
+    submitted = client.post(
+        f"/api/tasks/{task['id']}/form/submit",
+        json={
+            "proposal_id": proposal["id"],
+            "expected_revision": 1,
+            "client_request_id": "merge-values",
+            "values": {"quantity": 25, "budget": 200},
+        },
+    )
+    assert submitted.status_code == 201, submitted.json()
+    assert submitted.json()["task"]["conditions"] == {
+        "item": "彩色铅笔",
+        "people": 25,
+        "quantity": 25,
+        "budget": 200,
+    }
+    assert submitted.json()["run"]["goal"] == "Buy gifts"
 
 
 def test_dynamic_form_rejects_stale_revision_and_cross_account_access(
@@ -332,7 +399,15 @@ def test_dynamic_form_rejects_stale_revision_and_cross_account_access(
         },
     )
     assert stale.status_code == 409
+    assert (
+        client.get(f"/api/tasks/{task['id']}/form/{proposal['id']}").status_code
+        == 200
+    )
 
     with TestClient(app, base_url="http://testserver") as bob:
         register_and_login(bob, "bob")
         assert bob.get(f"/api/tasks/{task['id']}/form").status_code == 404
+        assert (
+            bob.get(f"/api/tasks/{task['id']}/form/{proposal['id']}").status_code
+            == 404
+        )

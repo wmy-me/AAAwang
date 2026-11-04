@@ -1,5 +1,6 @@
 """Owner-scoped proposal generation and atomic form confirmation."""
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -11,6 +12,8 @@ from life_agent.db.models import Conversation, DynamicFormProposal, Task, TaskRe
 from life_agent.modules.forms.schemas import FormField
 from life_agent.modules.tasks.schemas import Conditions, validate_conditions
 from life_agent.modules.tasks.service import RevisionConflictError, create_revision
+
+logger = logging.getLogger(__name__)
 
 
 class FormNotFoundError(LookupError):
@@ -80,7 +83,9 @@ def validate_model_schema(
         registered = _REGISTERED_FORM_FIELDS[field.id]
         if field.control != registered.control:
             raise FormValidationError("模型表单控件类型不匹配注册能力。")
-        if field.unit != registered.unit:
+        unit = field.unit.strip() if isinstance(field.unit, str) else field.unit
+        unit = unit or None
+        if unit != registered.unit:
             raise FormValidationError("模型表单单位不匹配注册能力。")
         if field.min_value is not None and (
             registered.min_value is None or field.min_value < registered.min_value
@@ -91,7 +96,11 @@ def validate_model_schema(
         ):
             raise FormValidationError("模型表单最大值超出注册范围。")
         seen.add(field.id)
-        fields.append(field.model_dump(exclude_none=True))
+        normalized = field.model_dump(exclude_none=True)
+        normalized["unit"] = unit
+        if unit is None:
+            normalized.pop("unit")
+        fields.append(normalized)
     return fields
 
 
@@ -108,7 +117,15 @@ def persist_model_proposal(
     )
     if snapshot is None:
         raise FormNotFoundError
-    schema = validate_model_schema(raw_schema, dict(snapshot.conditions))
+    try:
+        schema = validate_model_schema(raw_schema, dict(snapshot.conditions))
+    except FormValidationError:
+        logger.warning(
+            "discarding invalid model form schema: task=%s revision=%s",
+            task_id,
+            revision,
+        )
+        return None
     proposal = db.scalar(
         select(DynamicFormProposal).where(
             DynamicFormProposal.task_id == task_id,
@@ -184,8 +201,26 @@ def get_or_create_proposal(
     return proposal
 
 
+def get_proposal(
+    db: Session, owner_id: uuid.UUID, task_id: uuid.UUID, proposal_id: uuid.UUID
+) -> DynamicFormProposal:
+    """Read one owner-scoped proposal, including proposals for old revisions."""
+    task = _owned_task(db, owner_id, task_id)
+    proposal = db.scalar(
+        select(DynamicFormProposal).where(
+            DynamicFormProposal.id == proposal_id,
+            DynamicFormProposal.task_id == task.id,
+        )
+    )
+    if proposal is None:
+        raise FormNotFoundError
+    return proposal
+
+
 def _validate_values(
-    proposal: DynamicFormProposal, values: dict[str, object]
+    proposal: DynamicFormProposal,
+    values: dict[str, object],
+    base_conditions: Conditions,
 ) -> Conditions:
     fields = {field["id"]: field for field in proposal.schema}
     unknown = set(values) - fields.keys()
@@ -198,7 +233,7 @@ def _validate_values(
     }
     if missing:
         raise FormValidationError(f"缺少必填字段: {', '.join(sorted(missing))}。")
-    conditions: Conditions = {}
+    conditions: Conditions = dict(base_conditions)
     for field_id, value in values.items():
         field = fields[field_id]
         control = field["control"]
@@ -253,7 +288,15 @@ def confirm_proposal(
         return proposal, revision
     if task.current_revision != expected_revision or proposal.revision != expected_revision:
         raise RevisionConflictError(task.current_revision)
-    conditions = _validate_values(proposal, values)
+    snapshot = db.scalar(
+        select(TaskRevision).where(
+            TaskRevision.task_id == task.id,
+            TaskRevision.revision == proposal.revision,
+        )
+    )
+    if snapshot is None:
+        raise FormNotFoundError
+    conditions = _validate_values(proposal, values, dict(snapshot.conditions))
     revision = create_revision(
         db,
         owner_id,

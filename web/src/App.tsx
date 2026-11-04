@@ -351,7 +351,7 @@ function App() {
     setArtifacts(null);
     setMapPlaces([]);
     watchGeneration.current += 1;
-    if (run.status === "completed") void loadResult(run.id);
+    if (run.status === "completed") void loadResult(run.id, run);
     if (run.status === "queued" || run.status === "running") watchRun(run);
   }
 

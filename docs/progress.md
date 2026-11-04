@@ -4,15 +4,16 @@
 - 能力元数据已包含输入 schema、独立超时和预算字段；聊天 Run 的决策使用注册策略、服务开关、Worker 实时 MCP `list_tools()` 发现结果、Agent 与任务域交集，模型只能从可见集选择，执行前再次发现校验。
 - `direct_answer` 已支持无工具直答和确定性追问；Run 新增 nullable `decision`/`budget` 摘要字段，迁移为 `20261104_0016`，旧 Run NULL 兼容。
 - 聊天入口先创建 `capability_decision` Run；Worker 用真实 DeepSeek 作结构化决策，后端校验能力、重复项、地图位置和共享预算，完成时写回实际 `execution_type` 与 `capability_ids`。
-- 后端全量 `128 passed`、Ruff、compileall、Alembic check、前端 lint/build 和 Java `verify` 通过；前端保留 3 条 Hook warning。Run 详情已展示决策、能力快照、预算和终止原因，并用无头 Chromium 验证刷新前后一致。
+- 后端全量 `133 passed`、Ruff、compileall、Alembic check、前端 lint/build 和 Java `verify` 通过；前端保留 3 条 Hook warning。Run 详情已展示决策、能力快照、预算和终止原因，并用无头 Chromium 验证刷新前后一致。
 - 已用真实 DeepSeek、独立 Worker、PostgreSQL、高德 MCP、Java 模拟 MCP 验证直答、缺城市追问、纯地点、纯商品和地图+商品组合五类决策 Run，并确认第二账号隔离；取消、超时、租约过期和预算耗尽已用独立 Worker 验证；真实租约过期会 fencing 拒绝迟到写入并重新领取，`lease_lost` 分支用注入续租失败验证。
 - 受控真实 MCP 协议验证了服务关闭、工具下线/改名、错服务、schema 不兼容和执行前二次校验：前五类可见集为空并安全直答，工具在首次发现后移除时 Run 失败并记录“执行前 MCP 工具发现结果已变化”；跨 Agent 作用域用替身测试覆盖。注册 schema 已补真实 `keyword`/`keywords` 必填字段，真实服务回归仍完成地点、商品和组合 Run。详见[报告](reports/020-model-capability-budget-report.md)。
 
-## 021 自然语言任务与动态表单（部分实现）
+## 021 自然语言任务与动态表单（已完成）
 
 - 已新增受限动态表单提议契约、`dynamic_form_proposals` 持久化、字段白名单/类型/范围校验、任务 revision 确认和请求幂等；网页已展示并提交 shopping 的 item/people/quantity/budget 字段。
-- 021 专项 API/Worker `20 passed`，后端全量 `128 passed`，Ruff、compileall、迁移升级、Alembic check 和前端 build 通过；前端 lint 保留 3 条 Hook warning（含本次新增 `set-state-in-effect`）。表单提交与自然语言入口统一创建同 revision 的用户 Message 和 `capability_decision` Run，并支持相同请求重试复用消息/Run。
-- 真实 DeepSeek 已生成并持久化 `people/quantity/budget` 表单字段；表单确认 Run 由独立 Worker 消费，无头 Chromium 已完成登录、填写、提交和刷新重读。剩余多目标/目标变更字段、表单确认后是否自动执行采购 Run、travel 及日期/多选/地点控件未验收。详见[报告](reports/021-dynamic-task-forms-report.md)。
+- 021 专项 API/Worker `25 passed`，后端全量 `133 passed`，Ruff、compileall、迁移升级、Alembic check 和前端 build 通过；前端 lint 保留 3 条 Hook warning（含本次新增 `set-state-in-effect`）。表单提交与自然语言入口统一创建同 revision 的用户 Message 和 `capability_decision` Run，并支持相同请求重试复用消息/Run。
+- 确认值会合并既有任务条件，Run 保留原 task goal；模型按目标决定是否查询商品，条件足够时生成方案，探索时允许直答/追问，不写死表单必查商品。
+- 真实 DeepSeek、独立 Worker、PostgreSQL 和无头 Chromium 已验收无预算探索、多目标输入、目标修改后重新提议、旧 revision/旧表单/旧 Run 读取、表单确认后的商品方案、并发提交、同键幂等、过期 revision 和双账号隔离；新增历史表单读取 API。travel 及日期/多选/地点控件留给后续任务。详见[报告](reports/021-dynamic-task-forms-report.md)。
 
 ## 019 购物主 Agent 的受控能力路由与工具白名单
 

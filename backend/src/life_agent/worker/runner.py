@@ -353,17 +353,25 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
         '"form_schema":[]}\n'
         "capability_ids 只能从下列后端授权集合中选择，不能创建新 ID、URL、服务或工具：\n"
         f"{capability_lines}\n"
-        f"用户消息：{claim.input_message or claim.goal}\n"
+        f"任务目标：{claim.goal}\n"
+        f"本轮用户消息：{claim.input_message or '（无）'}\n"
         f"当前任务条件：{_bounded_json(claim.conditions)}\n"
         "判断规则：\n"
         "1. 问候、询问你能做什么、闲聊或解释概念：kind=direct，capability_ids=[]，不要调用工具。\n"
         "2. 用户本轮明确要查找地点/店铺/附近/路线，但没有城市或位置范围：kind=clarification。\n"
         "3. 城市名（如上海、北京）本身已是有效位置范围，不要要求区或街道；"
         "“查询上海附近的书店”应选择 map_place_search。\n"
-        "4. 用户本轮要求购买、查找或推荐具体商品（如“买彩色铅笔作为奖品”"
+        "4. 任务目标或本轮消息要求购买、查找或推荐具体商品（如“买彩色铅笔作为奖品”"
         "“给25人买彩色铅笔”）时，选择 shopping_product_discovery。\n"
         "5. 只有任务条件或历史目标提到预算、人数，而本轮没有商品或地点请求时，"
         "才不要选择能力。\n"
+        "6. “通过动态表单确认：...” 只表示用户确认条件，不代表不得执行工具，"
+        "必须同时看任务目标。任务目标明确要求购买、采购方案或生成清单且条件足够时，"
+        "选择 shopping_product_discovery（目标同时要求地点时也选择地图能力）；"
+        "不要因为本轮消息只有表单确认就直答。只有任务是开放探索、目标不明确"
+        "或条件不足时，才可以 direct 或 clarification。\n"
+        "7. 一句话包含多个目标时分别判断每个目标；form_schema 只列对当前任务确有帮助的字段，"
+        "不得把地点或其他目标的信息写成商品预算、人数或数量。\n"
         "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。\n"
         "form_schema 只能提出当前缺失且本轮确实有帮助的字段；没有必要时返回空数组。"
         "每项必须严格使用以下结构，且 id/control/unit 只能取注册值：\n"
@@ -382,13 +390,28 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
     value = _decision_json(response.text)
     if value is None:
         raise ToolLoopError("能力决策不是有效 JSON，已拒绝执行。")
+    visible_ids = {item.capability_id for item in visible}
+    if _decision_needs_correction(value, visible_ids):
+        correction = (
+            prompt
+            + "\n上一轮输出："
+            + response.text[:400]
+            + "\n上一轮的 kind 与 reason/能力选择不一致。请重新输出严格 JSON；"
+            "若 reason 表明需要采购能力，kind 必须是 capabilities 且 capability_ids 非空；"
+            "否则保持 direct/clarification 并说明理由。"
+        )
+        response = asyncio.run(
+            call_deepseek(settings, correction, budget=budget, max_tokens=512)
+        )
+        value = _decision_json(response.text)
+        if value is None:
+            raise ToolLoopError("能力决策纠正结果不是有效 JSON，已拒绝执行。")
     kind = value.get("kind")
     if kind not in {"direct", "clarification", "capabilities"}:
         raise ToolLoopError("能力决策类型未注册，已拒绝执行。")
     selected = value.get("capability_ids", [])
     if not isinstance(selected, list) or any(not isinstance(item, str) for item in selected):
         raise ToolLoopError("能力决策的 capability_ids 无效。")
-    visible_ids = {item.capability_id for item in visible}
     if any(item not in visible_ids for item in selected) or len(set(selected)) != len(selected):
         raise ToolLoopError("模型选择了当前不可见或重复的能力。")
     if kind == "capabilities" and not selected:
@@ -397,7 +420,9 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
         # Models sometimes label a tool-using reply "direct"; capability_ids are
         # validated against the visible set, so treat them as authoritative.
         kind = "capabilities"
-    if "map_place_search" in selected and not has_location_scope(claim.input_message or claim.goal):
+    if "map_place_search" in selected and not has_location_scope(
+        f"{claim.goal} {claim.input_message or ''}"
+    ):
         return {
             "kind": "clarification",
             "capability_ids": [],
@@ -419,6 +444,28 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
         "form_schema": value.get("form_schema", []),
         "decision_source": "deepseek_structured_worker",
     }
+
+
+def _decision_needs_correction(
+    value: dict[str, object], visible_ids: set[str]
+) -> bool:
+    """Detect a self-contradictory model decision before executing it."""
+    selected = value.get("capability_ids", [])
+    if not isinstance(selected, list):
+        return False
+    if value.get("kind") == "capabilities" and not selected:
+        return True
+    if (
+        value.get("kind") in {"direct", "clarification"}
+        and not selected
+        and "shopping_product_discovery" in visible_ids
+    ):
+        reason = str(value.get("reason") or "")
+        return any(
+            marker in reason
+            for marker in ("应执行", "商品发现", "采购方案", "购买具体商品", "搜索商品")
+        )
+    return False
 
 
 def _discover_capability_tools(settings, budget: RunBudget | None = None):

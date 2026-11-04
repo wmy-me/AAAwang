@@ -1,13 +1,13 @@
 # 021：自然语言任务与动态表单
 
-- 状态：部分实现；服务端注册字段的提议/确认、revision 与幂等校验、真实 DeepSeek 动态 schema、表单与 Run 统一语义、网页入口及无头 Chromium 登录/提交/刷新已验收；多目标与目标变更字段、表单确认后自动执行采购 Run、travel 及日期/多选/地点控件未完成，不标记为完成
+- 状态：已完成；服务端注册字段的提议/确认、revision 与幂等校验、真实 DeepSeek 动态 schema、无预算探索、多目标字段、目标变更重提议、表单与 Run 统一语义、旧 revision/表单/Run 读取、网页入口及无头 Chromium 登录/提交/刷新均已验收；travel、日期/多选/地点控件属于后续任务
 - 所属阶段：P4 真实信息与更多采买场景
 - 前置：[020 报告](../reports/020-model-capability-budget-report.md)、[动态表单设计](../design/dynamic-task-forms.md)、[Agent 执行规则](../design/agent-execution-rules.md)、[数据保护与幂等规则](../design/security-and-idempotency.md)
 - 完成后报告：`docs/reports/021-dynamic-task-forms-report.md`
 
 ## 1. 范围与边界
 
-本任务仅实现动态表单提议、服务端校验与网页渲染，不回填或替代 020 尚未完成的真实浏览器刷新、真实 Worker 取消/失租/超时和 Java `verify` 验收。动态表单是自然语言任务的补充入口，不把预算、人数或数量设为所有购物请求的固定必填字段。
+本任务仅实现动态表单提议、服务端校验与网页渲染；020 已完成的真实浏览器刷新、真实 Worker 终止、预算和 Java `verify` 不在本任务重复实现。动态表单是自然语言任务的补充入口，不把预算、人数或数量设为所有购物请求的固定必填字段。
 
 保留 017 的目标/条件一致性门禁、旧固定字段和历史 Run 兼容；字段提议、用户确认值、任务 revision 和 Run 仍按 owner、task、revision、幂等键绑定。模型不能生成 HTML、脚本、数据库列、工具权限、支付字段或用户身份字段。
 

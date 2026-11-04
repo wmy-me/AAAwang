@@ -25,7 +25,7 @@
 
 ## 验证
 
-- `uv run pytest -q`：`128 passed`。
+- `uv run pytest -q`：`133 passed`（021 收口后全量回归）。
 - `uv run ruff check src scripts tests`：通过。
 - `uv run python -m compileall -q src scripts tests`：通过。
 - `uv run alembic upgrade head`：已应用 `20261104_0017`（020 字段由 `20261104_0016` 引入）。

@@ -223,6 +223,109 @@ def test_capability_decision_downgrades_map_without_location(monkeypatch) -> Non
     assert decision["capability_ids"] == []
 
 
+def test_capability_decision_prompt_preserves_goal_and_form_message(monkeypatch) -> None:
+    settings = SimpleNamespace(mcp_services={}, map_mcp_tool_name="maps_text_search")
+    run_claim = SimpleNamespace(
+        input_message='通过动态表单确认：{"budget": 200}',
+        goal="给25人买彩色铅笔作为奖品",
+        conditions={"budget": 200},
+    )
+    captured: dict[str, str] = {}
+
+    async def fake_call(_settings, prompt, **_kwargs):
+        captured["prompt"] = prompt
+        return LLMResult('{"kind":"direct","capability_ids":[]}')
+
+    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+
+    assert "任务目标：给25人买彩色铅笔作为奖品" in captured["prompt"]
+    assert "本轮用户消息：通过动态表单确认" in captured["prompt"]
+    assert "只表示用户确认条件，不代表不得执行工具" in captured["prompt"]
+
+
+def test_capability_decision_retries_self_contradictory_direct(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        mcp_services={"shopping": SimpleNamespace(enabled=True)},
+        map_mcp_tool_name="maps_text_search",
+    )
+    run_claim = SimpleNamespace(
+        input_message='通过动态表单确认：{"quantity": 25}',
+        goal="为25名学生购买彩色铅笔作为奖品，预算200元",
+        conditions={"budget": 200, "people": 25},
+    )
+    calls: list[str] = []
+
+    async def fake_call(_settings, prompt, **_kwargs):
+        calls.append(prompt)
+        if len(calls) == 1:
+            return LLMResult(
+                '{"kind":"direct","capability_ids":[],"reason":"条件充分，应执行商品发现"}'
+            )
+        return LLMResult(
+            '{"kind":"capabilities","capability_ids":["shopping_product_discovery"]}'
+        )
+
+    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(
+        runner,
+        "_discover_capability_tools",
+        lambda settings, _budget=None: (
+            {"shopping"},
+            {"shopping": {
+                    "search_products": {
+                        "type": "object",
+                        "required": ["keyword"],
+                    }
+                }},
+        ),
+    )
+
+    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+
+    assert len(calls) == 2
+    assert "请重新输出严格 JSON" in calls[1]
+    assert decision["kind"] == "capabilities"
+    assert decision["capability_ids"] == ["shopping_product_discovery"]
+
+
+def test_capability_decision_uses_goal_location_for_form_confirmation(
+    monkeypatch,
+) -> None:
+    settings = SimpleNamespace(
+        mcp_services={"map": SimpleNamespace(enabled=True)},
+        map_mcp_tool_name="maps_text_search",
+    )
+    run_claim = SimpleNamespace(
+        input_message='通过动态表单确认：{"budget": 200}',
+        goal="查询上海附近的书店",
+        conditions={"budget": 200},
+    )
+
+    async def fake_call(*_args, **_kwargs):
+        return LLMResult('{"kind":"capabilities","capability_ids":["map_place_search"]}')
+
+    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(
+        runner,
+        "_discover_capability_tools",
+        lambda settings, _budget=None: (
+            {"map"},
+            {"map": {
+                    "maps_text_search": {
+                        "type": "object",
+                        "required": ["keywords"],
+                    }
+                }},
+        ),
+    )
+
+    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+
+    assert decision["kind"] == "capabilities"
+    assert decision["capability_ids"] == ["map_place_search"]
+
+
 def test_execution_rejects_changed_mcp_discovery(monkeypatch) -> None:
     claim_value = claim("map_places", ("map_place_search",))
     monkeypatch.setattr(

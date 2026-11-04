@@ -21,6 +21,7 @@ from life_agent.modules.forms.service import (
     FormValidationError,
     confirm_proposal,
     get_or_create_proposal,
+    get_proposal,
 )
 from life_agent.modules.runs.schemas import RunResponse
 from life_agent.modules.runs.service import create_run
@@ -34,6 +35,24 @@ router = APIRouter()
 def get_form(task_id: uuid.UUID, db: Database, current_user: CurrentUser):
     try:
         return get_or_create_proposal(db, current_user.id, task_id)
+    except FormNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="任务或表单不存在。") from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="表单存储暂时不可用。") from exc
+
+
+@router.get(
+    "/tasks/{task_id}/form/{proposal_id}",
+    response_model=DynamicFormProposalResponse,
+)
+def get_form_proposal(
+    task_id: uuid.UUID,
+    proposal_id: uuid.UUID,
+    db: Database,
+    current_user: CurrentUser,
+):
+    try:
+        return get_proposal(db, current_user.id, task_id, proposal_id)
     except FormNotFoundError as exc:
         raise HTTPException(status_code=404, detail="任务或表单不存在。") from exc
     except SQLAlchemyError as exc:
