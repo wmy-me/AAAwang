@@ -208,3 +208,17 @@ def test_execution_rejects_changed_mcp_discovery(monkeypatch) -> None:
 
     with pytest.raises(ToolLoopError, match="工具发现结果已变化"):
         runner._validate_discovered_capabilities(SimpleNamespace(), claim_value)
+
+
+def test_termination_reasons_are_bounded() -> None:
+    assert runner._termination_reason(runner.BudgetExceededError("model_budget_exhausted")) == (
+        "model_budget_exhausted"
+    )
+    assert runner._termination_reason(TimeoutError()) == "timeout"
+    assert runner._termination_reason(ToolLoopError("执行租约丢失，结果不会提交。")) == (
+        "lease_lost"
+    )
+    assert runner._termination_reason(
+        ToolLoopError("购物Agent超过总执行时限，结果不会提交")
+    ) == "timeout"
+    assert runner._termination_reason(RuntimeError("boom")) == "failed"

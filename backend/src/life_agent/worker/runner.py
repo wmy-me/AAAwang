@@ -275,16 +275,21 @@ def run_once(worker_id: str) -> bool:
                 error_summary,
             )
             with get_session_factory()() as fail_db:
-                if isinstance(exc, BudgetExceededError):
-                    reason = str(exc)
-                elif isinstance(exc, TimeoutError):
-                    reason = "timeout"
-                elif "租约丢失" in str(exc):
-                    reason = "lease_lost"
-                else:
-                    reason = "failed"
-                budget.stop(reason)
+                budget.stop(_termination_reason(exc))
                 return fail_claim(fail_db, claim, error_summary, budget.snapshot())
+
+
+def _termination_reason(exc: Exception) -> str:
+    """Map worker failures to a bounded, user-readable termination reason."""
+    if isinstance(exc, BudgetExceededError):
+        return str(exc)
+    if isinstance(exc, TimeoutError):
+        return "timeout"
+    if "租约丢失" in str(exc):
+        return "lease_lost"
+    if "超过总执行时限" in str(exc):
+        return "timeout"
+    return "failed"
 
 
 def _capability_decision(claim) -> dict[str, object]:
@@ -359,11 +364,21 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
         "“给25人买彩色铅笔”）时，选择 shopping_product_discovery。\n"
         "5. 只有任务条件或历史目标提到预算、人数，而本轮没有商品或地点请求时，"
         "才不要选择能力。\n"
-        "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。"
+        "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。\n"
         "form_schema 只能提出当前缺失且本轮确实有帮助的字段；没有必要时返回空数组。"
-        "budget、people、quantity 不是固定必填项；探索请求不得为了补字段而阻断。"
+        "每项必须严格使用以下结构，且 id/control/unit 只能取注册值：\n"
+        '{"id":"item|people|quantity|budget","control":"short_text|number|money",'
+        '"label":"简短标签","reason":"为什么需要","required":false,'
+        '"unit":"人|件|元（与 id 对应）"}\n'
+        "item 使用 short_text；people/quantity 使用 number 和单位 人/件；"
+        "budget 使用 money 和单位 元。已确认条件不得重复提出。"
+        "当用户明确要求补充条件或整理采购方案且关键信息缺失时，可以提出对应字段；"
+        "普通只读探索不要为了补字段而阻断。"
+        "budget、people、quantity 不是固定必填项。"
     )
-    response = asyncio.run(call_deepseek(settings, prompt, budget=budget))
+    response = asyncio.run(
+        call_deepseek(settings, prompt, budget=budget, max_tokens=512)
+    )
     value = _decision_json(response.text)
     if value is None:
         raise ToolLoopError("能力决策不是有效 JSON，已拒绝执行。")
