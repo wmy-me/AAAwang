@@ -1,5 +1,6 @@
 """Owner-scoped run persistence and database-backed worker ownership."""
 
+import hashlib
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from life_agent.db.models import (
     Conversation,
+    MapPlace,
     Message,
     Run,
     RunEvent,
@@ -112,9 +114,9 @@ def create_run(
     )
     if task is None:
         raise RunNotFoundError
-    if execution_type not in {"diagnostic", "shopping_research", "shopping_agent"}:
+    if execution_type not in {"diagnostic", "shopping_research", "shopping_agent", "map_places"}:
         raise ValueError("unsupported run execution type")
-    if execution_type in {"shopping_research", "shopping_agent"} and task.domain != "shopping":
+    if execution_type in {"shopping_research", "shopping_agent", "map_places"} and task.domain != "shopping":
         raise ValueError("shopping execution requires a shopping task")
     existing = db.scalar(
         select(Run).where(Run.task_id == task_id, Run.idempotency_key == idempotency_key)
@@ -308,6 +310,40 @@ def _finish_claim(
                         run_id=run.id,
                     )
                 )
+        if run.execution_type == "map_places":
+            query = str(shopping_result.get("query", ""))[:120]
+            city = str(shopping_result.get("city", ""))[:120]
+            observed_at = datetime.fromisoformat(
+                str(shopping_result.get("observed_at", now.isoformat()))
+            )
+            source = dict(shopping_result.get("source", {}))
+            for place in shopping_result.get("places", []):
+                name = str(place.get("name") or "未命名地点")[:240]
+                address = place.get("address")
+                location = place.get("location")
+                place_key = hashlib.sha256(
+                    f"{name}|{address or ''}|{location or ''}".encode()
+                ).hexdigest()[:64]
+                db.add(
+                    MapPlace(
+                        run_id=run.id,
+                        owner_id=run.owner_id,
+                        task_id=run.task_id,
+                        task_revision_id=run.task_revision_id,
+                        revision=run.revision,
+                        place_key=place_key,
+                        name=name,
+                        address=str(address)[:240] if address else None,
+                        location=str(location)[:240] if location else None,
+                        phone=str(place.get("phone"))[:80] if place.get("phone") else None,
+                        url=str(place.get("url"))[:240] if place.get("url") else None,
+                        query=query,
+                        city=city,
+                        source_service=str(source.get("service_id", "map"))[:64],
+                        source_tool=str(source.get("tool", ""))[:128],
+                        observed_at=observed_at,
+                    )
+                )
         if shopping_artifacts is not None:
             candidates_by_product: dict[str, ShoppingCandidate] = {}
             for draft in shopping_artifacts.get("candidates", []):
@@ -497,7 +533,7 @@ def get_shopping_result(
     db: Session, owner_id: uuid.UUID, run_id: uuid.UUID
 ) -> ShoppingRunResult:
     run = _owned_run(db, owner_id, run_id)
-    if run.execution_type not in {"shopping_research", "shopping_agent"}:
+    if run.execution_type not in {"shopping_research", "shopping_agent", "map_places"}:
         raise RunNotFoundError
     result = db.scalar(
         select(ShoppingRunResult).where(ShoppingRunResult.run_id == run_id)
@@ -505,6 +541,19 @@ def get_shopping_result(
     if result is None:
         raise RunNotFoundError
     return result
+
+
+def get_map_places(
+    db: Session, owner_id: uuid.UUID, run_id: uuid.UUID
+) -> list[MapPlace]:
+    _owned_run(db, owner_id, run_id)
+    return list(
+        db.scalars(
+            select(MapPlace)
+            .where(MapPlace.run_id == run_id, MapPlace.owner_id == owner_id)
+            .order_by(MapPlace.name, MapPlace.id)
+        )
+    )
 
 
 def get_shopping_artifacts(

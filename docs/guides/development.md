@@ -306,7 +306,7 @@ shopping-mcp 包含查询边界和 Origin 过滤测试；另外两个模块仍�
 
 尚未接通：
 
-- Python 已连接 PostgreSQL 用于认证、私有对话、用户消息、任务和条件版本；地图/搜索仍未连接。
+- Python 已连接 PostgreSQL 用于认证、私有对话、用户消息、任务和条件版本；地图地点查询可通过受控 `map_places` Run 持久化到 `map_places` 表，真实 PostgreSQL 升级后需执行地点刷新验收。
 - shopping-mcp 已有标准协议和一个只读模拟工具；travel 与 local-life 没有 MCP。
 - LLM 已通过独立有限执行器根据 schema 调用一个只读 MCP 工具；尚未接入 HTTP 聊天、LangGraph 或 Agent。
 - 网页没有聊天、任务、投稿、方案等业务页面；后端任务版本不等于已有执行器、Agent 回复或长期记忆。

@@ -1,4 +1,4 @@
-export type ApiErrorCode = 401 | 403 | 404 | 409 | 422 | 503
+export type ApiErrorCode = 401 | 403 | 404 | 409 | 422 | 502 | 503
 
 export class ApiError extends Error {
   status: number
@@ -52,7 +52,7 @@ export interface Run {
   task_revision_id: string
   revision: number
   conditions: Conditions
-  execution_type: 'diagnostic' | 'shopping_research' | 'shopping_agent'
+  execution_type: 'diagnostic' | 'shopping_research' | 'shopping_agent' | 'map_places'
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
   created_at: string
   started_at: string | null
@@ -114,6 +114,22 @@ export interface ShoppingPlan {
 export interface ShoppingArtifacts {
   candidates: ShoppingCandidate[]
   plan: ShoppingPlan | null
+}
+
+export interface MapPlace {
+  id: string
+  run_id: string
+  revision: number
+  name: string
+  address: string | null
+  location: string | null
+  phone: string | null
+  url: string | null
+  query: string
+  city: string
+  source_service: string
+  source_tool: string
+  observed_at: string
 }
 
 export interface ShoppingAdjustment {
@@ -248,6 +264,7 @@ export const api = {
   result: (runId: string) => request<RunResult>(`/runs/${runId}/result`),
   shoppingArtifacts: (runId: string) =>
     request<ShoppingArtifacts>(`/runs/${runId}/shopping-artifacts`),
+  mapPlaces: (runId: string) => request<MapPlace[]>(`/runs/${runId}/map-places`),
   shoppingAdjustments: (taskId: string) =>
     request<ShoppingAdjustmentList>(`/tasks/${taskId}/shopping-adjustments`),
   createShoppingAdjustment: (

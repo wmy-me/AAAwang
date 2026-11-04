@@ -216,13 +216,14 @@ def submit_turn(
     )
     db.add(message)
     db.flush()
+    map_request = bool(re.search(r"(地点|门店|店铺|超市|商场|附近|位置|地图|哪里买)", content))
     run = create_run(
         db,
         owner_id,
         task.id,
         expected_revision,
         f"turn:{client_turn_id}",
-        "shopping_agent",
+        "map_places" if map_request else "shopping_agent",
         input_message_id=message.id,
         commit=False,
     )

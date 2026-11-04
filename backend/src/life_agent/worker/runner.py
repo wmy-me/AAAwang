@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import logging
 import os
+import re
 import socket
 import threading
 import time
@@ -99,6 +100,12 @@ def run_once(worker_id: str) -> bool:
                         },
                         shopping_artifacts=artifacts,
                     )
+            if claim.execution_type == "map_places":
+                result = _run_map_places_with_lease(settings, claim)
+                with get_session_factory()() as result_db:
+                    if is_cancel_requested(result_db, claim):
+                        return cancel_claim(result_db, claim)
+                    return complete_claim(result_db, claim, shopping_result=result)
             return complete_claim(
                 db,
                 claim,
@@ -122,6 +129,67 @@ def _shopping_prompt(goal: str, conditions: dict[str, object]) -> str:
         f"购物目标：{goal}\n已知条件：{known}\n"
         "只查询并回答模拟商品候选。未提供的预算、物品、数量必须明确写为未知，不能猜测。"
     )
+
+
+_MAP_CITY_PATTERNS = (
+    re.compile(
+        r"(?:在|到|位于)\s*([^，。；;,\s]{2,20}?)(?=\s*(?:找|查|搜|看|的|附近|周边|有|$|[，。；;,]))"
+    ),
+    re.compile(
+        r"^(?:帮我|请|麻烦)?\s*(?:查询|查找|搜索|找)(?:一下)?\s*"
+        r"([一-鿿]{2,8}?)(?=(?:的)?(?:附近|周边|礼品|超市|商场|门店|店铺|地点|位置))"
+    ),
+    re.compile(r"^([一-鿿]{2,8}?)(?:市|区|县)?(?:附近|周边)"),
+)
+
+
+def _map_request(goal: str, input_message: str | None) -> tuple[str, str | None]:
+    text = (input_message or goal).strip()
+    city = next(
+        (match.group(1) for pattern in _MAP_CITY_PATTERNS if (match := pattern.search(text))),
+        None,
+    )
+    query = text.replace(city, " ", 1) if city else text
+    query = re.sub(
+        r"(?:帮我|请|麻烦|查询|查找|搜索|搜一下|找一下|看看|看一下|找|在|到|位于|"
+        r"附近的|附近|周边的|周边|的|地点|位置|哪里买|有卖)",
+        " ",
+        query,
+    )
+    query = " ".join(query.split())[:120]
+    return query or text[:120], city
+
+
+def _run_map_places_with_lease(settings, claim):
+    from life_agent.tools.maps import search_places
+
+    query, city = _map_request(claim.goal, claim.input_message)
+    if not city:
+        return {
+            "answer": "请先告诉我需要查询的城市或位置范围。",
+            "source": {"service_id": "map", "tool": None, "simulated": False},
+            "execution_version": "018-v1",
+            "decision_type": "clarification",
+            "delegated": False,
+            "mcp_call_count": 0,
+            "places": [], "query": query, "city": "",
+        }
+    result = asyncio.run(
+        asyncio.wait_for(
+            search_places(settings, query, city=city),
+            timeout=settings.map_mcp_timeout_seconds,
+        )
+    )
+    return {
+        "answer": f"已查询 {city} 的“{query}”，找到 {len(result['places'])} 个地点。",
+        "source": result["source"],
+        "execution_version": "018-v1",
+        "decision_type": "direct_answer",
+        "delegated": False,
+        "mcp_call_count": 1,
+        "places": result["places"], "query": query, "city": city,
+        "observed_at": result["observed_at"],
+    }
 
 
 def _run_shopping_agent_with_lease(settings, claim):

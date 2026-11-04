@@ -248,6 +248,9 @@ class Run(Base):
     shopping_plan: Mapped["ShoppingPlan | None"] = relationship(
         back_populates="run", cascade="all, delete-orphan", passive_deletes=True
     )
+    map_places: Mapped[list["MapPlace"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class RunEvent(Base):
@@ -286,6 +289,41 @@ class ShoppingRunResult(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     run: Mapped[Run] = relationship(back_populates="shopping_result")
+
+
+class MapPlace(Base):
+    __tablename__ = "map_places"
+    __table_args__ = (
+        UniqueConstraint("run_id", "place_key", name="uq_map_places_run_place"),
+        Index("ix_map_places_task_revision", "task_id", "revision"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_revisions.id", ondelete="CASCADE")
+    )
+    revision: Mapped[int] = mapped_column(Integer)
+    place_key: Mapped[str] = mapped_column(String(128))
+    name: Mapped[str] = mapped_column(String(240))
+    address: Mapped[str | None] = mapped_column(String(240))
+    location: Mapped[str | None] = mapped_column(String(240))
+    phone: Mapped[str | None] = mapped_column(String(80))
+    url: Mapped[str | None] = mapped_column(String(240))
+    query: Mapped[str] = mapped_column(String(120))
+    city: Mapped[str] = mapped_column(String(120))
+    source_service: Mapped[str] = mapped_column(String(64))
+    source_tool: Mapped[str] = mapped_column(String(128))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    run: Mapped[Run] = relationship(back_populates="map_places")
 
 
 class ShoppingCandidate(Base):

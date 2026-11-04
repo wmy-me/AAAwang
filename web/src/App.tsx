@@ -7,6 +7,7 @@ import {
   type Conditions,
   type Conversation,
   type Message,
+  type MapPlace,
   type Run,
   type RunResult,
   type ShoppingAdjustment,
@@ -35,6 +36,10 @@ function App() {
   const [adjustments, setAdjustments] = useState<ShoppingAdjustment[]>([]);
   const [adjustmentVersion, setAdjustmentVersion] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [mapPlaces, setMapPlaces] = useState<MapPlace[]>([]);
+  const [mapQuery, setMapQuery] = useState("");
+  const [mapCity, setMapCity] = useState("");
+  const [mapBusy, setMapBusy] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [turnSubmitting, setTurnSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
@@ -107,6 +112,7 @@ function App() {
       setRuns([]);
       setResult(null);
       setArtifacts(null);
+      setMapPlaces([]);
       setMessages([]);
       setError("登录状态已失效，请重新登录。");
       return;
@@ -167,6 +173,7 @@ function App() {
     setRuns([]);
     setResult(null);
     setArtifacts(null);
+    setMapPlaces([]);
     setMessages([]);
     setConversationId("");
     setNotice("已退出当前账号。");
@@ -332,6 +339,7 @@ function App() {
     setSelectedRunId(run.id);
     setResult(null);
     setArtifacts(null);
+    setMapPlaces([]);
     watchGeneration.current += 1;
     if (run.status === "completed") void loadResult(run.id);
     if (run.status === "queued" || run.status === "running") watchRun(run);
@@ -339,12 +347,15 @@ function App() {
 
   async function loadResult(runId: string) {
     try {
-      const [nextResult, nextArtifacts] = await Promise.all([
-        api.result(runId),
-        api.shoppingArtifacts(runId),
-      ]);
+      const currentRun = runs.find((item) => item.id === runId);
+      const nextResult = await api.result(runId);
       setResult(nextResult);
-      setArtifacts(nextArtifacts);
+      if (currentRun?.execution_type === "map_places") {
+        setMapPlaces(await api.mapPlaces(runId));
+        setArtifacts(null);
+      } else {
+        setArtifacts(await api.shoppingArtifacts(runId));
+      }
       if (task) {
         const history = await api.shoppingAdjustments(task.id);
         setAdjustments(history.items);
@@ -354,6 +365,31 @@ function App() {
     } catch (value) {
       if (!(value instanceof ApiError && value.status === 404))
         handleError(value);
+    }
+  }
+
+  async function submitMapSearch() {
+    if (!task || !mapQuery.trim() || !mapCity.trim() || mapBusy) return;
+    setMapBusy(true);
+    setError("");
+    try {
+      const turn = await api.submitTurn(
+        conversationId,
+        task.id,
+        crypto.randomUUID(),
+        `在${mapCity.trim()}，查询${mapQuery.trim()}地点`,
+        task.current_revision,
+      );
+      setMapQuery("");
+      setMapPlaces([]);
+      setTask(turn.task);
+      setRuns((items) => [turn.run, ...items.filter((item) => item.id !== turn.run.id)]);
+      selectRun(turn.run);
+      setNotice("地点查询已进入队列，结果会绑定当前任务版本。");
+    } catch (value) {
+      handleError(value);
+    } finally {
+      setMapBusy(false);
     }
   }
 
@@ -654,6 +690,17 @@ function App() {
               onSubmit={submitChatTurn}
             />
           )}
+          {task && (
+            <MapSearch
+              city={mapCity}
+              query={mapQuery}
+              busy={mapBusy}
+              places={mapPlaces}
+              onCity={setMapCity}
+              onQuery={setMapQuery}
+              onSubmit={submitMapSearch}
+            />
+          )}
           {artifacts && selectedRun && task && (
             <ShoppingArtifactsPanel
               artifacts={artifacts}
@@ -678,6 +725,51 @@ function App() {
         </section>
       </div>
     </main>
+  );
+}
+
+function MapSearch({
+  city,
+  query,
+  busy,
+  places,
+  onCity,
+  onQuery,
+  onSubmit,
+}: {
+  city: string;
+  query: string;
+  busy: boolean;
+  places: MapPlace[];
+  onCity: (value: string) => void;
+  onQuery: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <section className="chat-section">
+      <div className="section-bar">
+        <div>
+          <span className="eyebrow">03 / MAP SEARCH</span>
+          <h2>查找附近地点</h2>
+        </div>
+        <span className="section-meta">只读地点查询</span>
+      </div>
+      <form className="chat-composer" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+        <input value={city} onChange={(event) => onCity(event.target.value)} placeholder="城市或位置，例如上海" maxLength={120} disabled={busy} />
+        <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="关键词，例如礼品店" maxLength={120} disabled={busy} />
+        <button className="button button-primary" disabled={busy || !city.trim() || !query.trim()}>{busy ? "查询中…" : "查询地点"}</button>
+      </form>
+      {places.length > 0 && (
+        <div className="chat-history">
+          {places.map((place) => (
+            <div className="chat-message chat-assistant" key={place.id}>
+              <span>地点</span>
+              <p><strong>{place.name}</strong>{place.address ? ` · ${place.address}` : ""}<br /><small>{place.source_service} / {place.source_tool} · {formatDate(place.observed_at)}</small></p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

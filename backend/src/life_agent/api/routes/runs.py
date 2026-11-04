@@ -14,6 +14,7 @@ from life_agent.api.dependencies import CurrentUser, Database
 from life_agent.api.routes.auth import require_trusted_origin
 from life_agent.core.config import Settings, get_settings
 from life_agent.modules.runs.schemas import (
+    MapPlaceResponse,
     RunConflictResponse,
     RunCreate,
     RunEventList,
@@ -31,6 +32,7 @@ from life_agent.modules.runs.service import (
     RunRevisionConflictError,
     cancel_run,
     create_run,
+    get_map_places,
     get_run,
     get_shopping_artifacts,
     get_shopping_result,
@@ -170,6 +172,19 @@ def shopping_artifacts(
         candidates=[ShoppingCandidateResponse.model_validate(item) for item in candidates],
         plan=ShoppingPlanResponse.model_validate(plan) if plan is not None else None,
     )
+
+
+@router.get("/runs/{run_id}/map-places", response_model=list[MapPlaceResponse])
+def map_places(
+    run_id: uuid.UUID, db: Database, current_user: CurrentUser
+) -> list[MapPlaceResponse]:
+    try:
+        items = get_map_places(db, current_user.id, run_id)
+    except RunNotFoundError as exc:
+        raise _not_found() from exc
+    except SQLAlchemyError as exc:
+        raise _storage_unavailable() from exc
+    return [MapPlaceResponse.model_validate(item) for item in items]
 
 
 @router.get("/runs/{run_id}/events", response_model=RunEventList)

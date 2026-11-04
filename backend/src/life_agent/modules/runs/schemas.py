@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
 RunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
-RunExecutionType = Literal["diagnostic", "shopping_research", "shopping_agent"]
+RunExecutionType = Literal["diagnostic", "shopping_research", "shopping_agent", "map_places"]
 RunEventType = Literal[
     "run.queued",
     "run.running",
@@ -113,6 +113,24 @@ class ShoppingPlanResponse(BaseModel):
 class ShoppingArtifactsResponse(BaseModel):
     candidates: list[ShoppingCandidateResponse]
     plan: ShoppingPlanResponse | None
+
+
+class MapPlaceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    run_id: uuid.UUID
+    revision: int
+    name: str
+    address: str | None
+    location: str | None
+    phone: str | None
+    url: str | None
+    query: str
+    city: str
+    source_service: str
+    source_tool: str
+    observed_at: datetime
 
 
 class RunList(BaseModel):

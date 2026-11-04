@@ -14,7 +14,7 @@ Run 由当前用户明确为一个 task 的明确 revision 创建。身份只来
 }
 ```
 
-`execution_type` 默认为 `diagnostic`，保留007–009的无副作用语义；`shopping_research` 保留010的有限工具循环；`shopping_agent` 只接受 `shopping` task，使用主 Agent 委派信息发现 Agent。两种购物类型都只能使用后端固定的 `shopping` MCP 服务和 `search_products` 工具。客户端不能提交服务URL、工具名或执行代码。服务端在同一事务中锁定 task、核对 `expected_revision`，读取该版本不可变 revision，并复制完整 `conditions` 快照。响应包含 `task_revision_id`、`revision`、`conditions`、执行类型和 `status=queued`。之后 task 的 current revision 变化不影响该 run。
+`execution_type` 默认为 `diagnostic`，保留007–009的无副作用语义；`shopping_research` 保留010的有限工具循环；`shopping_agent` 使用主 Agent 委派信息发现 Agent；`map_places` 只接受 shopping task，使用后端配置的地图 service/tool，不能由客户端提交 URL、工具名或凭据。服务端在同一事务中锁定 task、核对 `expected_revision`，读取该版本不可变 revision，并复制完整 `conditions` 快照。响应包含 `task_revision_id`、`revision`、`conditions`、执行类型和 `status=queued`。之后 task 的 current revision 变化不影响该 run。
 
 幂等键在同一 task 内唯一。相同 task、相同键和相同 revision 的重试返回同一 run；同一 task 使用该键但请求版本不同返回 `409`。
 
@@ -41,6 +41,10 @@ Run 由当前用户明确为一个 task 的明确 revision 创建。身份只来
 ## 候选与方案
 
 `GET /api/runs/{run_id}/shopping-artifacts` 仅返回当前用户所属 shopping Run 的候选快照和服务端校验方案；越权、非购物 Run 或不存在的 Run 统一返回 `404`。候选保存每次实际 MCP 查询采用的 `product_id`、Decimal 单价、币种、包装可分份数、可用性、报价时间、查询时间、来源服务和 `simulated` 标记。方案按同一 Run 唯一保存 `people`、覆盖人数、预算、总额、余量、币种、未知费用提示和候选引用；金额由服务端使用 `Decimal` 复算，不信任模型合计。
+
+## 地点结果
+
+`GET /api/runs/{run_id}/map-places` 仅返回所属用户的 `map_places` Run 中的地点快照。每行绑定 `owner_id`、task、task revision 和 Run，包含名称、地址、坐标（如有）、来源 service/tool、查询城市/关键词和 UTC `observed_at`。合法空结果返回空数组；缺城市在任务对话中先返回澄清回答，不调用上游。POI 不进入商品候选、库存或金额复算。
 
 ## 状态码
 
