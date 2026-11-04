@@ -1,6 +1,6 @@
 # 020：模型能力决策与跨 Agent 共享预算
 
-- 状态：部分实现；共享预算、结构化模型能力决策、直答/追问、地图/商品/组合执行、决策与预算持久化及真实五类场景联调已完成；动态 MCP `list_tools()` 交集、网页决策/预算展示和预算耗尽/取消/失租/超时专项验收未完成，不标记为完成
+- 状态：部分实现；共享预算、结构化模型能力决策、直答/追问、地图/商品/组合执行、决策与预算持久化、真实五类场景联调、动态 MCP `list_tools()` 交集、网页决策/预算展示和预算终止代码/数据库专项验收已完成；真实 Worker 取消/失租/超时/耗尽联调、真实浏览器刷新和 Java `verify` 未完成，不标记为完成
 - 所属阶段：P4 真实信息与更多采买场景
 - 起始基线：`main` / `55522ade150aeface6266fffd68850ee14838cb6`；执行前核对 HEAD
 - 前置：[019 报告](../reports/019-capability-routing-report.md)、[019 任务](019-capability-routing.md)、[Agent 执行规则](../design/agent-execution-rules.md)、[Tools 与 MCP](../design/tools-and-mcp.md)

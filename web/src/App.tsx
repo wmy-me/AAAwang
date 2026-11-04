@@ -1261,6 +1261,7 @@ function RunDetail({
           <strong>{run.attempt}</strong>
         </span>
       </div>
+      <RunExecutionSummary run={run} />
       {run.status === "queued" || run.status === "running" ? (
         <div className="progress-copy">
           <span className="pulse-dot" />
@@ -1277,6 +1278,35 @@ function RunDetail({
       ) : (
         <div className="result-empty">结果尚未读回，正在重试…</div>
       )}
+    </div>
+  );
+}
+
+function RunExecutionSummary({ run }: { run: Run }) {
+  const budget = run.budget;
+  const decision = run.decision;
+  const termination = typeof budget?.termination_reason === "string"
+    ? budget.termination_reason
+    : null;
+  return (
+    <div className="run-summary">
+      <div>
+        <small>决策</small>
+        <strong>{decisionKindText(decision?.kind)}{decision?.decision_source ? " · 模型" : ""}</strong>
+      </div>
+      <div>
+        <small>能力快照</small>
+        <strong>{run.capability_ids?.length ? run.capability_ids.join(" + ") : "无工具"}</strong>
+      </div>
+      {budget && (
+        <div>
+          <small>预算</small>
+          <strong>
+            模型 {String(budget.model_requests ?? 0)} · MCP {String(budget.mcp_attempts ?? 0)} · 远端 {String(budget.remote_calls ?? 0)}
+          </strong>
+        </div>
+      )}
+      {termination && <div className="run-termination">终止：{terminationText(termination)}</div>}
     </div>
   );
 }
@@ -1522,6 +1552,29 @@ function decisionText(decision: RunResult["decision_type"]) {
     clarification: "需要补充条件",
     delegated_discovery: "已委派信息发现",
   }[decision];
+}
+
+function decisionKindText(kind: unknown) {
+  if (kind === "capabilities") return "能力执行";
+  if (kind === "clarification") return "追问";
+  if (kind === "direct") return "直接回答";
+  if (kind === "pending") return "等待决策";
+  return "未记录";
+}
+
+function terminationText(reason: string) {
+  const labels: Record<string, string> = {
+    cancelled: "已取消",
+    timeout: "超时",
+    lease_lost: "租约丢失",
+    lease_expired: "租约过期",
+    model_budget_exhausted: "模型预算耗尽",
+    delegation_budget_exhausted: "委派预算耗尽",
+    mcp_budget_exhausted: "MCP 预算耗尽",
+    remote_budget_exhausted: "远端调用预算耗尽",
+    failed: "执行失败",
+  };
+  return labels[reason] ?? reason;
 }
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {

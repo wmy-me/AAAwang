@@ -1,4 +1,5 @@
 import threading
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -50,3 +51,27 @@ def test_budget_stop_blocks_new_reservations() -> None:
 
     with pytest.raises(BudgetExceededError, match="cancelled"):
         budget.reserve("model")
+
+
+def test_discovery_consumes_shared_remote_limit() -> None:
+    budget = RunBudget(BudgetLimits(mcp_attempts=1, remote_calls=1))
+
+    budget.reserve("discovery")
+
+    with pytest.raises(BudgetExceededError, match="remote_budget_exhausted"):
+        budget.reserve("mcp")
+    snapshot = budget.snapshot()
+    assert snapshot["mcp_attempts"] == 0
+    assert snapshot["remote_calls"] == 1
+
+
+def test_budget_records_wall_clock_timeout_before_new_call() -> None:
+    budget = RunBudget(
+        BudgetLimits(wall_clock_seconds=0.01),
+        started_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
+
+    with pytest.raises(BudgetExceededError, match="timeout"):
+        budget.reserve("mcp")
+
+    assert budget.snapshot()["termination_reason"] == "timeout"

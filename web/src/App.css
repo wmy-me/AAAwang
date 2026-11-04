@@ -13,6 +13,12 @@
 	border: 1px solid var(--line);
 }
 
+.run-summary { display: grid; gap: 10px; margin: 0 0 22px; padding: 14px; border: 1px solid var(--line); background: var(--wash); }
+.run-summary > div { display: flex; justify-content: space-between; gap: 16px; }
+.run-summary small { color: var(--muted); }
+.run-summary strong { text-align: right; font: 600 11px 'DM Mono', monospace; overflow-wrap: anywhere; }
+.run-termination { color: var(--red); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+
 .candidate-row {
 	display: flex;
 	align-items: center;

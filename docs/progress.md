@@ -1,11 +1,11 @@
 ## 020 模型能力决策与跨 Agent 共享预算（部分实现）
 
-- 已实现 `RunBudget` 调用前预占、并发共享、失败计数、墙钟/取消/耗尽终止原因，以及模型、委派、MCP 和总远端调用硬上限。
-- 能力元数据已包含输入 schema、独立超时和预算字段；聊天 Run 的决策使用注册策略、服务开关、受信发现快照、Agent 与任务域交集，模型只能从可见集选择。
+- 已实现 `RunBudget` 调用前预占、并发共享、失败计数、墙钟/取消/耗尽终止原因，以及模型、委派、MCP 和总远端调用硬上限；预算专项代码/数据库验收覆盖耗尽、取消、超时和失租终态。
+- 能力元数据已包含输入 schema、独立超时和预算字段；聊天 Run 的决策使用注册策略、服务开关、Worker 实时 MCP `list_tools()` 发现结果、Agent 与任务域交集，模型只能从可见集选择，执行前再次发现校验。
 - `direct_answer` 已支持无工具直答和确定性追问；Run 新增 nullable `decision`/`budget` 摘要字段，迁移为 `20261104_0016`，旧 Run NULL 兼容。
 - 聊天入口先创建 `capability_decision` Run；Worker 用真实 DeepSeek 作结构化决策，后端校验能力、重复项、地图位置和共享预算，完成时写回实际 `execution_type` 与 `capability_ids`。
-- 后端全量 `119 passed`，Ruff、compileall、Alembic check、前端 lint/build 通过；前端保留既有 2 条 Hook warning。
-- 已用真实 DeepSeek、独立 Worker、PostgreSQL、高德 MCP、Java 模拟 MCP 验证直答、缺城市追问、纯地点、纯商品和地图+商品组合五类决策 Run，并确认第二账号隔离；动态 MCP `list_tools()`、网页决策/预算渲染、预算耗尽/取消/失租、浏览器刷新和 Java verify 未补。详见[报告](reports/020-model-capability-budget-report.md)。
+- 后端聚焦与全量回归、Ruff、compileall、Alembic check、前端 lint/build 通过；前端保留既有 2 条 Hook warning。Run 详情已展示决策、能力快照、预算和终止原因，但真实浏览器刷新验收待补。
+- 已用真实 DeepSeek、独立 Worker、PostgreSQL、高德 MCP、Java 模拟 MCP 验证直答、缺城市追问、纯地点、纯商品和地图+商品组合五类决策 Run，并确认第二账号隔离；动态发现和 UI 已接入代码，预算终止已完成代码/数据库专项验收；真实 Worker 终止场景、浏览器刷新和 Java verify 仍待补。详见[报告](reports/020-model-capability-budget-report.md)。
 
 ## 019 购物主 Agent 的受控能力路由与工具白名单
 

@@ -537,6 +537,8 @@ def fail_exhausted_runs(db: Session, max_attempts: int) -> int:
         run.finished_at = now
         run.lease_until = None
         run.error_summary = "worker lease expired after maximum attempts"
+        run.budget = dict(run.budget or {})
+        run.budget["termination_reason"] = "lease_expired"
         _append_event(db, run, "run.failed", now)
     db.commit()
     return len(runs)

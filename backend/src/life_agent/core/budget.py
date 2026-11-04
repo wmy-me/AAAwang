@@ -58,6 +58,11 @@ class RunBudget:
                     raise BudgetExceededError(self.termination_reason)
                 self.mcp_attempts += 1
                 self.remote_calls += 1
+            elif kind == "discovery":
+                if self.remote_calls >= self.limits.remote_calls:
+                    self.termination_reason = "remote_budget_exhausted"
+                    raise BudgetExceededError(self.termination_reason)
+                self.remote_calls += 1
             else:
                 raise ValueError(f"unsupported budget reservation: {kind}")
 

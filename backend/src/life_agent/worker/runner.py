@@ -12,7 +12,7 @@ import time
 import uuid
 from dataclasses import replace
 
-from life_agent.core.budget import RunBudget
+from life_agent.core.budget import BudgetExceededError, RunBudget
 from life_agent.core.config import get_settings
 from life_agent.core.llm import LLMRequestError, ToolLoopError, run_tool_loop
 from life_agent.core.llm.deepseek import call_deepseek
@@ -31,6 +31,7 @@ from life_agent.modules.runs.service import (
     is_cancel_requested,
     renew_claim,
 )
+from life_agent.tools.mcp import McpClient, McpClientError
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,7 @@ def run_once(worker_id: str) -> bool:
                     capability_ids=selected,
                     decision=decision,
                 )
+                _validate_discovered_capabilities(settings, claim, budget)
             if claim.execution_type == "direct_answer":
                 decision = claim.decision or {
                     "kind": "direct",
@@ -250,7 +252,15 @@ def run_once(worker_id: str) -> bool:
                 error_summary,
             )
             with get_session_factory()() as fail_db:
-                budget.stop("failed")
+                if isinstance(exc, BudgetExceededError):
+                    reason = str(exc)
+                elif isinstance(exc, TimeoutError):
+                    reason = "timeout"
+                elif "租约丢失" in str(exc):
+                    reason = "lease_lost"
+                else:
+                    reason = "failed"
+                budget.stop(reason)
                 return fail_claim(fail_db, claim, error_summary, budget.snapshot())
 
 
@@ -298,15 +308,7 @@ def _decision_json(text: str) -> dict[str, object] | None:
 
 def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
     """Ask the model for a bounded decision, then validate it server-side."""
-    enabled = {
-        service_id
-        for service_id, service in settings.mcp_services.items()
-        if service.enabled
-    }
-    discovered = {
-        "shopping": {"search_products": {"type": "object"}},
-        "map": {settings.map_mcp_tool_name: {"type": "object"}},
-    }
+    enabled, discovered = _discover_capability_tools(settings, budget)
     visible = visible_capabilities(
         task_domain="shopping",
         enabled_services=enabled,
@@ -375,6 +377,48 @@ def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
         "reason": str(value.get("reason"))[:500] if value.get("reason") else None,
         "decision_source": "deepseek_structured_worker",
     }
+
+
+def _discover_capability_tools(settings, budget: RunBudget | None = None):
+    """Discover configured MCP tools before exposing capabilities to the model."""
+
+    async def discover() -> tuple[set[str], dict[str, dict[str, dict[str, object]]]]:
+        enabled: set[str] = set()
+        discovered: dict[str, dict[str, dict[str, object]]] = {}
+        client = McpClient(settings)
+        for service_id, service in settings.mcp_services.items():
+            if not service.enabled:
+                continue
+            if budget is not None:
+                budget.reserve("discovery")
+            try:
+                async with client.connect(service_id) as connection:
+                    tools = await connection.list_tools()
+            except McpClientError:
+                logger.warning("MCP capability discovery unavailable: service=%s", service_id)
+                continue
+            enabled.add(service_id)
+            discovered[service_id] = {
+                tool.name: dict(tool.tool.input_schema or {}) for tool in tools
+            }
+        return enabled, discovered
+
+    return asyncio.run(discover())
+
+
+def _validate_discovered_capabilities(settings, claim, budget: RunBudget | None = None) -> None:
+    """Re-discover selected services immediately before capability execution."""
+    if not claim.capability_ids:
+        return
+    _, discovered = _discover_capability_tools(settings, budget)
+    visible = visible_capabilities(
+        task_domain="shopping",
+        enabled_services=set(discovered),
+        discovered_tools=discovered,
+    )
+    visible_ids = {item.capability_id for item in visible}
+    if any(item not in visible_ids for item in claim.capability_ids):
+        raise ToolLoopError("执行前 MCP 工具发现结果已变化，能力不可用。")
 
 
 def _shopping_prompt(goal: str, conditions: dict[str, object]) -> str:

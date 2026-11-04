@@ -86,6 +86,17 @@ def test_capability_decision_accepts_only_visible_registered_capabilities(monkey
         )
 
     monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(
+        runner,
+        "_discover_capability_tools",
+        lambda settings, _budget=None: (
+            {"map", "shopping"},
+            {
+                "map": {"maps_text_search": {"type": "object"}},
+                "shopping": {"search_products": {"type": "object"}},
+            },
+        ),
+    )
 
     decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
 
@@ -102,6 +113,14 @@ def test_capability_decision_rejects_unregistered_capability(monkeypatch) -> Non
         return LLMResult('{"kind":"capabilities","capability_ids":["arbitrary_url_tool"]}')
 
     monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(
+        runner,
+        "_discover_capability_tools",
+        lambda settings, _budget=None: (
+            {"shopping"},
+            {"shopping": {"search_products": {"type": "object"}}},
+        ),
+    )
 
     with pytest.raises(ToolLoopError, match="不可见或重复"):
         runner._run_capability_decision(settings, run_claim, runner.RunBudget())
@@ -121,6 +140,14 @@ def test_capability_decision_treats_valid_ids_as_capabilities(monkeypatch) -> No
         )
 
     monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(
+        runner,
+        "_discover_capability_tools",
+        lambda settings, _budget=None: (
+            {"shopping"},
+            {"shopping": {"search_products": {"type": "object"}}},
+        ),
+    )
 
     decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
 
@@ -156,8 +183,28 @@ def test_capability_decision_downgrades_map_without_location(monkeypatch) -> Non
         return LLMResult('{"kind":"capabilities","capability_ids":["map_place_search"]}')
 
     monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(
+        runner,
+        "_discover_capability_tools",
+        lambda settings, _budget=None: (
+            {"map"},
+            {"map": {"maps_text_search": {"type": "object"}}},
+        ),
+    )
 
     decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
 
     assert decision["kind"] == "clarification"
     assert decision["capability_ids"] == []
+
+
+def test_execution_rejects_changed_mcp_discovery(monkeypatch) -> None:
+    claim_value = claim("map_places", ("map_place_search",))
+    monkeypatch.setattr(
+        runner,
+        "_discover_capability_tools",
+        lambda settings, _budget=None: ({"map"}, {"map": {"other_tool": {"type": "object"}}}),
+    )
+
+    with pytest.raises(ToolLoopError, match="工具发现结果已变化"):
+        runner._validate_discovered_capabilities(SimpleNamespace(), claim_value)

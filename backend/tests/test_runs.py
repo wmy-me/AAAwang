@@ -24,7 +24,11 @@ from life_agent.db.models import (
 )
 from life_agent.db.session import get_db
 from life_agent.main import app
-from life_agent.modules.runs.service import claim_run, complete_claim
+from life_agent.modules.runs.service import (
+    claim_run,
+    complete_claim,
+    fail_exhausted_runs,
+)
 from life_agent.modules.shopping_plans.service import build_artifacts
 
 PASSWORD = f"test-only-{secrets.token_urlsafe(18)}"
@@ -172,6 +176,35 @@ def test_fencing_rejects_late_worker_completion(
         assert stored is not None
         assert stored.status == "completed"
         assert stored.worker_id == "worker-two"
+
+
+def test_expired_run_records_lease_termination_reason(
+    run_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = run_context
+    register_and_login(client, "lease-user")
+    task = create_task(client)
+    created = client.post(
+        f"/api/tasks/{task['id']}/runs",
+        json={"expected_revision": 1, "idempotency_key": "lease-final"},
+    )
+    run_id = uuid.UUID(created.json()["id"])
+
+    with factory() as db:
+        worker = claim_run(db, "lease-worker", 1, 1)
+        assert worker is not None
+        db.execute(
+            Run.__table__.update()
+            .where(Run.id == run_id)
+            .values(lease_until=datetime.now(UTC) - timedelta(seconds=1))
+        )
+        db.commit()
+        assert fail_exhausted_runs(db, 1) == 1
+        stored = db.scalar(select(Run).where(Run.id == run_id))
+        assert stored is not None
+        assert stored.status == "failed"
+        assert stored.budget is not None
+        assert stored.budget["termination_reason"] == "lease_expired"
 
 
 def test_run_input_and_cross_site_write_are_rejected(
