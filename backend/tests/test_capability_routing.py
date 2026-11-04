@@ -44,7 +44,9 @@ def test_registered_capabilities_are_read_only_and_allowlisted() -> None:
 
 def test_visible_capabilities_require_configured_and_discovered_intersection() -> None:
     discovered = {
-        "map": {"maps_text_search": {"type": "object"}},
+        "map": {
+            "maps_text_search": {"type": "object", "required": ["keywords"]}
+        },
         "shopping": {"other_tool": {"type": "object"}},
     }
 
@@ -63,8 +65,45 @@ def test_visible_capabilities_reject_schema_incompatibility_and_disabled_service
         enabled_services={"shopping"},
         discovered_tools={
             "shopping": {"search_products": {"type": "array"}},
-            "map": {"maps_text_search": {"type": "object"}},
+            "map": {
+                "maps_text_search": {"type": "object", "required": ["keywords"]}
+            },
         },
+    )
+
+    assert visible == ()
+
+
+def test_visible_capabilities_reject_missing_registered_required_field() -> None:
+    visible = visible_capabilities(
+        task_domain="shopping",
+        enabled_services={"shopping"},
+        discovered_tools={
+            "shopping": {
+                "search_products": {
+                    "type": "object",
+                    "required": ["query"],
+                }
+            }
+        },
+    )
+
+    assert visible == ()
+
+
+def test_visible_capabilities_reject_other_agent_scope() -> None:
+    visible = visible_capabilities(
+        task_domain="shopping",
+        enabled_services={"shopping"},
+        discovered_tools={
+            "shopping": {
+                "search_products": {
+                    "type": "object",
+                    "required": ["keyword"],
+                }
+            }
+        },
+        agent_id="planner",
     )
 
     assert visible == ()

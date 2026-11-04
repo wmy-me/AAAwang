@@ -44,7 +44,7 @@ _CAPABILITIES = {
         allowed_tool_names=("search_products",),
         read_only=True,
         result_type="shopping_candidates",
-        input_schema={"type": "object"},
+        input_schema={"type": "object", "required": ["keyword"]},
         timeout_seconds=90.0,
     ),
     "map_place_search": CapabilitySpec(
@@ -55,7 +55,7 @@ _CAPABILITIES = {
         allowed_tool_names=("maps_text_search",),
         read_only=True,
         result_type="map_places",
-        input_schema={"type": "object"},
+        input_schema={"type": "object", "required": ["keywords"]},
         timeout_seconds=20.0,
     ),
 }

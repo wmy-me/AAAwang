@@ -51,7 +51,7 @@
 | 017 | [任务目标与结构化条件一致性](017-task-goal-consistency.md) | 已完成；目标快照、冲突 409、双入口 Run 前门禁、迁移、浏览器冲突处理与真实 DeepSeek/MCP 新 Run 闭环均通过，见[报告](../reports/017-task-goal-consistency-report.md) |
 | 018 | [真实地图 MCP 地点查询最小接入](018-map-mcp-place-search.md) | 已完成最小真实闭环；高德 MCP、独立 Worker、map_places Run、PostgreSQL 持久化、刷新、跨账号隔离、错误分类和地点路由均已验收；完整主协调 Graph 与动态工具注册不在本任务范围，见[报告](../reports/018-map-mcp-place-search-report.md) |
 | 019 | [购物主 Agent 的受控能力路由与工具白名单](019-capability-routing.md) | 核心闭环已完成；能力注册、结构化路由、Run 能力快照、Worker 白名单和真实组合 Run 已验收，架构增强项见[报告](../reports/019-capability-routing-report.md) |
-| 020 | [模型能力决策与跨 Agent 共享预算](020-model-capability-budget.md) | 部分实现；共享预算、结构化模型决策、实时 MCP 发现交集、决策/预算网页展示、五类真实联调、真实 Worker 终止场景、Chromium 刷新和 Java `verify` 已验证；服务关闭/工具下线/schema 不兼容专项仍待补，见[报告](../reports/020-model-capability-budget-report.md) |
+| 020 | [模型能力决策与跨 Agent 共享预算](020-model-capability-budget.md) | 已完成；共享预算、结构化模型决策、实时 MCP 发现交集、受控 MCP 服务关闭/工具下线/错服务/schema 不兼容/执行前二次校验、真实 Worker 终止、Chromium 刷新和 Java `verify` 均已验收，见[报告](../reports/020-model-capability-budget-report.md) |
 | 021 | [自然语言任务与动态表单](021-dynamic-task-forms.md) | 部分实现；服务端提议/确认、模型 schema 校验、revision/Message/Run 幂等、真实 DeepSeek 和 Chromium 登录/提交/刷新已验证；多目标/目标变更字段及 travel 控件待补，见[报告](../reports/021-dynamic-task-forms-report.md) |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。

@@ -92,8 +92,18 @@ def test_capability_decision_accepts_only_visible_registered_capabilities(monkey
         lambda settings, _budget=None: (
             {"map", "shopping"},
             {
-                "map": {"maps_text_search": {"type": "object"}},
-                "shopping": {"search_products": {"type": "object"}},
+                "map": {
+                    "maps_text_search": {
+                        "type": "object",
+                        "required": ["keywords"],
+                    }
+                },
+                "shopping": {
+                    "search_products": {
+                        "type": "object",
+                        "required": ["keyword"],
+                    }
+                },
             },
         ),
     )
@@ -118,7 +128,12 @@ def test_capability_decision_rejects_unregistered_capability(monkeypatch) -> Non
         "_discover_capability_tools",
         lambda settings, _budget=None: (
             {"shopping"},
-            {"shopping": {"search_products": {"type": "object"}}},
+            {"shopping": {
+                    "search_products": {
+                        "type": "object",
+                        "required": ["keyword"],
+                    }
+                }},
         ),
     )
 
@@ -145,7 +160,12 @@ def test_capability_decision_treats_valid_ids_as_capabilities(monkeypatch) -> No
         "_discover_capability_tools",
         lambda settings, _budget=None: (
             {"shopping"},
-            {"shopping": {"search_products": {"type": "object"}}},
+            {"shopping": {
+                    "search_products": {
+                        "type": "object",
+                        "required": ["keyword"],
+                    }
+                }},
         ),
     )
 
@@ -188,7 +208,12 @@ def test_capability_decision_downgrades_map_without_location(monkeypatch) -> Non
         "_discover_capability_tools",
         lambda settings, _budget=None: (
             {"map"},
-            {"map": {"maps_text_search": {"type": "object"}}},
+            {"map": {
+                    "maps_text_search": {
+                        "type": "object",
+                        "required": ["keywords"],
+                    }
+                }},
         ),
     )
 

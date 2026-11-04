@@ -17,7 +17,7 @@
 ## 验证
 
 - 动态表单与 capability Worker 专项：`20 passed`。
-- 后端全量回归：`126 passed`。
+- 后端全量回归：`128 passed`。
 - Ruff、compileall、Alembic 迁移升级与前端 TypeScript build 通过。
 - 前端 lint 通过，保留 3 条 React Hook warnings（含本次新增 `set-state-in-effect`）。
 - 本地数据库已从 `20261104_0016` 升级到 `20261104_0017`。
