@@ -1,11 +1,11 @@
 ## 018 真实地图 MCP 地点查询
 
-- 部分完成：已接入高德官方 Streamable HTTP MCP，配置拆分为 `MAP_MCP_URL`、`MAP_MCP_KEY`、`MAP_MCP_TIMEOUT_SECONDS`、`MAP_MCP_ENABLED` 和 `MAP_MCP_TOOL_NAME`；真实 Key 仅保留在本地 `.env`。
+- 已完成最小真实闭环：已接入高德官方 Streamable HTTP MCP，配置拆分为 `MAP_MCP_URL`、`MAP_MCP_KEY`、`MAP_MCP_TIMEOUT_SECONDS`、`MAP_MCP_ENABLED` 和 `MAP_MCP_TOOL_NAME`；真实 Key 仅保留在本地 `.env`。
 - 真实握手协商 `2025-03-26`，发现 `amap-sse-server 1.0.0` 和 `maps_text_search`；上海“礼品店”查询返回 20 个 POI，结果标记 `simulated=false`。
 - 适配高德文本 JSON 返回，新增认证私有地点查询 API；地点结果首版不持久化、不进入商品候选和金额复算。
-- 后端全量测试 `73 passed`，Ruff、compileall 通过；本地数据库已升级到 `20261104_0014`，`alembic check` 通过；前端 lint/build 通过（2 条既有警告）。
+- 后端全量测试 `88 passed`，Ruff、compileall 通过；本地数据库已升级到 `20261104_0014`，`alembic check` 通过；前端 lint/build 通过（2 条既有警告）。
 - 已补入：`map_places` Run、任务聊天地点分支、城市/关键词解析测试、缺位置澄清、地点表迁移、owner/revision/Run 绑定、幂等/取消/fencing 复用、私有刷新 API 和网页城市/关键词入口。
-- 未完成：真实 PostgreSQL 地点 Run 写入/刷新与浏览器闭环、DeepSeek→地图任务回合复验、主协调完整 Graph 条件路由、按任务上下文生成工具注册，以及认证/协议/限流/超时 HTTP 错误细分。路线、天气、真实商品价格/库存和下单仍未实现。
+- 真实浏览器账号 A、独立 Worker、PostgreSQL 写入/刷新和账号 B 越权 404 已验收；错误分类替身测试与安全日志检查已补齐。当前仍是受控服务端路由，不宣称完整主协调 Graph 或动态模型工具注册；路线、天气、真实商品价格/库存和下单仍未实现。
 
 ## 016 已选购物任务方案调整
 

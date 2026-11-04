@@ -6,7 +6,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from life_agent.core.config import Settings
-from life_agent.tools.mcp import McpClient
+from life_agent.tools.mcp import (
+    McpAuthenticationError,
+    McpClient,
+    McpConnectionError,
+    McpProtocolError,
+    McpRateLimitError,
+    McpTimeoutError,
+    McpToolExecutionError,
+    McpToolNotFoundError,
+)
 
 MAX_QUERY_LENGTH = 120
 MAX_TEXT_LENGTH = 240
@@ -15,6 +24,26 @@ MAX_RESULTS = 20
 
 class MapPlaceSearchError(RuntimeError):
     """Raised when a map query cannot be safely executed."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+MAP_ERROR_MESSAGES = {
+    "not_configured": "地图服务未配置。",
+    "invalid_request": "地点查询参数无效。",
+    "authentication_failed": "地图服务鉴权失败。",
+    "protocol_error": "地图服务协议不兼容。",
+    "rate_limited": "地图服务请求过于频繁，请稍后重试。",
+    "timeout": "地图服务请求超时，请稍后重试。",
+    "external_failure": "地图服务暂时失败，请稍后重试。",
+}
+
+
+def _error(code: str, message: str | None = None) -> MapPlaceSearchError:
+    return MapPlaceSearchError(code, message or MAP_ERROR_MESSAGES[code])
 
 
 def _text(value: Any) -> str | None:
@@ -74,28 +103,38 @@ async def search_places(
     query = query.strip()
     city = city.strip() if city else None
     if not query or len(query) > MAX_QUERY_LENGTH:
-        raise MapPlaceSearchError("地点查询必须是 1 到 120 个字符。")
+        raise _error("invalid_request")
     if not city or len(city) > MAX_QUERY_LENGTH:
-        raise MapPlaceSearchError("地点查询必须明确提供城市或位置范围。")
+        raise _error("invalid_request", "地点查询必须明确提供城市或位置范围。")
     config = settings.mcp_services.get(service_id)
     if config is None or not config.enabled:
-        raise MapPlaceSearchError("地图服务未配置。")
+        raise _error("not_configured")
     if len(config.allowed_tool_names) != 1:
-        raise MapPlaceSearchError("地图服务必须配置一个只读地点工具。")
+        raise _error("protocol_error")
     tool_name = config.allowed_tool_names[0]
     client = mcp_client or McpClient(settings)
     try:
         async with client.connect(service_id) as connection:
             discovered = await connection.list_tools()
             if tool_name not in {tool.name for tool in discovered}:
-                raise MapPlaceSearchError("地图地点工具未被服务公布。")
+                raise _error("protocol_error")
             result = await connection.call_tool(
                 tool_name, {"keywords": query, "city": city, "citylimit": True}
             )
     except MapPlaceSearchError:
         raise
+    except McpAuthenticationError as exc:
+        raise _error("authentication_failed") from exc
+    except McpRateLimitError as exc:
+        raise _error("rate_limited") from exc
+    except McpTimeoutError as exc:
+        raise _error("timeout") from exc
+    except (McpProtocolError, McpToolNotFoundError) as exc:
+        raise _error("protocol_error") from exc
+    except (McpConnectionError, McpToolExecutionError) as exc:
+        raise _error("external_failure") from exc
     except Exception as exc:
-        raise MapPlaceSearchError("地图地点查询失败，请稍后重试。") from exc
+        raise _error("external_failure") from exc
     return {
         "places": normalize_places(
             _content_payload(result.result),

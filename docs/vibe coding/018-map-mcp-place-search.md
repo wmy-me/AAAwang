@@ -1,6 +1,6 @@
 # 018：真实地图 MCP 地点查询最小接入
 
-- 状态：部分完成；真实高德 MCP 握手、工具发现和一次 POI 查询已通过，且已接入选定购物任务的 map_places Run、地点持久化和网页入口；真实浏览器闭环、错误细分和完整 DeepSeek→地图→数据库验收仍待补，详见[报告](../reports/018-map-mcp-place-search-report.md)
+- 状态：已完成最小真实闭环；高德 MCP、独立 Worker、`map_places` Run、PostgreSQL 持久化、刷新、跨账号隔离、错误分类和地点路由均已验收；完整主协调 Graph 与动态工具注册不在本任务范围，详见[报告](../reports/018-map-mcp-place-search-report.md)
 - 阶段：P4 真实信息与更多采买场景
 - 起始基线：`main` / `b1b0334a680a47edafc8f7731634b9eeac7077b7`；执行前核对 HEAD
 - 前置：[017 报告](../reports/017-task-goal-consistency-report.md)、[外部服务清单](../design/external-services.md)、[Tools 与 MCP](../design/tools-and-mcp.md)

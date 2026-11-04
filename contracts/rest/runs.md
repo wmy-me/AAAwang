@@ -46,6 +46,10 @@ Run 由当前用户明确为一个 task 的明确 revision 创建。身份只来
 
 `GET /api/runs/{run_id}/map-places` 仅返回所属用户的 `map_places` Run 中的地点快照。每行绑定 `owner_id`、task、task revision 和 Run，包含名称、地址、坐标（如有）、来源 service/tool、查询城市/关键词和 UTC `observed_at`。合法空结果返回空数组；缺城市在任务对话中先返回澄清回答，不调用上游。POI 不进入商品候选、库存或金额复算。
 
+## 地点查询错误
+
+地点 Run 或地点查询 API 只返回稳定的 `code` 和安全 `message`，不返回上游异常、认证查询参数、Key 或完整 URL。错误 code 为 `not_configured`、`invalid_request`、`authentication_failed`、`protocol_error`、`rate_limited`、`timeout` 和 `external_failure`。合法空结果仍为成功响应，`places` 为空数组，并保留来源和查询时间。
+
 ## 状态码
 
 | 状态 | 含义 |
@@ -56,3 +60,6 @@ Run 由当前用户明确为一个 task 的明确 revision 创建。身份只来
 | `409` | revision 已过期或幂等键冲突 |
 | `422` | revision、幂等键、UUID 或分页参数无效 |
 | `503` | 认证或 run 存储暂时不可用 |
+| `429` | 地图上游限流，地点查询可稍后重试 |
+| `504` | 地图上游超时 |
+| `502` | 地图协议错误或其他外部失败 |

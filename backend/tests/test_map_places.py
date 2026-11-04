@@ -9,7 +9,13 @@ from pydantic import SecretStr
 
 from life_agent.core.config import McpServiceConfig, Settings
 from life_agent.tools.maps import MapPlaceSearchError, normalize_places, search_places
-from life_agent.tools.mcp import McpClient
+from life_agent.tools.mcp import (
+    McpAuthenticationError,
+    McpClient,
+    McpProtocolError,
+    McpRateLimitError,
+    McpTimeoutError,
+)
 
 
 class FakeConnection:
@@ -45,6 +51,28 @@ class FakeMcpClient:
     @asynccontextmanager
     async def connect(self, _service_id: str) -> Any:
         yield FakeConnection()
+
+
+class EmptyConnection(FakeConnection):
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        return SimpleNamespace(result=CallToolResult(content=[], structuredContent=None))
+
+
+class RaisingMcpClient:
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    @asynccontextmanager
+    async def connect(self, _service_id: str) -> Any:
+        yield RaisingConnection(self.error)
+
+
+class RaisingConnection(FakeConnection):
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    async def list_tools(self) -> list[Any]:
+        raise self.error
 
 
 def configured_settings() -> Settings:
@@ -93,6 +121,48 @@ def test_poi_fields_are_allowlisted_and_source_is_attached() -> None:
     ]
     assert result["source"]["simulated"] is False
     assert "observed_at" in result
+
+
+def test_legal_empty_result_is_successful() -> None:
+    class EmptyClient:
+        @asynccontextmanager
+        async def connect(self, _service_id: str) -> Any:
+            yield EmptyConnection()
+
+    result = asyncio.run(
+        search_places(
+            configured_settings(),
+            "不存在的关键词",
+            city="上海",
+            mcp_client=EmptyClient(),
+        )
+    )
+    assert result["places"] == []
+
+
+@pytest.mark.parametrize(
+    ("exception", "code"),
+    [
+        (McpAuthenticationError(), "authentication_failed"),
+        (McpProtocolError(), "protocol_error"),
+        (McpRateLimitError(), "rate_limited"),
+        (McpTimeoutError(), "timeout"),
+    ],
+)
+def test_mcp_failures_have_safe_stable_codes(
+    exception: Exception, code: str
+) -> None:
+    with pytest.raises(MapPlaceSearchError) as exc_info:
+        asyncio.run(
+            search_places(
+                configured_settings(),
+                "礼品店",
+                city="上海",
+                mcp_client=RaisingMcpClient(exception),
+            )
+        )
+    assert exc_info.value.code == code
+    assert "secret" not in str(exc_info.value).lower()
 
 
 def test_normalize_places_limits_text_and_unknown_payload() -> None:

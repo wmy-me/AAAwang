@@ -37,6 +37,18 @@ async def get_places(
         )
     except MapPlaceSearchError as exc:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+                if exc.code == "invalid_request"
+                else status.HTTP_503_SERVICE_UNAVAILABLE
+                if exc.code == "not_configured"
+                else status.HTTP_401_UNAUTHORIZED
+                if exc.code == "authentication_failed"
+                else status.HTTP_429_TOO_MANY_REQUESTS
+                if exc.code == "rate_limited"
+                else status.HTTP_504_GATEWAY_TIMEOUT
+                if exc.code == "timeout"
+                else status.HTTP_502_BAD_GATEWAY
+            ),
+            detail={"code": exc.code, "message": exc.message},
         ) from exc

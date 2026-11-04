@@ -117,10 +117,16 @@ def run_once(worker_id: str) -> bool:
                     "revision": claim.revision,
                 },
             )
-        except Exception as exc:
-            logger.exception("run execution failed for %s", claim.run_id)
+        except Exception as exc:  # noqa: BLE001
+            error_summary = _safe_error(exc)
+            logger.error(
+                "run execution failed: run_id=%s execution_type=%s error=%s",
+                claim.run_id,
+                claim.execution_type,
+                error_summary,
+            )
             with get_session_factory()() as fail_db:
-                return fail_claim(fail_db, claim, _safe_error(exc))
+                return fail_claim(fail_db, claim, error_summary)
 
 
 def _shopping_prompt(goal: str, conditions: dict[str, object]) -> str:
@@ -136,8 +142,8 @@ _MAP_CITY_PATTERNS = (
         r"(?:在|到|位于)\s*([^，。；;,\s]{2,20}?)(?=\s*(?:找|查|搜|看|的|附近|周边|有|$|[，。；;,]))"
     ),
     re.compile(
-        r"^(?:帮我|请|麻烦)?\s*(?:查询|查找|搜索|找)(?:一下)?\s*"
-        r"([一-鿿]{2,8}?)(?=(?:的)?(?:附近|周边|礼品|超市|商场|门店|店铺|地点|位置))"
+        r"^(?:帮我|请|麻烦)?\s*(?:查询|查找|搜索)(?:一下)?\s*"
+        r"([一-鿿]{2,8}?)(?=(?:的)?(?:附近|周边|礼品|超市|商场|门店|店铺|地点|位置|店))"
     ),
     re.compile(r"^([一-鿿]{2,8}?)(?:市|区|县)?(?:附近|周边)"),
 )
@@ -281,6 +287,10 @@ def _bounded_json(value: object) -> object:
 
 
 def _safe_error(error: Exception) -> str:
+    from life_agent.tools.maps import MapPlaceSearchError
+
+    if isinstance(error, MapPlaceSearchError):
+        return f"map_{error.code}"
     if isinstance(error, (ToolLoopError, LLMRequestError)):
         return str(error)[:500]
     return "shopping execution failed; external call history may be uncertain"

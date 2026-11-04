@@ -2,11 +2,13 @@
 
 from life_agent.tools.mcp.client import (
 	DiscoveredTool,
+	McpAuthenticationError,
 	McpCallResult,
 	McpClient,
 	McpClientError,
 	McpConnectionError,
 	McpProtocolError,
+	McpRateLimitError,
 	McpServiceConfigurationError,
 	McpTimeoutError,
 	McpToolExecutionError,
@@ -15,11 +17,13 @@ from life_agent.tools.mcp.client import (
 
 __all__ = [
 	"DiscoveredTool",
+	"McpAuthenticationError",
 	"McpCallResult",
 	"McpClient",
 	"McpClientError",
 	"McpConnectionError",
 	"McpProtocolError",
+	"McpRateLimitError",
 	"McpServiceConfigurationError",
 	"McpTimeoutError",
 	"McpToolExecutionError",

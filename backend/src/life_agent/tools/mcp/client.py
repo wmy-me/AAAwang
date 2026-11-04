@@ -25,6 +25,14 @@ class McpConnectionError(McpClientError):
     """Raised when a configured MCP server cannot be reached."""
 
 
+class McpAuthenticationError(McpClientError):
+    """Raised when the configured credential is rejected."""
+
+
+class McpRateLimitError(McpClientError):
+    """Raised when an upstream quota or rate limit blocks a request."""
+
+
 class McpProtocolError(McpClientError):
     """Raised when MCP initialization, discovery, or invocation fails."""
 
@@ -98,6 +106,9 @@ class McpConnection:
                 f"MCP 服务 {self.service_id} 工具发现超时。"
             ) from exc
         except Exception as exc:
+            classified = _classify_transport_error(exc)
+            if classified is not None:
+                raise classified from exc
             raise McpProtocolError(
                 f"MCP 服务 {self.service_id} 工具发现失败。"
             ) from exc
@@ -126,6 +137,9 @@ class McpConnection:
                 f"MCP 服务 {self.service_id} 调用工具 {tool_name} 超时。"
             ) from exc
         except Exception as exc:
+            classified = _classify_transport_error(exc)
+            if classified is not None:
+                raise classified from exc
             raise McpProtocolError(
                 f"MCP 服务 {self.service_id} 调用工具 {tool_name} 时协议失败。"
             ) from exc
@@ -187,9 +201,22 @@ class McpClient:
         except (ConnectionError, OSError) as exc:
             raise McpConnectionError(f"无法连接 MCP 服务 {service_id}。") from exc
         except Exception as exc:
+            classified = _classify_transport_error(exc)
+            if classified is not None:
+                raise classified from exc
             raise McpProtocolError(f"MCP 服务 {service_id} 初始化失败。") from exc
 
         try:
             yield McpConnection(service_id, config, sdk_client)
         finally:
             await sdk_client.__aexit__(None, None, None)
+
+
+def _classify_transport_error(error: Exception) -> McpClientError | None:
+    """Classify common SDK/HTTP failures without exposing exception text."""
+    text = f"{type(error).__name__} {error}".casefold()
+    if any(token in text for token in ("401", "403", "unauthorized", "forbidden", "authentication")):
+        return McpAuthenticationError("MCP 服务鉴权失败。")
+    if any(token in text for token in ("429", "rate limit", "rate_limit", "too many requests", "quota")):
+        return McpRateLimitError("MCP 服务请求受限。")
+    return None
