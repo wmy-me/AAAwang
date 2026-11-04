@@ -20,6 +20,10 @@ class CapabilitySpec:
     allowed_tool_names: tuple[str, ...]
     read_only: bool
     result_type: str
+    input_schema: dict[str, object]
+    timeout_seconds: float
+    model_budget_cost: int = 0
+    remote_budget_cost: int = 1
 
 
 @dataclass(frozen=True)
@@ -27,6 +31,8 @@ class CapabilityDecision:
     kind: RouteKind
     capability_ids: tuple[str, ...] = ()
     clarification: str | None = None
+    parameters: dict[str, object] | None = None
+    reason: str | None = None
 
 
 _CAPABILITIES = {
@@ -38,6 +44,8 @@ _CAPABILITIES = {
         allowed_tool_names=("search_products",),
         read_only=True,
         result_type="shopping_candidates",
+        input_schema={"type": "object"},
+        timeout_seconds=90.0,
     ),
     "map_place_search": CapabilitySpec(
         capability_id="map_place_search",
@@ -47,6 +55,8 @@ _CAPABILITIES = {
         allowed_tool_names=("maps_text_search",),
         read_only=True,
         result_type="map_places",
+        input_schema={"type": "object"},
+        timeout_seconds=20.0,
     ),
 }
 
@@ -69,6 +79,50 @@ def get_capability(capability_id: str) -> CapabilitySpec:
         return _CAPABILITIES[capability_id]
     except KeyError as exc:
         raise ValueError(f"未注册能力: {capability_id}") from exc
+
+
+def visible_capabilities(
+    *,
+    task_domain: str,
+    enabled_services: set[str],
+    discovered_tools: dict[str, dict[str, dict[str, object]]],
+    agent_id: str = "discovery",
+) -> tuple[CapabilitySpec, ...]:
+    """Return the intersection of trusted policy and observed MCP tools.
+
+    ``discovered_tools`` is deliberately a backend-owned snapshot keyed by
+    service and tool name; model supplied URLs or tool names never enter this
+    function.
+    """
+    visible: list[CapabilitySpec] = []
+    for capability in _CAPABILITIES.values():
+        if (
+            capability.agent_id != agent_id
+            or capability.task_domain != task_domain
+            or not capability.read_only
+            or capability.service_id not in enabled_services
+        ):
+            continue
+        service_tools = discovered_tools.get(capability.service_id, {})
+        if not any(
+            tool_name in service_tools
+            and _schema_compatible(capability.input_schema, service_tools[tool_name])
+            for tool_name in capability.allowed_tool_names
+        ):
+            continue
+        visible.append(capability)
+    return tuple(visible)
+
+
+def _schema_compatible(
+    registered: dict[str, object], discovered: dict[str, object]
+) -> bool:
+    """Require the discovered schema to preserve registered required fields."""
+    if registered.get("type") != discovered.get("type"):
+        return False
+    registered_required = set(registered.get("required", ()))
+    discovered_required = set(discovered.get("required", ()))
+    return registered_required <= discovered_required
 
 
 def _has_city(text: str) -> bool:

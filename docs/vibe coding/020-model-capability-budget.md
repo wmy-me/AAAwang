@@ -1,6 +1,6 @@
 # 020：模型能力决策与跨 Agent 共享预算
 
-- 状态：待执行；承接 019 已验证核心闭环后的剩余架构要求
+- 状态：部分实现；已完成共享预算、直答/追问 Run、决策与预算持久化、能力元数据与工具交集计算，并完成直答、缺城市追问、地图+商品组合的真实联调；结构化模型能力决策、生产执行接线与网页展示仍未实现，不标记为完成
 - 所属阶段：P4 真实信息与更多采买场景
 - 起始基线：`main` / `55522ade150aeface6266fffd68850ee14838cb6`；执行前核对 HEAD
 - 前置：[019 报告](../reports/019-capability-routing-report.md)、[019 任务](019-capability-routing.md)、[Agent 执行规则](../design/agent-execution-rules.md)、[Tools 与 MCP](../design/tools-and-mcp.md)

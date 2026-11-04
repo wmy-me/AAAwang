@@ -1,3 +1,12 @@
+## 020 模型能力决策与跨 Agent 共享预算（部分实现）
+
+- 已实现 `RunBudget` 调用前预占、并发共享、失败计数、墙钟/取消/耗尽终止原因，以及模型、委派、MCP 和总远端调用硬上限。
+- 能力元数据已包含输入 schema、独立超时和预算字段；注册策略、服务开关、实际发现工具/schema、Agent 与任务域交集已加入替身测试，但**尚未接入生产执行路径**。
+- `direct_answer` 已支持无工具直答和确定性追问；Run 新增 nullable `decision`/`budget` 摘要字段，迁移为 `20261104_0016`，旧 Run NULL 兼容。
+- **未实现**：结构化模型能力决策，`route_task_turn` 仍为服务端正则；网页仍未渲染决策/预算。
+- 后端全量 `114 passed`，Ruff、compileall、Alembic check、前端 lint/build 通过；前端保留既有 2 条 Hook warning。
+- 已用真实 DeepSeek、独立 Worker、PostgreSQL、高德 MCP、Java 模拟 MCP 验证无工具直答、缺城市追问和地图+商品组合 Run，并确认第二账号隔离；预算耗尽/取消/失租、浏览器刷新和 Java verify 未补。详见[报告](reports/020-model-capability-budget-report.md)。
+
 ## 019 购物主 Agent 的受控能力路由与工具白名单
 
 - 已完成首版受信能力注册表、结构化服务端路由、`capability_ids` Run 快照、`capability_router` 单 Run 组合执行、幂等能力快照比较和 Worker claim 后二次白名单校验。

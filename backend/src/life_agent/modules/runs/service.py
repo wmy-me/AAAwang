@@ -62,6 +62,7 @@ class RunClaim:
     input_message: str | None
     execution_type: str
     capability_ids: tuple[str, ...]
+    decision: dict[str, object] | None
     worker_id: str
     fencing_token: int
 
@@ -105,6 +106,7 @@ def create_run(
     idempotency_key: str,
     execution_type: str = "diagnostic",
     capability_ids: list[str] | tuple[str, ...] | None = None,
+    decision: dict[str, object] | None = None,
     input_message_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> Run:
@@ -118,6 +120,7 @@ def create_run(
         raise RunNotFoundError
     if execution_type not in {
         "diagnostic",
+        "direct_answer",
         "shopping_research",
         "shopping_agent",
         "map_places",
@@ -141,6 +144,7 @@ def create_run(
             or existing.execution_type != execution_type
             or tuple(existing.capability_ids or ())
             != tuple(capability_ids or ())
+            or (existing.decision or None) != (decision or None)
         ):
             raise IdempotencyConflictError
         return existing
@@ -168,6 +172,8 @@ def create_run(
         input_message_id=input_message_id,
         execution_type=execution_type,
         capability_ids=list(capability_ids) if capability_ids is not None else None,
+        decision=decision,
+        budget=None,
         status="queued",
         attempt=0,
         fencing_token=0,
@@ -270,6 +276,7 @@ def claim_run(
         input_message=input_message,
         execution_type=run.execution_type,
         capability_ids=tuple(run.capability_ids or ()),
+        decision=dict(run.decision) if run.decision is not None else None,
         worker_id=worker_id,
         fencing_token=run.fencing_token,
     )
@@ -291,6 +298,8 @@ def _finish_claim(
     error_summary: str | None = None,
     shopping_result: dict[str, object] | None = None,
     shopping_artifacts: dict[str, object] | None = None,
+    budget: dict[str, object] | None = None,
+    decision: dict[str, object] | None = None,
 ) -> bool:
     now = datetime.now(UTC)
     run = db.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
@@ -308,6 +317,10 @@ def _finish_claim(
     run.lease_until = None
     run.diagnostic = diagnostic
     run.error_summary = error_summary
+    if budget is not None:
+        run.budget = budget
+    if decision is not None:
+        run.decision = decision
     if shopping_result is not None:
         db.add(
             ShoppingRunResult(
@@ -434,6 +447,8 @@ def complete_claim(
     diagnostic: dict[str, object] | None = None,
     shopping_result: dict[str, object] | None = None,
     shopping_artifacts: dict[str, object] | None = None,
+    budget: dict[str, object] | None = None,
+    decision: dict[str, object] | None = None,
 ) -> bool:
     return _finish_claim(
         db,
@@ -442,19 +457,31 @@ def complete_claim(
         diagnostic=diagnostic,
         shopping_result=shopping_result,
         shopping_artifacts=shopping_artifacts,
+        budget=budget,
+        decision=decision,
     )
 
 
-def fail_claim(db: Session, claim: RunClaim, error_summary: str) -> bool:
-    return _finish_claim(db, claim, "failed", error_summary=error_summary[:500])
+def fail_claim(
+    db: Session,
+    claim: RunClaim,
+    error_summary: str,
+    budget: dict[str, object] | None = None,
+) -> bool:
+    return _finish_claim(
+        db, claim, "failed", error_summary=error_summary[:500], budget=budget
+    )
 
 
-def cancel_claim(db: Session, claim: RunClaim) -> bool:
+def cancel_claim(
+    db: Session, claim: RunClaim, budget: dict[str, object] | None = None
+) -> bool:
     return _finish_claim(
         db,
         claim,
         "cancelled",
         diagnostic={"message": "run cancelled at worker checkpoint"},
+        budget=budget,
     )
 
 
@@ -563,6 +590,7 @@ def get_shopping_result(
         "shopping_agent",
         "map_places",
         "capability_router",
+        "direct_answer",
     }:
         raise RunNotFoundError
     result = db.scalar(

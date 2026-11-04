@@ -8,6 +8,7 @@ from typing import Any, TypedDict, cast
 from langgraph.graph import END, START, StateGraph
 from openai import AsyncOpenAI
 
+from life_agent.core.budget import RunBudget
 from life_agent.core.config import Settings
 from life_agent.core.llm.deepseek import (
     LLMRequestError,
@@ -168,6 +169,7 @@ async def _supervisor_decide(
     goal: str,
     conditions: dict[str, object],
     model_client: AsyncOpenAI | None,
+    budget: RunBudget | None = None,
 ) -> tuple[str, str, dict[str, object] | None, int]:
     """Decide once; retry the JSON contract at most once when formatting fails."""
     messages = _supervisor_messages(goal, conditions)
@@ -176,6 +178,7 @@ async def _supervisor_decide(
         response = await create_deepseek_completion(
             settings,
             client,
+            budget=budget,
             messages=messages,
             tools=tools,
             tool_choice="auto",
@@ -199,6 +202,7 @@ async def _supervisor_decide(
             retry = await create_deepseek_completion(
                 settings,
                 client,
+                budget=budget,
                 messages=retry_messages,
                 tools=tools,
                 tool_choice="auto",
@@ -215,6 +219,7 @@ async def _summarize_discovery(
     goal: str,
     discovery: ToolLoopResult,
     model_client: AsyncOpenAI | None,
+    budget: RunBudget | None = None,
 ) -> str:
     evidence = {
         "called": discovery.tool_calls == 1,
@@ -235,7 +240,7 @@ async def _summarize_discovery(
     ]
     async with open_deepseek_client(settings, model_client) as client:
         response = await create_deepseek_completion(
-            settings, client, messages=messages, max_tokens=256
+            settings, client, budget=budget, messages=messages, max_tokens=256
         )
     if not response.choices or not (response.choices[0].message.content or "").strip():
         raise LLMRequestError("主 Agent 汇总返回空响应。")
@@ -249,6 +254,7 @@ def _build_graph(
     mcp_client: McpClient | Any | None,
     *,
     force_discovery: bool = False,
+    budget: RunBudget | None = None,
 ):
     async def supervisor(state: _ShoppingState) -> dict[str, object]:
         if force_discovery:
@@ -262,7 +268,7 @@ def _build_graph(
                 "supervisor_requests": 0,
             }
         decision, answer, request, requests = await _supervisor_decide(
-            settings, state["goal"], state["conditions"], model_client
+            settings, state["goal"], state["conditions"], model_client, budget
         )
         return {
             "decision_type": decision,
@@ -273,6 +279,8 @@ def _build_graph(
         }
 
     async def discovery(state: _ShoppingState) -> dict[str, object]:
+        if budget is not None:
+            budget.reserve("delegation")
         request = state["discovery_request"]
         keyword = request.get("keyword")
         keyword_instruction = (
@@ -298,6 +306,7 @@ def _build_graph(
             mcp_client=mcp_client,
             total_timeout_seconds=90.0,
             force_tool_call=force_discovery,
+            budget=budget,
         )
         return {"discovery": result, "mcp_call_count": result.tool_calls}
 
@@ -313,7 +322,7 @@ def _build_graph(
             }
         discovery_result = cast(ToolLoopResult, state["discovery"])
         answer = await _summarize_discovery(
-            settings, state["goal"], discovery_result, model_client
+            settings, state["goal"], discovery_result, model_client, budget
         )
         return {
             "answer": answer,
@@ -353,6 +362,7 @@ async def run_shopping_agent(
     discovery_model_client: AsyncOpenAI | None = None,
     mcp_client: McpClient | Any | None = None,
     force_discovery: bool = False,
+    budget: RunBudget | None = None,
 ) -> ShoppingAgentResult:
     """Run one bounded supervisor/discovery graph without a checkpointer."""
     if not goal.strip():
@@ -363,6 +373,7 @@ async def run_shopping_agent(
         discovery_model_client,
         mcp_client,
         force_discovery=force_discovery,
+        budget=budget,
     ).ainvoke({"goal": goal, "conditions": dict(conditions)})
     decision = str(result["decision_type"])
     return ShoppingAgentResult(

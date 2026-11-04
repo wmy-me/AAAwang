@@ -11,6 +11,7 @@ from typing import Any
 from jsonschema import SchemaError, ValidationError, validate
 from openai import AsyncOpenAI
 
+from life_agent.core.budget import RunBudget
 from life_agent.core.config import Settings
 from life_agent.core.llm.deepseek import (
     LLMRequestError,
@@ -120,6 +121,7 @@ async def run_tool_loop(
     mcp_client: McpClient | None = None,
     total_timeout_seconds: float = 90.0,
     force_tool_call: bool = False,
+    budget: RunBudget | None = None,
 ) -> ToolLoopResult:
     """Run one discovery, up to two model requests, and at most one MCP call."""
     if not prompt.strip():
@@ -147,6 +149,7 @@ async def run_tool_loop(
                 first = await create_deepseek_completion(
                     settings,
                     active_model,
+                    budget=budget,
                     messages=messages,
                     tools=model_tools,
                     tool_choice="required" if force_tool_call else "auto",
@@ -182,6 +185,8 @@ async def run_tool_loop(
                 arguments = _parse_arguments(
                     tool_call.function.arguments, exposed.discovered.tool.input_schema
                 )
+                if budget is not None:
+                    budget.reserve("mcp")
                 call_result = await connection.call_tool(
                     exposed.discovered.name, arguments
                 )
@@ -221,6 +226,7 @@ async def run_tool_loop(
                 final = await create_deepseek_completion(
                     settings,
                     active_model,
+                    budget=budget,
                     messages=messages,
                     max_tokens=256,
                 )

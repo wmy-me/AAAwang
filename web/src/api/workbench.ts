@@ -52,7 +52,10 @@ export interface Run {
   task_revision_id: string
   revision: number
   conditions: Conditions
-  execution_type: 'diagnostic' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'capability_router'
+  execution_type: 'diagnostic' | 'direct_answer' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'capability_router'
+  capability_ids: string[] | null
+  decision: Record<string, unknown> | null
+  budget: Record<string, unknown> | null
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
   created_at: string
   started_at: string | null

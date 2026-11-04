@@ -4,6 +4,7 @@ from life_agent.modules.capabilities import (
     RouteKind,
     get_capability,
     route_task_turn,
+    visible_capabilities,
 )
 
 
@@ -38,3 +39,32 @@ def test_unregistered_capability_is_rejected() -> None:
 def test_registered_capabilities_are_read_only_and_allowlisted() -> None:
     assert get_capability("map_place_search").read_only is True
     assert get_capability("map_place_search").allowed_tool_names == ("maps_text_search",)
+    assert get_capability("map_place_search").timeout_seconds > 0
+
+
+def test_visible_capabilities_require_configured_and_discovered_intersection() -> None:
+    discovered = {
+        "map": {"maps_text_search": {"type": "object"}},
+        "shopping": {"other_tool": {"type": "object"}},
+    }
+
+    visible = visible_capabilities(
+        task_domain="shopping",
+        enabled_services={"map", "shopping"},
+        discovered_tools=discovered,
+    )
+
+    assert tuple(spec.capability_id for spec in visible) == ("map_place_search",)
+
+
+def test_visible_capabilities_reject_schema_incompatibility_and_disabled_service() -> None:
+    visible = visible_capabilities(
+        task_domain="shopping",
+        enabled_services={"shopping"},
+        discovered_tools={
+            "shopping": {"search_products": {"type": "array"}},
+            "map": {"maps_text_search": {"type": "object"}},
+        },
+    )
+
+    assert visible == ()

@@ -14,6 +14,7 @@ from openai import (
     NotFoundError,
 )
 
+from life_agent.core.budget import RunBudget
 from life_agent.core.config import Settings
 
 
@@ -79,9 +80,12 @@ async def open_deepseek_client(
 async def create_deepseek_completion(
     settings: Settings,
     client: AsyncOpenAI,
+    budget: RunBudget | None = None,
     **kwargs: Any,
 ) -> Any:
     """Create one completion and map provider failures to safe local errors."""
+    if budget is not None:
+        budget.reserve("model")
     try:
         return await client.chat.completions.create(
             model=settings.llm_model,
@@ -110,6 +114,7 @@ async def call_deepseek(
     prompt: str,
     *,
     client: AsyncOpenAI | None = None,
+    budget: RunBudget | None = None,
 ) -> LLMResult:
     """Send one non-streaming text request with retries disabled."""
     async with open_deepseek_client(settings, client) as active_client:
@@ -118,6 +123,7 @@ async def call_deepseek(
             active_client,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=128,
+            budget=budget,
         )
 
     if not response.choices:

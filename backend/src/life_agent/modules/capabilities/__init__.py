@@ -6,6 +6,7 @@ from life_agent.modules.capabilities.routing import (
     RouteKind,
     get_capability,
     route_task_turn,
+    visible_capabilities,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "RouteKind",
     "get_capability",
     "route_task_turn",
+    "visible_capabilities",
 ]

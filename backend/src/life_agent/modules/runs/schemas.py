@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr
 RunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 RunExecutionType = Literal[
     "diagnostic",
+    "direct_answer",
     "shopping_research",
     "shopping_agent",
     "map_places",
@@ -46,6 +47,8 @@ class RunResponse(BaseModel):
     idempotency_key: str
     execution_type: RunExecutionType
     capability_ids: list[str] | None
+    decision: dict[str, object] | None
+    budget: dict[str, object] | None
     status: RunStatus
     created_at: datetime
     started_at: datetime | None

@@ -228,7 +228,19 @@ def submit_turn(
     decision = route_task_turn(content)
     map_request = "map_place_search" in decision.capability_ids or _is_map_request(content)
     capability_ids = list(decision.capability_ids)
-    if len(capability_ids) > 1:
+    decision_snapshot: dict[str, object] = {
+        "kind": decision.kind.value,
+        "capability_ids": capability_ids,
+    }
+    if decision.clarification:
+        decision_snapshot["clarification"] = decision.clarification
+    if decision.parameters is not None:
+        decision_snapshot["parameters"] = decision.parameters
+    if decision.reason:
+        decision_snapshot["reason"] = decision.reason
+    if decision.kind.name in {"DIRECT", "CLARIFICATION"}:
+        execution_type = "direct_answer"
+    elif len(capability_ids) > 1:
         execution_type = "capability_router"
     elif "map_place_search" in capability_ids or map_request:
         execution_type = "map_places"
@@ -243,6 +255,7 @@ def submit_turn(
         execution_type,
         input_message_id=message.id,
         capability_ids=capability_ids,
+        decision=decision_snapshot,
         commit=False,
     )
     message.run_id = run.id

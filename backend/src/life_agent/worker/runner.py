@@ -11,8 +11,10 @@ import time
 import uuid
 from dataclasses import replace
 
+from life_agent.core.budget import RunBudget
 from life_agent.core.config import get_settings
 from life_agent.core.llm import LLMRequestError, ToolLoopError, run_tool_loop
+from life_agent.core.llm.deepseek import call_deepseek
 from life_agent.db.session import get_session_factory
 from life_agent.modules.capabilities import get_capability
 from life_agent.modules.runs.service import (
@@ -45,14 +47,47 @@ def run_once(worker_id: str) -> bool:
         if claim is None:
             return False
         try:
+            budget = RunBudget()
             if is_cancel_requested(db, claim):
-                return cancel_claim(db, claim)
+                budget.stop("cancelled")
+                return cancel_claim(db, claim, budget.snapshot())
             _validate_claim_capabilities(claim)
-            if claim.execution_type == "shopping_research":
-                result = _run_shopping_with_lease(settings, claim)
+            if claim.execution_type == "direct_answer":
+                decision = claim.decision or {
+                    "kind": "direct",
+                    "capability_ids": [],
+                }
+                if decision.get("kind") == "clarification":
+                    result = str(
+                        decision.get("clarification")
+                        or "请补充必要信息后再试。"
+                    )[:12_000]
+                else:
+                    result = _run_direct_answer_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
                     if is_cancel_requested(result_db, claim):
-                        return cancel_claim(result_db, claim)
+                        budget.stop("cancelled")
+                        return cancel_claim(result_db, claim, budget.snapshot())
+                    return complete_claim(
+                        result_db,
+                        claim,
+                        shopping_result={
+                            "answer": result,
+                            "source": {"service_id": None, "tool": None, "simulated": False},
+                            "execution_version": "020-v1",
+                            "decision_type": "direct_answer",
+                            "delegated": False,
+                            "mcp_call_count": 0,
+                        },
+                        budget=budget.snapshot(),
+                        decision=decision,
+                    )
+            if claim.execution_type == "shopping_research":
+                result = _run_shopping_with_lease(settings, claim, budget)
+                with get_session_factory()() as result_db:
+                    if is_cancel_requested(result_db, claim):
+                        budget.stop("cancelled")
+                        return cancel_claim(result_db, claim, budget.snapshot())
                     return complete_claim(
                         result_db,
                         claim,
@@ -67,11 +102,14 @@ def run_once(worker_id: str) -> bool:
                                 "tool_calls": result.tool_calls,
                             },
                             "execution_version": "010-v1",
+                            "budget": budget.snapshot(),
                         },
+                        budget=budget.snapshot(),
+                        decision=_capability_decision(claim),
                     )
             if claim.execution_type == "shopping_agent":
                 started = time.monotonic()
-                result = _run_shopping_agent_with_lease(settings, claim)
+                result = _run_shopping_agent_with_lease(settings, claim, budget=budget)
                 from life_agent.modules.shopping_plans.service import (
                     build_artifacts,
                     validated_plan_answer,
@@ -83,13 +121,15 @@ def run_once(worker_id: str) -> bool:
                         "delegations": 1 if result.delegated else 0,
                         "elapsed_seconds": round(time.monotonic() - started, 3),
                         "stop_reason": "completed",
+                        "budget": budget.snapshot(),
                     }
                 )
                 artifacts = build_artifacts(source, claim.conditions)
                 answer = validated_plan_answer(artifacts) or result.answer
                 with get_session_factory()() as result_db:
                     if is_cancel_requested(result_db, claim):
-                        return cancel_claim(result_db, claim)
+                        budget.stop("cancelled")
+                        return cancel_claim(result_db, claim, budget.snapshot())
                     return complete_claim(
                         result_db,
                         claim,
@@ -102,23 +142,35 @@ def run_once(worker_id: str) -> bool:
                             "mcp_call_count": result.mcp_call_count,
                         },
                         shopping_artifacts=artifacts,
+                        budget=budget.snapshot(),
+                        decision=_capability_decision(claim),
                     )
             if claim.execution_type == "map_places":
-                result = _run_map_places_with_lease(settings, claim)
+                result = _run_map_places_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
                     if is_cancel_requested(result_db, claim):
-                        return cancel_claim(result_db, claim)
-                    return complete_claim(result_db, claim, shopping_result=result)
+                        budget.stop("cancelled")
+                        return cancel_claim(result_db, claim, budget.snapshot())
+                    return complete_claim(
+                        result_db,
+                        claim,
+                        shopping_result=result,
+                        budget=budget.snapshot(),
+                        decision=_capability_decision(claim),
+                    )
             if claim.execution_type == "capability_router":
-                result, artifacts = _run_capability_router_with_lease(settings, claim)
+                result, artifacts = _run_capability_router_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
                     if is_cancel_requested(result_db, claim):
-                        return cancel_claim(result_db, claim)
+                        budget.stop("cancelled")
+                        return cancel_claim(result_db, claim, budget.snapshot())
                     return complete_claim(
                         result_db,
                         claim,
                         shopping_result=result,
                         shopping_artifacts=artifacts,
+                        budget=budget.snapshot(),
+                        decision=_capability_decision(claim),
                     )
             return complete_claim(
                 db,
@@ -130,6 +182,8 @@ def run_once(worker_id: str) -> bool:
                     "task_revision_id": str(claim.task_revision_id),
                     "revision": claim.revision,
                 },
+                budget=budget.snapshot(),
+                decision={"kind": "diagnostic", "capability_ids": []},
             )
         except Exception as exc:  # noqa: BLE001
             error_summary = _safe_error(exc)
@@ -140,7 +194,15 @@ def run_once(worker_id: str) -> bool:
                 error_summary,
             )
             with get_session_factory()() as fail_db:
-                return fail_claim(fail_db, claim, error_summary)
+                budget.stop("failed")
+                return fail_claim(fail_db, claim, error_summary, budget.snapshot())
+
+
+def _capability_decision(claim) -> dict[str, object]:
+    return {
+        "kind": "capabilities",
+        "capability_ids": list(claim.capability_ids),
+    }
 
 
 def _shopping_prompt(goal: str, conditions: dict[str, object]) -> str:
@@ -149,6 +211,45 @@ def _shopping_prompt(goal: str, conditions: dict[str, object]) -> str:
         f"购物目标：{goal}\n已知条件：{known}\n"
         "只查询并回答模拟商品候选。未提供的预算、物品、数量必须明确写为未知，不能猜测。"
     )
+
+
+def _run_direct_answer_with_lease(settings, claim, budget) -> str:
+    prompt = (
+        f"用户请求：{claim.input_message or claim.goal}\n"
+        f"已确认条件：{_bounded_json(claim.conditions)}\n"
+        "请直接回答，不要调用任何工具；未知信息要明确说明。"
+    )
+    stop = threading.Event()
+    lease_lost = threading.Event()
+
+    def renew() -> None:
+        interval = max(0.5, settings.run_worker_lease_seconds / 3)
+        while not stop.wait(interval):
+            try:
+                with get_session_factory()() as lease_db:
+                    if not renew_claim(lease_db, claim, settings.run_worker_lease_seconds):
+                        lease_lost.set()
+                        return
+            except Exception:
+                logger.exception("run lease renewal failed for %s", claim.run_id)
+                lease_lost.set()
+                return
+
+    heartbeat = threading.Thread(target=renew, name="run-lease-renewal", daemon=True)
+    heartbeat.start()
+    try:
+        result = asyncio.run(
+            asyncio.wait_for(
+                call_deepseek(settings, prompt, budget=budget),
+                timeout=settings.shopping_agent_total_timeout_seconds,
+            )
+        )
+        if lease_lost.is_set():
+            raise ToolLoopError("直答执行租约丢失，结果不会提交；请创建新的 run 重试。")
+        return result.text[:12_000]
+    finally:
+        stop.set()
+        heartbeat.join(timeout=2)
 
 
 _MAP_CITY_PATTERNS = (
@@ -205,7 +306,7 @@ def _map_request(goal: str, input_message: str | None) -> tuple[str, str | None]
     return query or text[:120], city
 
 
-def _run_map_places_with_lease(settings, claim):
+def _run_map_places_with_lease(settings, claim, budget=None):
     from life_agent.tools.maps import search_places
 
     query, city = _map_request(claim.goal, claim.input_message)
@@ -219,6 +320,8 @@ def _run_map_places_with_lease(settings, claim):
             "mcp_call_count": 0,
             "places": [], "query": query, "city": "",
         }
+    if budget is not None:
+        budget.reserve("mcp")
     result = asyncio.run(
         asyncio.wait_for(
             search_places(settings, query, city=city),
@@ -237,7 +340,7 @@ def _run_map_places_with_lease(settings, claim):
     }
 
 
-def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = False):
+def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = False, budget=None):
     from life_agent.agents.shopping import run_shopping_agent
 
     stop = threading.Event()
@@ -270,6 +373,7 @@ def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = F
                         goal,
                         claim.conditions,
                         force_discovery=force_discovery,
+                        budget=budget,
                     ),
                     timeout=settings.shopping_agent_total_timeout_seconds,
                 )
@@ -286,7 +390,7 @@ def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = F
         heartbeat.join(timeout=2)
 
 
-def _run_shopping_with_lease(settings, claim):
+def _run_shopping_with_lease(settings, claim, budget=None):
     stop = threading.Event()
     lease_lost = threading.Event()
 
@@ -313,6 +417,7 @@ def _run_shopping_with_lease(settings, claim):
                 service_id="shopping",
                 allowed_tool_names=("search_products",),
                 total_timeout_seconds=90.0,
+                budget=budget,
             )
         )
         if lease_lost.is_set():
@@ -363,14 +468,14 @@ def _validate_claim_capabilities(claim) -> None:
         raise ToolLoopError("组合 Run 缺少能力快照。")
 
 
-def _run_capability_router_with_lease(settings, claim):
+def _run_capability_router_with_lease(settings, claim, budget=None):
     """Run the selected read-only capabilities once, inside one durable Run."""
     selected = set(claim.capability_ids)
     map_result = None
     shopping_result = None
     artifacts = None
     if "map_place_search" in selected:
-        map_result = _run_map_places_with_lease(settings, claim)
+        map_result = _run_map_places_with_lease(settings, claim, budget)
     if "shopping_product_discovery" in selected:
         started = time.monotonic()
         shopping_text = claim.input_message or claim.goal
@@ -385,7 +490,7 @@ def _run_capability_router_with_lease(settings, claim):
             input_message=None,
         )
         shopping_agent = _run_shopping_agent_with_lease(
-            settings, shopping_claim, force_discovery=True
+            settings, shopping_claim, force_discovery=True, budget=budget
         )
         from life_agent.modules.shopping_plans.service import (
             build_artifacts,
@@ -398,6 +503,7 @@ def _run_capability_router_with_lease(settings, claim):
                 "delegations": 1 if shopping_agent.delegated else 0,
                 "elapsed_seconds": round(time.monotonic() - started, 3),
                 "stop_reason": "completed",
+                "budget": budget.snapshot() if budget is not None else None,
             }
         )
         artifacts = build_artifacts(source, claim.conditions)
