@@ -1,6 +1,6 @@
 # 021：自然语言任务与动态表单
 
-- 状态：已建立任务文档；尚未实现
+- 状态：部分实现；服务端注册字段的提议/确认、revision 与幂等校验、网页入口已实现；真实模型动态 schema、表单与 Run 统一语义、浏览器刷新与提交验收未完成，不标记为完成
 - 所属阶段：P4 真实信息与更多采买场景
 - 前置：[020 报告](../reports/020-model-capability-budget-report.md)、[动态表单设计](../design/dynamic-task-forms.md)、[Agent 执行规则](../design/agent-execution-rules.md)、[数据保护与幂等规则](../design/security-and-idempotency.md)
 - 完成后报告：`docs/reports/021-dynamic-task-forms-report.md`

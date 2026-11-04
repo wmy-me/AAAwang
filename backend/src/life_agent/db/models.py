@@ -192,6 +192,39 @@ class TaskRevision(Base):
     task: Mapped[Task] = relationship(back_populates="revisions")
 
 
+class DynamicFormProposal(Base):
+    __tablename__ = "dynamic_form_proposals"
+    __table_args__ = (
+        UniqueConstraint(
+            "task_id", "task_revision_id", name="uq_form_proposals_task_revision"
+        ),
+        UniqueConstraint(
+            "task_id", "client_request_id", name="uq_form_proposals_task_request"
+        ),
+        Index("ix_form_proposals_task_created", "task_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_revisions.id", ondelete="CASCADE")
+    )
+    revision: Mapped[int]
+    schema: Mapped[list[dict[str, object]]] = mapped_column(JSON)
+    source: Mapped[str] = mapped_column(String(32), default="server_registered")
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    confirmed_values: Mapped[dict[str, object] | None] = mapped_column(JSON)
+    client_request_id: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    task: Mapped[Task] = relationship()
+    task_revision: Mapped[TaskRevision] = relationship()
+
+
 class Run(Base):
     __tablename__ = "runs"
     __table_args__ = (

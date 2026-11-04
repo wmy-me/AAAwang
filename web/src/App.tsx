@@ -6,6 +6,7 @@ import {
   isAuthError,
   type Conditions,
   type Conversation,
+  type DynamicFormProposal,
   type Message,
   type MapPlace,
   type Run,
@@ -29,6 +30,7 @@ function App() {
   const [conversationId, setConversationId] = useState("");
   const [, setTasks] = useState<Task[]>([]);
   const [task, setTask] = useState<Task | null>(null);
+  const [dynamicForm, setDynamicForm] = useState<DynamicFormProposal | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRunId, setSelectedRunId] = useState("");
   const [result, setResult] = useState<RunResult | null>(null);
@@ -79,10 +81,12 @@ function App() {
         );
       })
       .catch(handleError);
+    setDynamicForm(null);
   }, [conversationId]);
 
   useEffect(() => {
     if (!task) return;
+    void api.getDynamicForm(task.id).then(setDynamicForm).catch(handleError);
     api
       .runs(task.id)
       .then((page) => {
@@ -109,6 +113,7 @@ function App() {
       setConversations([]);
       setTasks([]);
       setTask(null);
+      setDynamicForm(null);
       setRuns([]);
       setResult(null);
       setArtifacts(null);
@@ -170,6 +175,7 @@ function App() {
     setConversations([]);
     setTasks([]);
     setTask(null);
+    setDynamicForm(null);
     setRuns([]);
     setResult(null);
     setArtifacts(null);
@@ -201,6 +207,7 @@ function App() {
       const created = await api.createTask(conversationId, goal, conditions);
       setTasks((items) => [created, ...items]);
       setTask(created);
+      setDynamicForm(null);
       setShowTaskForm(false);
       setRuns([]);
       setResult(null);
@@ -246,6 +253,8 @@ function App() {
       );
       const fresh = await api.getTask(task.id);
       setTask(fresh);
+      const proposal = await api.getDynamicForm(fresh.id);
+      setDynamicForm(proposal);
       setTasks((items) =>
         items.map((item) => (item.id === fresh.id ? fresh : item)),
       );
@@ -316,6 +325,7 @@ function App() {
         ...(turn.assistant_message ? [turn.assistant_message] : []),
       ]);
       setTask(turn.task);
+      void api.getDynamicForm(turn.task.id).then(setDynamicForm).catch(handleError);
       setRuns((items) => [
         turn.run,
         ...items.filter((item) => item.id !== turn.run.id),
@@ -617,6 +627,34 @@ function App() {
                     busy={busy}
                     onUpdate={updateConditions}
                     onRun={createRun}
+                  />
+                )}
+                {task && dynamicForm && dynamicForm.task_id === task.id
+                  && dynamicForm.status === "pending" && dynamicForm.schema.length > 0 && (
+                  <DynamicFormPanel
+                    key={dynamicForm.id}
+                    proposal={dynamicForm}
+                    task={task}
+                    busy={busy}
+                    onSubmit={async (values) => {
+                      setBusy(true);
+                      try {
+                        await api.submitDynamicForm(
+                          task.id,
+                          dynamicForm.id,
+                          task.current_revision,
+                          values,
+                        );
+                        const fresh = await api.getTask(task.id);
+                        setTask(fresh);
+                        setDynamicForm(await api.getDynamicForm(fresh.id));
+                        setNotice(`已确认动态字段，任务进入第 ${fresh.current_revision} 版。`);
+                      } catch (value) {
+                        handleError(value);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
                   />
                 )}
               </section>
@@ -1063,6 +1101,75 @@ function TaskForm({
           保存任务
         </button>
       </div>
+    </form>
+  );
+}
+
+function DynamicFormPanel({
+  proposal,
+  task,
+  busy,
+  onSubmit,
+}: {
+  proposal: DynamicFormProposal;
+  task: Task;
+  busy: boolean;
+  onSubmit: (values: Record<string, unknown>) => void;
+}) {
+  const [values, setValues] = useState<Record<string, unknown>>({});
+
+  function updateValue(field: DynamicFormProposal["schema"][number], value: string) {
+    setValues((current) => {
+      const next = { ...current };
+      if (value === "") {
+        delete next[field.id];
+      } else {
+        next[field.id] = field.control === "number" || field.control === "money"
+          ? Number(value)
+          : value;
+      }
+      return next;
+    });
+  }
+
+  return (
+    <form
+      className="dynamic-form-panel"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(values);
+      }}
+    >
+      <div className="dynamic-form-heading">
+        <div>
+          <span className="eyebrow">ADAPTIVE INPUT</span>
+          <h3>补充当前目标需要的条件</h3>
+        </div>
+        <span className="section-meta">REV {task.current_revision}</span>
+      </div>
+      <p className="form-hint">这些字段是本轮建议，不会在确认前写入任务条件。</p>
+      <div className="dynamic-form-grid">
+        {proposal.schema.map((field) => (
+          <label key={field.id}>
+            <span>{field.label}{field.required ? " *" : ""}</span>
+            <input
+              type={field.control === "number" || field.control === "money" ? "number" : "text"}
+              min={field.min_value ?? undefined}
+              max={field.max_value ?? undefined}
+              step={field.control === "money" ? "0.01" : field.control === "number" ? "1" : undefined}
+              placeholder={field.unit ? `单位：${field.unit}` : "可选"}
+              value={String(values[field.id] ?? "")}
+              onChange={(event) => updateValue(field, event.target.value)}
+              required={field.required}
+              disabled={busy}
+            />
+            <small>{field.reason}</small>
+          </label>
+        ))}
+      </div>
+      <button className="button button-dark" disabled={busy || !Object.keys(values).length}>
+        {busy ? "确认中…" : "确认并生成新版本"}
+      </button>
     </form>
   );
 }

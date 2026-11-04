@@ -78,6 +78,19 @@
 .chat-composer { display: flex; gap: 10px; }
 .chat-composer input { flex: 1; min-width: 0; }
 
+.dynamic-form-panel { margin-top: 18px; padding: 22px; border: 1px solid var(--line); background: var(--wash); }
+.dynamic-form-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.dynamic-form-heading h3 { margin: 6px 0 0; font-size: 16px; }
+.dynamic-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.dynamic-form-grid label { display: grid; gap: 6px; }
+.dynamic-form-grid label > span { font-size: 12px; font-weight: 700; }
+.dynamic-form-grid small { color: var(--muted); line-height: 1.45; }
+
+@media (max-width: 640px) {
+	.dynamic-form-panel { padding: 18px; }
+	.dynamic-form-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 640px) {
 	.chat-section { padding: 18px; }
 	.chat-message { max-width: 92%; }

@@ -7,6 +7,12 @@
 - 后端聚焦与全量回归、Ruff、compileall、Alembic check、前端 lint/build 通过；前端保留既有 2 条 Hook warning。Run 详情已展示决策、能力快照、预算和终止原因，但真实浏览器刷新验收待补。
 - 已用真实 DeepSeek、独立 Worker、PostgreSQL、高德 MCP、Java 模拟 MCP 验证直答、缺城市追问、纯地点、纯商品和地图+商品组合五类决策 Run，并确认第二账号隔离；动态发现和 UI 已接入代码，预算终止已完成代码/数据库专项验收；真实 Worker 终止场景、浏览器刷新和 Java verify 仍待补。详见[报告](reports/020-model-capability-budget-report.md)。
 
+## 021 自然语言任务与动态表单（部分实现）
+
+- 已新增受限动态表单提议契约、`dynamic_form_proposals` 持久化、字段白名单/类型/范围校验、任务 revision 确认和请求幂等；网页已展示并提交 shopping 的 item/people/quantity/budget 字段。
+- 021 专项 API `6 passed`，后端全量 `125 passed`，Ruff、compileall、迁移升级、Alembic check 和前端 build 通过；前端 lint 保留 3 条 Hook warning（含本次新增 `set-state-in-effect`）。详见[报告](reports/021-dynamic-task-forms-report.md)。
+- 真实 DeepSeek 动态 schema、真实浏览器刷新/提交、表单提交与 Run 的统一语义、travel 及日期/多选/地点控件仍待后续实现和验收。
+
 ## 019 购物主 Agent 的受控能力路由与工具白名单
 
 - 已完成首版受信能力注册表、结构化服务端路由、`capability_ids` Run 快照、`capability_router` 单 Run 组合执行、幂等能力快照比较和 Worker claim 后二次白名单校验。

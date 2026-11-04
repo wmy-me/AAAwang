@@ -46,6 +46,31 @@ export interface Conditions {
   item?: string
 }
 
+export interface FormField {
+  id: string
+  control: 'short_text' | 'number' | 'money' | 'date' | 'single_select' | 'multi_select' | 'location'
+  label: string
+  reason: string
+  required: boolean
+  unit?: string | null
+  options?: string[] | null
+  min_value?: number | null
+  max_value?: number | null
+}
+
+export interface DynamicFormProposal {
+  id: string
+  task_id: string
+  task_revision_id: string
+  revision: number
+  schema: FormField[]
+  source: string
+  status: 'pending' | 'confirmed'
+  confirmed_values: Record<string, unknown> | null
+  created_at: string
+  confirmed_at: string | null
+}
+
 export interface Run {
   id: string
   task_id: string
@@ -256,6 +281,21 @@ export const api = {
       json({ expected_revision: expectedRevision, goal, conditions, change_note: changeNote || undefined, confirm_goal_conflict: confirmGoalConflict }),
     ),
   getTask: (taskId: string) => request<Task>(`/tasks/${taskId}`),
+  getDynamicForm: (taskId: string) => request<DynamicFormProposal>(`/tasks/${taskId}/form`),
+  submitDynamicForm: (
+    taskId: string,
+    proposalId: string,
+    expectedRevision: number,
+    values: Record<string, unknown>,
+  ) => request<{ revision: number }>(
+    `/tasks/${taskId}/form/submit`,
+    json({
+      proposal_id: proposalId,
+      expected_revision: expectedRevision,
+      client_request_id: crypto.randomUUID(),
+      values,
+    }),
+  ),
   runs: (taskId: string) => request<Page<Run>>(`/tasks/${taskId}/runs?limit=100`),
   createRun: (taskId: string, revision: number, idempotencyKey: string) =>
     request<Run>(

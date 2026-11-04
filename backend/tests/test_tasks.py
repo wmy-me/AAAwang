@@ -245,3 +245,90 @@ def test_rejects_invalid_conditions_forged_identity_and_cross_site_write(
     )
     assert cross_site.status_code == 403
     assert client.get(f"/api/tasks/{task['id']}").json()["current_revision"] == 1
+
+
+def test_dynamic_form_is_bounded_idempotent_and_creates_revision(
+    task_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = task_context
+    register_and_login(client, "alice")
+    conversation_id = create_conversation(client)
+    task = create_task(client, conversation_id, "shopping", "Buy gifts", {})
+
+    proposal = client.get(f"/api/tasks/{task['id']}/form")
+    assert proposal.status_code == 200
+    body = proposal.json()
+    assert {field["id"] for field in body["schema"]} == {
+        "item",
+        "people",
+        "quantity",
+        "budget",
+    }
+    assert body["status"] == "pending"
+
+    invalid = client.post(
+        f"/api/tasks/{task['id']}/form/submit",
+        json={
+            "proposal_id": body["id"],
+            "expected_revision": 1,
+            "client_request_id": "form-1",
+            "values": {"unknown": "x"},
+        },
+    )
+    assert invalid.status_code == 422
+
+    submitted = client.post(
+        f"/api/tasks/{task['id']}/form/submit",
+        json={
+            "proposal_id": body["id"],
+            "expected_revision": 1,
+            "client_request_id": "form-1",
+            "values": {"people": 25, "budget": 200},
+        },
+    )
+    assert submitted.status_code == 201
+    assert submitted.json()["revision"] == 2
+    assert submitted.json()["conditions"] == {"people": 25, "budget": 200}
+
+    repeated = client.post(
+        f"/api/tasks/{task['id']}/form/submit",
+        json={
+            "proposal_id": body["id"],
+            "expected_revision": 1,
+            "client_request_id": "form-1",
+            "values": {"people": 25, "budget": 200},
+        },
+    )
+    assert repeated.status_code == 201
+    assert repeated.json()["id"] == submitted.json()["id"]
+    with factory() as db:
+        assert db.scalar(select(func.count()).select_from(TaskRevision)) == 2
+
+
+def test_dynamic_form_rejects_stale_revision_and_cross_account_access(
+    task_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, _factory = task_context
+    register_and_login(client, "alice")
+    conversation_id = create_conversation(client)
+    task = create_task(client, conversation_id, "shopping", "Buy gifts", {})
+    proposal = client.get(f"/api/tasks/{task['id']}/form").json()
+    revised = client.post(
+        f"/api/tasks/{task['id']}/revisions",
+        json={"expected_revision": 1, "conditions": {"people": 2}},
+    )
+    assert revised.status_code == 201
+    stale = client.post(
+        f"/api/tasks/{task['id']}/form/submit",
+        json={
+            "proposal_id": proposal["id"],
+            "expected_revision": 1,
+            "client_request_id": "stale-form",
+            "values": {"budget": 100},
+        },
+    )
+    assert stale.status_code == 409
+
+    with TestClient(app, base_url="http://testserver") as bob:
+        register_and_login(bob, "bob")
+        assert bob.get(f"/api/tasks/{task['id']}/form").status_code == 404

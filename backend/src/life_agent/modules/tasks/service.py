@@ -195,6 +195,7 @@ def create_revision(
     conditions: Conditions,
     change_note: str | None,
     confirm_goal_conflict: bool = False,
+    commit: bool = True,
 ) -> TaskRevision:
     task = _get_owned_task(db, owner_id, task_id)
     current_snapshot = _get_revision(db, task.id, expected_revision)
@@ -229,6 +230,7 @@ def create_revision(
     )
     db.add(snapshot)
     task.goal = effective_goal
-    db.commit()
-    db.refresh(snapshot)
+    if commit:
+        db.commit()
+        db.refresh(snapshot)
     return snapshot
