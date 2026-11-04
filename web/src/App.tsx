@@ -345,9 +345,9 @@ function App() {
     if (run.status === "queued" || run.status === "running") watchRun(run);
   }
 
-  async function loadResult(runId: string) {
+  async function loadResult(runId: string, runOverride?: Run) {
     try {
-      const currentRun = runs.find((item) => item.id === runId);
+      const currentRun = runOverride ?? runs.find((item) => item.id === runId);
       const nextResult = await api.result(runId);
       setResult(nextResult);
       const isMapRun =
@@ -442,7 +442,7 @@ function App() {
           items.map((item) => (item.id === current.id ? current : item)),
         );
         if (current.status === "completed") {
-          await loadResult(current.id);
+          await loadResult(current.id, current);
           cleanup();
         }
         if (current.status === "queued" || current.status === "running")

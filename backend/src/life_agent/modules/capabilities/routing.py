@@ -129,6 +129,11 @@ def _has_city(text: str) -> bool:
     return any(match.groups() for match in _CITY_PATTERN.finditer(text))
 
 
+def has_location_scope(text: str) -> bool:
+    """Return whether the trusted location parser found a search scope."""
+    return _has_city(text)
+
+
 def route_task_turn(content: str, *, task_domain: str = "shopping") -> CapabilityDecision:
     """Choose trusted capabilities; model or user input cannot choose tools."""
     if task_domain != "shopping":

@@ -120,6 +120,7 @@ def create_run(
         raise RunNotFoundError
     if execution_type not in {
         "diagnostic",
+        "capability_decision",
         "direct_answer",
         "shopping_research",
         "shopping_agent",
@@ -128,6 +129,7 @@ def create_run(
     }:
         raise ValueError("unsupported run execution type")
     if execution_type in {
+        "capability_decision",
         "shopping_research",
         "shopping_agent",
         "map_places",
@@ -300,6 +302,8 @@ def _finish_claim(
     shopping_artifacts: dict[str, object] | None = None,
     budget: dict[str, object] | None = None,
     decision: dict[str, object] | None = None,
+    execution_type: str | None = None,
+    capability_ids: tuple[str, ...] | None = None,
 ) -> bool:
     now = datetime.now(UTC)
     run = db.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
@@ -321,6 +325,10 @@ def _finish_claim(
         run.budget = budget
     if decision is not None:
         run.decision = decision
+    if execution_type is not None:
+        run.execution_type = execution_type
+    if capability_ids is not None:
+        run.capability_ids = list(capability_ids)
     if shopping_result is not None:
         db.add(
             ShoppingRunResult(
@@ -449,6 +457,8 @@ def complete_claim(
     shopping_artifacts: dict[str, object] | None = None,
     budget: dict[str, object] | None = None,
     decision: dict[str, object] | None = None,
+    execution_type: str | None = None,
+    capability_ids: tuple[str, ...] | None = None,
 ) -> bool:
     return _finish_claim(
         db,
@@ -459,6 +469,8 @@ def complete_claim(
         shopping_artifacts=shopping_artifacts,
         budget=budget,
         decision=decision,
+        execution_type=execution_type,
+        capability_ids=capability_ids,
     )
 
 
@@ -590,6 +602,7 @@ def get_shopping_result(
         "shopping_agent",
         "map_places",
         "capability_router",
+        "capability_decision",
         "direct_answer",
     }:
         raise RunNotFoundError

@@ -153,6 +153,7 @@ def _infer_conditions(
 
 
 def _is_map_request(content: str) -> bool:
+    """Keep the legacy routing helper for old callers and focused tests."""
     decision = route_task_turn(content)
     return "map_place_search" in decision.capability_ids or (
         decision.clarification is not None
@@ -225,34 +226,19 @@ def submit_turn(
     )
     db.add(message)
     db.flush()
-    decision = route_task_turn(content)
-    map_request = "map_place_search" in decision.capability_ids or _is_map_request(content)
-    capability_ids = list(decision.capability_ids)
+    capability_ids: list[str] = []
     decision_snapshot: dict[str, object] = {
-        "kind": decision.kind.value,
-        "capability_ids": capability_ids,
+        "kind": "pending",
+        "capability_ids": [],
+        "decision_source": "deepseek_structured_worker",
     }
-    if decision.clarification:
-        decision_snapshot["clarification"] = decision.clarification
-    if decision.parameters is not None:
-        decision_snapshot["parameters"] = decision.parameters
-    if decision.reason:
-        decision_snapshot["reason"] = decision.reason
-    if decision.kind.name in {"DIRECT", "CLARIFICATION"}:
-        execution_type = "direct_answer"
-    elif len(capability_ids) > 1:
-        execution_type = "capability_router"
-    elif "map_place_search" in capability_ids or map_request:
-        execution_type = "map_places"
-    else:
-        execution_type = "shopping_agent"
     run = create_run(
         db,
         owner_id,
         task.id,
         expected_revision,
         f"turn:{client_turn_id}",
-        execution_type,
+        "capability_decision",
         input_message_id=message.id,
         capability_ids=capability_ids,
         decision=decision_snapshot,

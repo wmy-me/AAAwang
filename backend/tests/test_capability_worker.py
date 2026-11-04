@@ -3,7 +3,9 @@ from types import SimpleNamespace
 import pytest
 
 from life_agent.core.llm import ToolLoopError
+from life_agent.core.llm.deepseek import LLMResult
 from life_agent.modules.runs.service import _map_source
+from life_agent.worker import runner
 from life_agent.worker.runner import _validate_claim_capabilities
 
 
@@ -63,3 +65,99 @@ def test_map_only_run_falls_back_to_its_source() -> None:
         {"source": {"service_id": "map", "tool": "maps_text_search"}}
     )
     assert source == {"service_id": "map", "tool": "maps_text_search"}
+
+
+def test_capability_decision_accepts_only_visible_registered_capabilities(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        mcp_services={
+            "shopping": SimpleNamespace(enabled=True),
+            "map": SimpleNamespace(enabled=True),
+        },
+        map_mcp_tool_name="maps_text_search",
+    )
+    run_claim = SimpleNamespace(
+        input_message="在上海找礼品店",
+        goal="找礼品店",
+        conditions={},
+    )
+    async def fake_call(*args, **kwargs):
+        return LLMResult(
+            '{"kind":"capabilities","capability_ids":["map_place_search"],"reason":"需要地点"}'
+        )
+
+    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+
+    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+
+    assert decision["capability_ids"] == ["map_place_search"]
+
+
+def test_capability_decision_rejects_unregistered_capability(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        mcp_services={"shopping": SimpleNamespace(enabled=True)},
+        map_mcp_tool_name="maps_text_search",
+    )
+    run_claim = SimpleNamespace(input_message="买彩色铅笔", goal="购物", conditions={})
+    async def fake_call(*args, **kwargs):
+        return LLMResult('{"kind":"capabilities","capability_ids":["arbitrary_url_tool"]}')
+
+    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+
+    with pytest.raises(ToolLoopError, match="不可见或重复"):
+        runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+
+
+def test_capability_decision_treats_valid_ids_as_capabilities(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        mcp_services={"shopping": SimpleNamespace(enabled=True)},
+        map_mcp_tool_name="maps_text_search",
+    )
+    run_claim = SimpleNamespace(
+        input_message="买彩色铅笔作为奖品", goal="购物", conditions={}
+    )
+    async def fake_call(*args, **kwargs):
+        return LLMResult(
+            '{"kind":"direct","capability_ids":["shopping_product_discovery"]}'
+        )
+
+    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+
+    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+
+    assert decision["kind"] == "capabilities"
+    assert decision["capability_ids"] == ["shopping_product_discovery"]
+
+
+def test_capability_decision_parses_fenced_json(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        mcp_services={},
+        map_mcp_tool_name="maps_text_search",
+    )
+    run_claim = SimpleNamespace(input_message="你好", goal="购物", conditions={})
+    async def fake_call(*args, **kwargs):
+        return LLMResult(
+            '```json\n{"kind":"direct","capability_ids":[],"reason":"问候"}\n```'
+        )
+
+    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+
+    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+
+    assert decision["kind"] == "direct"
+
+
+def test_capability_decision_downgrades_map_without_location(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        mcp_services={"map": SimpleNamespace(enabled=True)},
+        map_mcp_tool_name="maps_text_search",
+    )
+    run_claim = SimpleNamespace(input_message="找一家礼品店", goal="找店", conditions={})
+    async def fake_call(*args, **kwargs):
+        return LLMResult('{"kind":"capabilities","capability_ids":["map_place_search"]}')
+
+    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+
+    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+
+    assert decision["kind"] == "clarification"
+    assert decision["capability_ids"] == []

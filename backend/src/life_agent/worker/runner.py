@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import re
@@ -16,7 +17,11 @@ from life_agent.core.config import get_settings
 from life_agent.core.llm import LLMRequestError, ToolLoopError, run_tool_loop
 from life_agent.core.llm.deepseek import call_deepseek
 from life_agent.db.session import get_session_factory
-from life_agent.modules.capabilities import get_capability
+from life_agent.modules.capabilities import (
+    get_capability,
+    has_location_scope,
+    visible_capabilities,
+)
 from life_agent.modules.runs.service import (
     cancel_claim,
     claim_run,
@@ -52,6 +57,45 @@ def run_once(worker_id: str) -> bool:
                 budget.stop("cancelled")
                 return cancel_claim(db, claim, budget.snapshot())
             _validate_claim_capabilities(claim)
+            if claim.execution_type == "capability_decision":
+                decision = _run_capability_decision(settings, claim, budget)
+                if decision["kind"] == "clarification":
+                    clarification = str(
+                        decision.get("clarification") or "请补充必要信息后再试。"
+                    )[:12_000]
+                    with get_session_factory()() as result_db:
+                        return complete_claim(
+                            result_db,
+                            claim,
+                            shopping_result={
+                                "answer": clarification,
+                                "source": {"service_id": None, "tool": None, "simulated": False},
+                                "execution_version": "020-v1",
+                                "decision_type": "clarification",
+                                "delegated": False,
+                                "mcp_call_count": 0,
+                            },
+                            budget=budget.snapshot(),
+                            decision=decision,
+                            execution_type="direct_answer",
+                            capability_ids=(),
+                        )
+                selected = tuple(decision.get("capability_ids", ()))
+                execution_type = (
+                    "capability_router"
+                    if len(selected) > 1
+                    else "map_places"
+                    if selected == ("map_place_search",)
+                    else "shopping_agent"
+                    if selected == ("shopping_product_discovery",)
+                    else "direct_answer"
+                )
+                claim = replace(
+                    claim,
+                    execution_type=execution_type,
+                    capability_ids=selected,
+                    decision=decision,
+                )
             if claim.execution_type == "direct_answer":
                 decision = claim.decision or {
                     "kind": "direct",
@@ -81,6 +125,8 @@ def run_once(worker_id: str) -> bool:
                         },
                         budget=budget.snapshot(),
                         decision=decision,
+                        execution_type=claim.execution_type,
+                        capability_ids=claim.capability_ids,
                     )
             if claim.execution_type == "shopping_research":
                 result = _run_shopping_with_lease(settings, claim, budget)
@@ -105,7 +151,9 @@ def run_once(worker_id: str) -> bool:
                             "budget": budget.snapshot(),
                         },
                         budget=budget.snapshot(),
-                        decision=_capability_decision(claim),
+                        decision=_decision_for_completion(claim),
+                        execution_type=claim.execution_type,
+                        capability_ids=claim.capability_ids,
                     )
             if claim.execution_type == "shopping_agent":
                 started = time.monotonic()
@@ -143,7 +191,9 @@ def run_once(worker_id: str) -> bool:
                         },
                         shopping_artifacts=artifacts,
                         budget=budget.snapshot(),
-                        decision=_capability_decision(claim),
+                        decision=_decision_for_completion(claim),
+                        execution_type=claim.execution_type,
+                        capability_ids=claim.capability_ids,
                     )
             if claim.execution_type == "map_places":
                 result = _run_map_places_with_lease(settings, claim, budget)
@@ -156,7 +206,9 @@ def run_once(worker_id: str) -> bool:
                         claim,
                         shopping_result=result,
                         budget=budget.snapshot(),
-                        decision=_capability_decision(claim),
+                        decision=_decision_for_completion(claim),
+                        execution_type=claim.execution_type,
+                        capability_ids=claim.capability_ids,
                     )
             if claim.execution_type == "capability_router":
                 result, artifacts = _run_capability_router_with_lease(settings, claim, budget)
@@ -170,7 +222,9 @@ def run_once(worker_id: str) -> bool:
                         shopping_result=result,
                         shopping_artifacts=artifacts,
                         budget=budget.snapshot(),
-                        decision=_capability_decision(claim),
+                        decision=_decision_for_completion(claim),
+                        execution_type=claim.execution_type,
+                        capability_ids=claim.capability_ids,
                     )
             return complete_claim(
                 db,
@@ -184,6 +238,8 @@ def run_once(worker_id: str) -> bool:
                 },
                 budget=budget.snapshot(),
                 decision={"kind": "diagnostic", "capability_ids": []},
+                execution_type=claim.execution_type,
+                capability_ids=claim.capability_ids,
             )
         except Exception as exc:  # noqa: BLE001
             error_summary = _safe_error(exc)
@@ -202,6 +258,122 @@ def _capability_decision(claim) -> dict[str, object]:
     return {
         "kind": "capabilities",
         "capability_ids": list(claim.capability_ids),
+    }
+
+
+def _decision_for_completion(claim) -> dict[str, object]:
+    """Keep the model's validated decision when the run came from a decision step."""
+    if claim.decision and claim.decision.get("kind") == "capabilities":
+        return dict(claim.decision)
+    return _capability_decision(claim)
+
+
+def _decision_json(text: str) -> dict[str, object] | None:
+    """Parse one JSON object, tolerating a fenced or prose-wrapped reply."""
+    stripped = text.strip()
+    candidates = [stripped]
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if len(lines) >= 3 and lines[-1].strip().startswith("```"):
+            candidates.append("\n".join(lines[1:-1]))
+    decoder = json.JSONDecoder()
+    for candidate in candidates:
+        try:
+            value = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    for index, char in enumerate(stripped):
+        if char != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(stripped[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
+    """Ask the model for a bounded decision, then validate it server-side."""
+    enabled = {
+        service_id
+        for service_id, service in settings.mcp_services.items()
+        if service.enabled
+    }
+    discovered = {
+        "shopping": {"search_products": {"type": "object"}},
+        "map": {settings.map_mcp_tool_name: {"type": "object"}},
+    }
+    visible = visible_capabilities(
+        task_domain="shopping",
+        enabled_services=enabled,
+        discovered_tools=discovered,
+    )
+    capability_lines = "\n".join(
+        f"- {item.capability_id}: {item.result_type}; 只读；服务={item.service_id}"
+        for item in visible
+    ) or "- 无可用能力"
+    prompt = (
+        "你是购物任务主协调 Agent。只输出一个 JSON 对象，不要 Markdown。\n"
+        '{"kind":"direct|clarification|capabilities",'
+        '"capability_ids":[],"clarification":null,"reason":"简短原因"}\n'
+        "capability_ids 只能从下列后端授权集合中选择，不能创建新 ID、URL、服务或工具：\n"
+        f"{capability_lines}\n"
+        f"用户消息：{claim.input_message or claim.goal}\n"
+        f"当前任务条件：{_bounded_json(claim.conditions)}\n"
+        "判断规则：\n"
+        "1. 问候、询问你能做什么、闲聊或解释概念：kind=direct，capability_ids=[]，不要调用工具。\n"
+        "2. 用户本轮明确要查找地点/店铺/附近/路线，但没有城市或位置范围：kind=clarification。\n"
+        "3. 城市名（如上海、北京）本身已是有效位置范围，不要要求区或街道；"
+        "“查询上海附近的书店”应选择 map_place_search。\n"
+        "4. 用户本轮要求购买、查找或推荐具体商品（如“买彩色铅笔作为奖品”"
+        "“给25人买彩色铅笔”）时，选择 shopping_product_discovery。\n"
+        "5. 只有任务条件或历史目标提到预算、人数，而本轮没有商品或地点请求时，"
+        "才不要选择能力。\n"
+        "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。"
+    )
+    response = asyncio.run(call_deepseek(settings, prompt, budget=budget))
+    value = _decision_json(response.text)
+    if value is None:
+        raise ToolLoopError("能力决策不是有效 JSON，已拒绝执行。")
+    kind = value.get("kind")
+    if kind not in {"direct", "clarification", "capabilities"}:
+        raise ToolLoopError("能力决策类型未注册，已拒绝执行。")
+    selected = value.get("capability_ids", [])
+    if not isinstance(selected, list) or any(not isinstance(item, str) for item in selected):
+        raise ToolLoopError("能力决策的 capability_ids 无效。")
+    visible_ids = {item.capability_id for item in visible}
+    if any(item not in visible_ids for item in selected) or len(set(selected)) != len(selected):
+        raise ToolLoopError("模型选择了当前不可见或重复的能力。")
+    if kind == "capabilities" and not selected:
+        raise ToolLoopError("capabilities 决策必须选择至少一项能力。")
+    if kind != "capabilities" and selected:
+        # Models sometimes label a tool-using reply "direct"; capability_ids are
+        # validated against the visible set, so treat them as authoritative.
+        kind = "capabilities"
+    if "map_place_search" in selected and not has_location_scope(claim.input_message or claim.goal):
+        return {
+            "kind": "clarification",
+            "capability_ids": [],
+            "clarification": "请先告诉我需要查询的城市或位置范围。",
+            "reason": "后端校验发现地图查询缺少位置范围",
+            "decision_source": "deepseek_structured_worker",
+        }
+    raw_clarification = value.get("clarification")
+    clarification = (
+        raw_clarification.strip()
+        if isinstance(raw_clarification, str) and raw_clarification.strip()
+        else "请补充必要信息后再试。"
+    )
+    return {
+        "kind": kind,
+        "capability_ids": selected,
+        "clarification": clarification[:500] if kind == "clarification" else None,
+        "reason": str(value.get("reason"))[:500] if value.get("reason") else None,
+        "decision_source": "deepseek_structured_worker",
     }
 
 

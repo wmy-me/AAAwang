@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr
 RunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 RunExecutionType = Literal[
     "diagnostic",
+    "capability_decision",
     "direct_answer",
     "shopping_research",
     "shopping_agent",
