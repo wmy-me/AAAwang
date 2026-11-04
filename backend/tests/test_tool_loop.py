@@ -264,6 +264,27 @@ def test_multiple_tool_calls_are_rejected_before_execution() -> None:
     assert connection.calls == []
 
 
+def test_forced_tool_call_without_tool_call_fails_before_execution() -> None:
+    connection = FakeConnection()
+    client = FakeModelClient([model_message("我不想调用工具。")])
+
+    with pytest.raises(ToolLoopError, match="必需的工具调用"):
+        asyncio.run(
+            run_tool_loop(
+                settings(),
+                "test",
+                service_id="shopping",
+                allowed_tool_names={"search_products"},
+                model_client=cast(AsyncOpenAI, client),
+                mcp_client=cast(Any, FakeMcpClient(connection)),
+                force_tool_call=True,
+            )
+        )
+
+    assert client.completions.requests[0]["tool_choice"] == "required"
+    assert connection.calls == []
+
+
 def test_empty_result_is_returned_to_model_as_success() -> None:
     connection = FakeConnection(empty=True)
     probe = FakeModelClient([model_message("probe")])

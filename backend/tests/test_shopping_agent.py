@@ -201,3 +201,38 @@ def test_delegation_uses_only_discovery_tool_and_persists_source_facts() -> None
     assert connection.calls == [("search_products", {"keyword": "彩色铅笔", "limit": 2})]
     assert result.source["simulated"] is True
     assert result.source["tool"] == "shopping:search_products"
+
+
+def test_forced_discovery_skips_supervisor_and_requires_tool_call() -> None:
+    supervisor = FakeModel([message("已根据模拟商品查询结果整理回复。")])
+    discovery = FakeModel(
+        [
+            message(
+                tool=_model_tool_name("shopping:search_products"),
+                arguments=json.dumps({"keyword": "彩色铅笔", "limit": 2}),
+            ),
+            message("模拟候选：彩色铅笔套装，12.8 元。"),
+        ]
+    )
+    connection = FakeConnection()
+    result = asyncio.run(
+        run_shopping_agent(
+            settings(),
+            "彩色铅笔",
+            {"budget": 15},
+            model_client=supervisor,
+            discovery_model_client=discovery,
+            mcp_client=FakeMcp(connection),
+            force_discovery=True,
+        )
+    )
+
+    assert result.decision_type == "delegated_discovery"
+    assert result.delegated is True
+    assert result.mcp_call_count == 1
+    assert connection.calls == [
+        ("search_products", {"keyword": "彩色铅笔", "limit": 2})
+    ]
+    assert discovery.completions.requests[0]["tool_choice"] == "required"
+    assert len(supervisor.completions.requests) == 1
+    assert result.source["model_requests"] == 3

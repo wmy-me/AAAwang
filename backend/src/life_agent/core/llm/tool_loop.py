@@ -119,6 +119,7 @@ async def run_tool_loop(
     model_client: AsyncOpenAI | None = None,
     mcp_client: McpClient | None = None,
     total_timeout_seconds: float = 90.0,
+    force_tool_call: bool = False,
 ) -> ToolLoopResult:
     """Run one discovery, up to two model requests, and at most one MCP call."""
     if not prompt.strip():
@@ -148,7 +149,8 @@ async def run_tool_loop(
                     active_model,
                     messages=messages,
                     tools=model_tools,
-                    tool_choice="auto",
+                    tool_choice="required" if force_tool_call else "auto",
+                    parallel_tool_calls=False if force_tool_call else None,
                     max_tokens=256,
                 )
                 if not first.choices:
@@ -156,6 +158,8 @@ async def run_tool_loop(
                 message = first.choices[0].message
                 tool_calls = list(message.tool_calls or [])
                 if not tool_calls:
+                    if force_tool_call:
+                        raise ToolLoopError("模型未返回必需的工具调用，已停止执行。")
                     answer = (message.content or "").strip()
                     if not answer:
                         raise LLMRequestError("DeepSeek 返回空响应：没有文本或工具调用。")
@@ -167,7 +171,9 @@ async def run_tool_loop(
                         discovered_tools=tuple(tool.qualified_name for tool in discovered),
                     )
                 if len(tool_calls) != 1:
-                    raise ToolLoopError("模型返回多个工具调用，超过本轮一次调用上限。")
+                    if not force_tool_call:
+                        raise ToolLoopError("模型返回多个工具调用，超过本轮一次调用上限。")
+                    tool_calls = tool_calls[:1]
 
                 tool_call = tool_calls[0]
                 exposed = mapping.get(tool_call.function.name)

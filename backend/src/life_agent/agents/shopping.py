@@ -247,8 +247,20 @@ def _build_graph(
     model_client: AsyncOpenAI | None,
     discovery_model_client: AsyncOpenAI | None,
     mcp_client: McpClient | Any | None,
+    *,
+    force_discovery: bool = False,
 ):
     async def supervisor(state: _ShoppingState) -> dict[str, object]:
+        if force_discovery:
+            # The trusted capability router already selected product discovery.
+            # Skip a second model decision but keep the same graph delegation edge.
+            return {
+                "decision_type": "delegated_discovery",
+                "delegated": True,
+                "answer": "",
+                "discovery_request": {"limit": 5},
+                "supervisor_requests": 0,
+            }
         decision, answer, request, requests = await _supervisor_decide(
             settings, state["goal"], state["conditions"], model_client
         )
@@ -262,8 +274,18 @@ def _build_graph(
 
     async def discovery(state: _ShoppingState) -> dict[str, object]:
         request = state["discovery_request"]
+        keyword = request.get("keyword")
+        keyword_instruction = (
+            f"必要查询关键词：{keyword}\n"
+            if keyword
+            else (
+                "请从购物目标中提取一个简短商品关键词后调用工具；"
+                "关键词只写商品名称（2–10 个汉字，例如“奖品”“文具”“水杯”），"
+                "不要包含城市、地点、预算、人数或整句。\n"
+            )
+        )
         prompt = (
-            f"购物目标：{state['goal']}\n必要查询关键词：{request['keyword']}\n"
+            f"购物目标：{state['goal']}\n{keyword_instruction}"
             f"已知条件：{json.dumps(state['conditions'], ensure_ascii=False)}\n"
             f"最多返回 {request.get('limit', 5)} 个候选。"
         )
@@ -275,6 +297,7 @@ def _build_graph(
             model_client=discovery_model_client,
             mcp_client=mcp_client,
             total_timeout_seconds=90.0,
+            force_tool_call=force_discovery,
         )
         return {"discovery": result, "mcp_call_count": result.tool_calls}
 
@@ -329,12 +352,17 @@ async def run_shopping_agent(
     model_client: AsyncOpenAI | None = None,
     discovery_model_client: AsyncOpenAI | None = None,
     mcp_client: McpClient | Any | None = None,
+    force_discovery: bool = False,
 ) -> ShoppingAgentResult:
     """Run one bounded supervisor/discovery graph without a checkpointer."""
     if not goal.strip():
         raise LLMRequestError("购物目标不能为空。")
     result = await _build_graph(
-        settings, model_client, discovery_model_client, mcp_client
+        settings,
+        model_client,
+        discovery_model_client,
+        mcp_client,
+        force_discovery=force_discovery,
     ).ainvoke({"goal": goal, "conditions": dict(conditions)})
     decision = str(result["decision_type"])
     return ShoppingAgentResult(

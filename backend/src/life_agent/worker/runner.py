@@ -9,6 +9,7 @@ import socket
 import threading
 import time
 import uuid
+from dataclasses import replace
 
 from life_agent.core.config import get_settings
 from life_agent.core.llm import LLMRequestError, ToolLoopError, run_tool_loop
@@ -158,8 +159,19 @@ _MAP_CITY_PATTERNS = (
         r"^(?:帮我|请|麻烦)?\s*(?:查询|查找|搜索)(?:一下)?\s*"
         r"([一-鿿]{2,8}?)(?=(?:的)?(?:附近|周边|礼品|超市|商场|门店|店铺|地点|位置|店))"
     ),
+    re.compile(
+        r"(?:看看|看一下|查查|找找|查询|查找|搜索|找)\s*"
+        r"([一-鿿]{2,8}?)(?:市|区|县)?(?:附近|周边)"
+    ),
     re.compile(r"^([一-鿿]{2,8}?)(?:市|区|县)?(?:附近|周边)"),
 )
+
+_CLAUSE_SPLIT = re.compile(r"[，。；;,]|(?:并|同时|以及|然后|再)")
+_MAP_CLAUSE_HINT = re.compile(r"(附近|周边|地点|位置|地图|礼品店|哪里买)")
+
+
+def _clauses(text: str) -> list[str]:
+    return [clause.strip() for clause in _CLAUSE_SPLIT.split(text) if clause.strip()]
 
 
 def _map_request(goal: str, input_message: str | None) -> tuple[str, str | None]:
@@ -168,7 +180,21 @@ def _map_request(goal: str, input_message: str | None) -> tuple[str, str | None]
         (match.group(1) for pattern in _MAP_CITY_PATTERNS if (match := pattern.search(text))),
         None,
     )
-    query = text.replace(city, " ", 1) if city else text
+    clauses = _clauses(text)
+    target = next(
+        (
+            clause
+            for clause in clauses
+            if _MAP_CLAUSE_HINT.search(clause) and (city is None or city in clause)
+        ),
+        None,
+    )
+    if target is None:
+        target = next(
+            (clause for clause in clauses if _MAP_CLAUSE_HINT.search(clause)),
+            text,
+        )
+    query = target.replace(city, " ", 1) if city else target
     query = re.sub(
         r"(?:帮我|请|麻烦|查询|查找|搜索|搜一下|找一下|看看|看一下|找|在|到|位于|"
         r"附近的|附近|周边的|周边|的|地点|位置|哪里买|有卖)",
@@ -211,7 +237,7 @@ def _run_map_places_with_lease(settings, claim):
     }
 
 
-def _run_shopping_agent_with_lease(settings, claim):
+def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = False):
     from life_agent.agents.shopping import run_shopping_agent
 
     stop = threading.Event()
@@ -239,7 +265,12 @@ def _run_shopping_agent_with_lease(settings, claim):
         try:
             result = asyncio.run(
                 asyncio.wait_for(
-                    run_shopping_agent(settings, goal, claim.conditions),
+                    run_shopping_agent(
+                        settings,
+                        goal,
+                        claim.conditions,
+                        force_discovery=force_discovery,
+                    ),
                     timeout=settings.shopping_agent_total_timeout_seconds,
                 )
             )
@@ -342,8 +373,24 @@ def _run_capability_router_with_lease(settings, claim):
         map_result = _run_map_places_with_lease(settings, claim)
     if "shopping_product_discovery" in selected:
         started = time.monotonic()
-        shopping_agent = _run_shopping_agent_with_lease(settings, claim)
-        from life_agent.modules.shopping_plans.service import build_artifacts
+        shopping_text = claim.input_message or claim.goal
+        shopping_goal = "，".join(
+            clause
+            for clause in _clauses(shopping_text)
+            if not _MAP_CLAUSE_HINT.search(clause)
+        )
+        shopping_claim = replace(
+            claim,
+            goal=shopping_goal or shopping_text,
+            input_message=None,
+        )
+        shopping_agent = _run_shopping_agent_with_lease(
+            settings, shopping_claim, force_discovery=True
+        )
+        from life_agent.modules.shopping_plans.service import (
+            build_artifacts,
+            validated_plan_answer,
+        )
 
         source = dict(shopping_agent.source)
         source.update(
@@ -355,7 +402,7 @@ def _run_capability_router_with_lease(settings, claim):
         )
         artifacts = build_artifacts(source, claim.conditions)
         shopping_result = {
-            "answer": shopping_agent.answer,
+            "answer": validated_plan_answer(artifacts) or shopping_agent.answer,
             "source": source,
             "execution_version": "019-v1",
             "decision_type": shopping_agent.decision_type,
