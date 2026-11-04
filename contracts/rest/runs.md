@@ -16,7 +16,9 @@ Run 由当前用户明确为一个 task 的明确 revision 创建。身份只来
 
 `execution_type` 默认为 `diagnostic`，保留007–009的无副作用语义；`shopping_research` 保留010的有限工具循环；`shopping_agent` 使用主 Agent 委派信息发现 Agent；`map_places` 只接受 shopping task，使用后端配置的地图 service/tool，不能由客户端提交 URL、工具名或凭据。服务端在同一事务中锁定 task、核对 `expected_revision`，读取该版本不可变 revision，并复制完整 `conditions` 快照。响应包含 `task_revision_id`、`revision`、`conditions`、执行类型和 `status=queued`。之后 task 的 current revision 变化不影响该 run。
 
-幂等键在同一 task 内唯一。相同 task、相同键和相同 revision 的重试返回同一 run；同一 task 使用该键但请求版本不同返回 `409`。
+019 新增受信 `capability_ids` 快照。当前注册能力为 `shopping_product_discovery`（shopping/`search_products`，只读）和 `map_place_search`（map/`maps_text_search`，只读）。单能力继续使用 `shopping_agent` 或 `map_places`；同时选择两者时使用一个 `capability_router` Run，在同一 Run 内分别保存商品与地点结果，不拆成隐藏 Run。能力 ID 由服务端根据任务轮次生成，客户端不能提交服务、工具、URL 或凭据；Worker claim 后再次核对注册表、任务域、只读属性和允许组合。
+
+幂等键在同一 task 内唯一。相同 task、相同键、相同 revision、执行类型和能力快照的重试返回同一 run；其中任一项不同返回 `409`。
 
 ## 查询与取消
 

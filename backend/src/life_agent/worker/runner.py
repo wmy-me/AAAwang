@@ -13,6 +13,7 @@ import uuid
 from life_agent.core.config import get_settings
 from life_agent.core.llm import LLMRequestError, ToolLoopError, run_tool_loop
 from life_agent.db.session import get_session_factory
+from life_agent.modules.capabilities import get_capability
 from life_agent.modules.runs.service import (
     cancel_claim,
     claim_run,
@@ -45,6 +46,7 @@ def run_once(worker_id: str) -> bool:
         try:
             if is_cancel_requested(db, claim):
                 return cancel_claim(db, claim)
+            _validate_claim_capabilities(claim)
             if claim.execution_type == "shopping_research":
                 result = _run_shopping_with_lease(settings, claim)
                 with get_session_factory()() as result_db:
@@ -106,6 +108,17 @@ def run_once(worker_id: str) -> bool:
                     if is_cancel_requested(result_db, claim):
                         return cancel_claim(result_db, claim)
                     return complete_claim(result_db, claim, shopping_result=result)
+            if claim.execution_type == "capability_router":
+                result, artifacts = _run_capability_router_with_lease(settings, claim)
+                with get_session_factory()() as result_db:
+                    if is_cancel_requested(result_db, claim):
+                        return cancel_claim(result_db, claim)
+                    return complete_claim(
+                        result_db,
+                        claim,
+                        shopping_result=result,
+                        shopping_artifacts=artifacts,
+                    )
             return complete_claim(
                 db,
                 claim,
@@ -294,6 +307,72 @@ def _safe_error(error: Exception) -> str:
     if isinstance(error, (ToolLoopError, LLMRequestError)):
         return str(error)[:500]
     return "shopping execution failed; external call history may be uncertain"
+
+
+def _validate_claim_capabilities(claim) -> None:
+    """Re-check the trusted capability snapshot immediately before execution."""
+    for capability_id in claim.capability_ids:
+        capability = get_capability(capability_id)
+        if capability.task_domain != "shopping" or not capability.read_only:
+            raise ToolLoopError("能力不允许在当前购物任务中执行。")
+    if claim.execution_type == "map_places" and claim.capability_ids not in (
+        (),
+        ("map_place_search",),
+    ):
+        raise ToolLoopError("地点 Run 的能力快照无效。")
+    if claim.execution_type == "shopping_agent" and claim.capability_ids not in (
+        (),
+        ("shopping_product_discovery",),
+    ):
+        raise ToolLoopError("商品 Run 的能力快照无效。")
+    if claim.execution_type == "capability_router" and claim.capability_ids not in (
+        ("map_place_search", "shopping_product_discovery"),
+        ("shopping_product_discovery", "map_place_search"),
+    ):
+        raise ToolLoopError("组合 Run 缺少能力快照。")
+
+
+def _run_capability_router_with_lease(settings, claim):
+    """Run the selected read-only capabilities once, inside one durable Run."""
+    selected = set(claim.capability_ids)
+    map_result = None
+    shopping_result = None
+    artifacts = None
+    if "map_place_search" in selected:
+        map_result = _run_map_places_with_lease(settings, claim)
+    if "shopping_product_discovery" in selected:
+        started = time.monotonic()
+        shopping_agent = _run_shopping_agent_with_lease(settings, claim)
+        from life_agent.modules.shopping_plans.service import build_artifacts
+
+        source = dict(shopping_agent.source)
+        source.update(
+            {
+                "delegations": 1 if shopping_agent.delegated else 0,
+                "elapsed_seconds": round(time.monotonic() - started, 3),
+                "stop_reason": "completed",
+            }
+        )
+        artifacts = build_artifacts(source, claim.conditions)
+        shopping_result = {
+            "answer": shopping_agent.answer,
+            "source": source,
+            "execution_version": "019-v1",
+            "decision_type": shopping_agent.decision_type,
+            "delegated": shopping_agent.delegated,
+            "mcp_call_count": shopping_agent.mcp_call_count,
+        }
+    if map_result is not None and shopping_result is not None:
+        shopping_result["answer"] = f"{map_result['answer']}\n{shopping_result['answer']}"
+        shopping_result["map_source"] = map_result["source"]
+        shopping_result["places"] = map_result["places"]
+        shopping_result["query"] = map_result["query"]
+        shopping_result["city"] = map_result["city"]
+        shopping_result["observed_at"] = map_result["observed_at"]
+        shopping_result["mcp_call_count"] = int(shopping_result["mcp_call_count"]) + int(
+            map_result["mcp_call_count"]
+        )
+    return shopping_result or map_result, artifacts
 
 
 def run_forever(worker_id: str) -> None:

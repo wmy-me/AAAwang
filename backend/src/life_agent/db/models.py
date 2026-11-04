@@ -220,6 +220,7 @@ class Run(Base):
     conditions: Mapped[dict[str, object]] = mapped_column(JSON)
     idempotency_key: Mapped[str] = mapped_column(String(128))
     execution_type: Mapped[str] = mapped_column(String(32), default="diagnostic")
+    capability_ids: Mapped[list[str] | None] = mapped_column(JSON)
     status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

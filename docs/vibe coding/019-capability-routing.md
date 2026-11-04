@@ -1,6 +1,6 @@
 # 019：购物主 Agent 的受控能力路由与工具白名单
 
-- 状态：待执行；本文件定义下一步，不表示代码已实现
+- 状态：实现中；受控能力路由、能力快照、Worker 白名单和组合 Run 初版已实现，真实闭环验收尚未完成
 - 所属阶段：P4 真实信息与更多采买场景
 - 起始基线：`main` / `2e1b4f92c6c22fd377530f4e032e3aa6d60cf412`；开始前核对最新 HEAD
 - 前置：[018 报告](../reports/018-map-mcp-place-search-report.md)、[Agent 架构](../design/agent-architecture.md)、[Tools 与 MCP](../design/tools-and-mcp.md)、[Agent 预算规则](../design/agent-execution-rules.md)

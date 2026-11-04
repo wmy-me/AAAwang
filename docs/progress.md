@@ -1,3 +1,9 @@
+## 019 购物主 Agent 的受控能力路由与工具白名单
+
+- 已完成首版受信能力注册表、结构化服务端路由、`capability_ids` Run 快照、`capability_router` 单 Run 组合执行、幂等能力快照比较和 Worker claim 后二次白名单校验。
+- 已覆盖商品、地图、缺城市追问和商品+地图组合的替身测试；后端全量 `102 passed`，Ruff、compileall、Alembic check、前端 lint/build 通过；迁移已应用至 `20261104_0015`。
+- 组合 Run 的网页已同时读取商品 artifacts 与地点结果，地图来源与商品来源分开保存。真实 DeepSeek、独立 Worker、真实 PostgreSQL、高德 MCP、Java 商品 MCP 和浏览器的 019 四路径尚未重新验收；共享预算、MCP 动态发现交集、模型 schema 决策和无工具直答仍待完成，不能标记 019 整体完成。详见[报告](reports/019-capability-routing-report.md)。
+
 ## 018 真实地图 MCP 地点查询
 
 - 已完成最小真实闭环：已接入高德官方 Streamable HTTP MCP，配置拆分为 `MAP_MCP_URL`、`MAP_MCP_KEY`、`MAP_MCP_TIMEOUT_SECONDS`、`MAP_MCP_ENABLED` 和 `MAP_MCP_TOOL_NAME`；真实 Key 仅保留在本地 `.env`。

@@ -350,12 +350,15 @@ function App() {
       const currentRun = runs.find((item) => item.id === runId);
       const nextResult = await api.result(runId);
       setResult(nextResult);
-      if (currentRun?.execution_type === "map_places") {
-        setMapPlaces(await api.mapPlaces(runId));
-        setArtifacts(null);
-      } else {
-        setArtifacts(await api.shoppingArtifacts(runId));
-      }
+      const isMapRun =
+        currentRun?.execution_type === "map_places" ||
+        currentRun?.execution_type === "capability_router";
+      const isShoppingRun =
+        currentRun?.execution_type === "capability_router" ||
+        currentRun?.execution_type === "shopping_agent" ||
+        currentRun?.execution_type === "shopping_research";
+      setMapPlaces(isMapRun ? await api.mapPlaces(runId) : []);
+      setArtifacts(isShoppingRun ? await api.shoppingArtifacts(runId) : null);
       if (task) {
         const history = await api.shoppingAdjustments(task.id);
         setAdjustments(history.items);
@@ -719,7 +722,7 @@ function App() {
             />
           )}
           <footer className="page-foot">
-            <span>本工作台不自动识别自然语言意图，也不代表真实下单。</span>
+            <span>本工作台只按受控能力路由执行，也不代表真实下单。</span>
             <span>条件、Run 与结果均由服务端保存。</span>
           </footer>
         </section>

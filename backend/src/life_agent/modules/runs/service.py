@@ -61,6 +61,7 @@ class RunClaim:
     goal: str
     input_message: str | None
     execution_type: str
+    capability_ids: tuple[str, ...]
     worker_id: str
     fencing_token: int
 
@@ -103,6 +104,7 @@ def create_run(
     expected_revision: int,
     idempotency_key: str,
     execution_type: str = "diagnostic",
+    capability_ids: list[str] | tuple[str, ...] | None = None,
     input_message_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> Run:
@@ -114,9 +116,20 @@ def create_run(
     )
     if task is None:
         raise RunNotFoundError
-    if execution_type not in {"diagnostic", "shopping_research", "shopping_agent", "map_places"}:
+    if execution_type not in {
+        "diagnostic",
+        "shopping_research",
+        "shopping_agent",
+        "map_places",
+        "capability_router",
+    }:
         raise ValueError("unsupported run execution type")
-    if execution_type in {"shopping_research", "shopping_agent", "map_places"} and task.domain != "shopping":
+    if execution_type in {
+        "shopping_research",
+        "shopping_agent",
+        "map_places",
+        "capability_router",
+    } and task.domain != "shopping":
         raise ValueError("shopping execution requires a shopping task")
     existing = db.scalar(
         select(Run).where(Run.task_id == task_id, Run.idempotency_key == idempotency_key)
@@ -126,6 +139,8 @@ def create_run(
             existing.owner_id != owner_id
             or existing.revision != expected_revision
             or existing.execution_type != execution_type
+            or tuple(existing.capability_ids or ())
+            != tuple(capability_ids or ())
         ):
             raise IdempotencyConflictError
         return existing
@@ -152,6 +167,7 @@ def create_run(
         idempotency_key=idempotency_key,
         input_message_id=input_message_id,
         execution_type=execution_type,
+        capability_ids=list(capability_ids) if capability_ids is not None else None,
         status="queued",
         attempt=0,
         fencing_token=0,
@@ -253,9 +269,18 @@ def claim_run(
         goal=goal,
         input_message=input_message,
         execution_type=run.execution_type,
+        capability_ids=tuple(run.capability_ids or ()),
         worker_id=worker_id,
         fencing_token=run.fencing_token,
     )
+
+
+def _map_source(shopping_result: dict[str, object]) -> dict[str, object]:
+    """Keep map attribution separate from a combined shopping result."""
+    source = shopping_result.get("map_source")
+    if isinstance(source, dict):
+        return source
+    return dict(shopping_result.get("source", {}))
 
 
 def _finish_claim(
@@ -310,13 +335,13 @@ def _finish_claim(
                         run_id=run.id,
                     )
                 )
-        if run.execution_type == "map_places":
+        if run.execution_type == "map_places" or shopping_result.get("places") is not None:
             query = str(shopping_result.get("query", ""))[:120]
             city = str(shopping_result.get("city", ""))[:120]
             observed_at = datetime.fromisoformat(
                 str(shopping_result.get("observed_at", now.isoformat()))
             )
-            source = dict(shopping_result.get("source", {}))
+            source = _map_source(shopping_result)
             for place in shopping_result.get("places", []):
                 name = str(place.get("name") or "未命名地点")[:240]
                 address = place.get("address")
@@ -533,7 +558,12 @@ def get_shopping_result(
     db: Session, owner_id: uuid.UUID, run_id: uuid.UUID
 ) -> ShoppingRunResult:
     run = _owned_run(db, owner_id, run_id)
-    if run.execution_type not in {"shopping_research", "shopping_agent", "map_places"}:
+    if run.execution_type not in {
+        "shopping_research",
+        "shopping_agent",
+        "map_places",
+        "capability_router",
+    }:
         raise RunNotFoundError
     result = db.scalar(
         select(ShoppingRunResult).where(ShoppingRunResult.run_id == run_id)

@@ -8,7 +8,13 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
 RunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
-RunExecutionType = Literal["diagnostic", "shopping_research", "shopping_agent", "map_places"]
+RunExecutionType = Literal[
+    "diagnostic",
+    "shopping_research",
+    "shopping_agent",
+    "map_places",
+    "capability_router",
+]
 RunEventType = Literal[
     "run.queued",
     "run.running",
@@ -39,6 +45,7 @@ class RunResponse(BaseModel):
     conditions: dict[str, object]
     idempotency_key: str
     execution_type: RunExecutionType
+    capability_ids: list[str] | None
     status: RunStatus
     created_at: datetime
     started_at: datetime | None

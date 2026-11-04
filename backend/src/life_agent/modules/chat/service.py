@@ -9,6 +9,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from life_agent.db.models import Conversation, Message, Run, Task, TaskRevision
+from life_agent.modules.capabilities import route_task_turn
 from life_agent.modules.runs.service import create_run
 from life_agent.modules.tasks.consistency import (
     GoalConflictError,
@@ -151,14 +152,12 @@ def _infer_conditions(
     return validate_conditions("shopping", merged)
 
 
-_MAP_REQUEST_PATTERN = re.compile(
-    r"(?:地点|附近|周边|位置|地图|哪里买|礼品店)"
-    r"|(?:(?:在|到|位于)\s*[^，。；;,\s]{2,20}?\s*(?:找|查|搜|看))"
-)
-
-
 def _is_map_request(content: str) -> bool:
-    return bool(_MAP_REQUEST_PATTERN.search(content))
+    decision = route_task_turn(content)
+    return "map_place_search" in decision.capability_ids or (
+        decision.clarification is not None
+        and "城市或位置范围" in decision.clarification
+    )
 
 
 def submit_turn(
@@ -226,15 +225,24 @@ def submit_turn(
     )
     db.add(message)
     db.flush()
-    map_request = _is_map_request(content)
+    decision = route_task_turn(content)
+    map_request = "map_place_search" in decision.capability_ids or _is_map_request(content)
+    capability_ids = list(decision.capability_ids)
+    if len(capability_ids) > 1:
+        execution_type = "capability_router"
+    elif "map_place_search" in capability_ids or map_request:
+        execution_type = "map_places"
+    else:
+        execution_type = "shopping_agent"
     run = create_run(
         db,
         owner_id,
         task.id,
         expected_revision,
         f"turn:{client_turn_id}",
-        "map_places" if map_request else "shopping_agent",
+        execution_type,
         input_message_id=message.id,
+        capability_ids=capability_ids,
         commit=False,
     )
     message.run_id = run.id
