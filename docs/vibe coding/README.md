@@ -50,6 +50,7 @@
 | 016 | [已选购物任务的方案调整与条件一致性](016-shopping-plan-adjustment.md) | 已完成；不可变调整、并发/幂等/权限、真实外部/浏览器闭环，以及 017 补齐的目标冲突提示与 Run 前门禁均已验收，见[报告](../reports/016-shopping-plan-adjustment-report.md) |
 | 017 | [任务目标与结构化条件一致性](017-task-goal-consistency.md) | 已完成；目标快照、冲突 409、双入口 Run 前门禁、迁移、浏览器冲突处理与真实 DeepSeek/MCP 新 Run 闭环均通过，见[报告](../reports/017-task-goal-consistency-report.md) |
 | 018 | [真实地图 MCP 地点查询最小接入](018-map-mcp-place-search.md) | 已完成最小真实闭环；高德 MCP、独立 Worker、map_places Run、PostgreSQL 持久化、刷新、跨账号隔离、错误分类和地点路由均已验收；完整主协调 Graph 与动态工具注册不在本任务范围，见[报告](../reports/018-map-mcp-place-search-report.md) |
+| 019 | [购物主 Agent 的受控能力路由与工具白名单](019-capability-routing.md) | 待执行；基于 018 的商品/地图能力建立按需条件路由与任务工具白名单 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
