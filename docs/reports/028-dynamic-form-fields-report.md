@@ -2,7 +2,7 @@
 
 ## 结论
 
-028 部分完成：动态字段已有实现和一个真实模型/Worker/数据库场景；网页实际填写提交、第二个真实场景及动态字段经 revision 接口写入的校验边界尚待补证。此前 `8bebb53` 的版本仍把字段限制在预设注册表；本轮已改为“模型生成业务字段、服务端校验受控 schema、用户确认后写入 revision”，并记录真实模型/Worker/PostgreSQL 场景及 Chrome 打开、刷新和接口读取。同时保留 021 的 shopping 默认四字段、任务 revision、确认幂等、历史读取和预算复算语义。未新增数据库迁移：`TaskRevision.conditions` 与 `DynamicFormProposal.schema/confirmed_values` 已是 JSON 快照。
+028 已完成：动态字段实现、两个真实 DeepSeek 场景、独立 Worker/PostgreSQL、真实浏览器填写提交与刷新重读，以及 proposal/revision 边界均已验证。此前 `8bebb53` 的版本仍把字段限制在预设注册表；当前实现改为“模型生成业务字段、服务端校验受控 schema、用户确认后写入 revision”。同时保留 021 的 shopping 默认四字段、任务 revision、确认幂等、历史读取和预算复算语义。未新增数据库迁移：`TaskRevision.conditions` 与 `DynamicFormProposal.schema/confirmed_values` 已是 JSON 快照。
 
 ## 实现
 
@@ -22,6 +22,7 @@
 - `uv run alembic check`：通过，数据库版本 `20261105_0019`，无新增迁移。
 - `npm run build`：通过。
 - `npm run lint`：通过，保留仓库已有 3 条 React Hook warning，未新增阻断错误。
+- 新增 proposal 边界专项：`uv run pytest -q tests/test_tasks.py` 为 `11 passed`；自定义单选/多选 proposal 的非法选项、未知字段在 revision 写入前失败，合法值才创建 revision，且失败无部分写入。
 
 专项覆盖包括受控单选/多选 schema、脚本标记拒绝、旧购物四字段 proposal、条件合并、revision、幂等和 run 回归。自动化测试使用 TestClient/SQLite 替身，不代表真实外部服务 exactly-once。
 
@@ -32,7 +33,10 @@
 - 真实提交选择：`color=黑色`、`fabric=尼龙`、`waterproof_level=高防水`、`hat_type=连帽`、`season=四季通用`。任务从 revision 1 进入 revision 2，条件快照只包含这些确认值；proposal 状态为 `confirmed`，消息与 Run 均关联同一 revision。
 - 后续真实 Run 使用 revision 2 条件，DeepSeek 选择 `shopping_product_discovery`，Worker 调用 shopping MCP；返回无匹配候选时明确标记模拟来源并不补造价格/库存，Run 最终 `completed`。
 - Chrome CDP 使用真实登录 session 打开前端并刷新；刷新后同源 API 读取到 `revision=2` 及上述五个条件，页面 title 为“生活采买智能体”、React root 正常存在。
+- 第二个真实目标为“轻量化徒步相机包”。DeepSeek/Worker 生成了此前未固定的 `capacity`、`protection_level`、`carry_system`、`rain_protection` 四个单选字段及各自场景选项；真实任务 `68314666-b0f7-43bf-8576-21581c055e92` 的 Run `6fd610df-be26-4f1a-bb60-dc2445a64fc8` 完成并持久化 proposal。Chrome 实际选择 `10-15L`、`加强防震`、`双肩背包`、`需要自带防雨罩`，提交后进入 revision 2；后续 Run 调用 shopping MCP 并完成，刷新后页面重新读到 revision 2、四个确认条件和完成结果。
+- 直接 `POST /tasks/{task_id}/revisions` 仍是用户主动编辑入口，允许通过通用动态条件边界写入未预设业务字段；它不接收或确认模型 proposal，不能替代表单确认。模型生成值只能通过绑定 task/revision 的 proposal schema 和 `_validate_values` 进入确认路径；新增测试覆盖错误选项、未知字段、合法值和无部分写入。
 - 真实测试中发现旧的 `color` 固定选项校验会丢弃整个动态 proposal，已移除该固定选项阻断；修复后重新启动 Worker、重新运行 DeepSeek、提交、Run 和 Chrome 刷新，全部通过。远端 `git pull --ff-only` 两次因 GitHub TLS 握手失败，当前 HEAD 为 `8bebb53`，未能取得更远端提交。
+- 最新 `git pull --ff-only` 已成功快进至 `fceb8f7`；本报告不再把此前的 TLS 失败描述为当前状态。
 
 ## 数据与安全决策
 

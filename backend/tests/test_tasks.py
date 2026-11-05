@@ -1,6 +1,7 @@
 """Focused API checks for private tasks and immutable condition revisions."""
 
 import secrets
+import uuid
 from collections.abc import Iterator
 
 import pytest
@@ -14,7 +15,11 @@ from life_agent.db.base import Base
 from life_agent.db.models import Task, TaskRevision
 from life_agent.db.session import get_db
 from life_agent.main import app
-from life_agent.modules.forms.service import FormValidationError, validate_model_schema
+from life_agent.modules.forms.service import (
+    FormValidationError,
+    persist_model_proposal,
+    validate_model_schema,
+)
 
 PASSWORD = f"test-only-{secrets.token_urlsafe(18)}"
 
@@ -441,6 +446,82 @@ def test_dynamic_form_merges_confirmed_values_with_existing_conditions(
         "budget": 200,
     }
     assert submitted.json()["run"]["goal"] == "Buy gifts"
+
+
+def test_dynamic_form_custom_proposal_validates_values_before_revision(
+    task_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = task_context
+    register_and_login(client, "alice")
+    conversation_id = create_conversation(client)
+    task = create_task(client, conversation_id, "shopping", "Choose a raincoat", {})
+    custom_schema = [
+        {
+            "id": "fabric_type",
+            "control": "single_select",
+            "label": "面料",
+            "reason": "筛选通勤面料",
+            "options": ["尼龙", "涤纶", "牛津布"],
+        },
+        {
+            "id": "weather_preferences",
+            "control": "multi_select",
+            "label": "天气偏好",
+            "reason": "筛选适合天气",
+            "options": ["小雨", "大雨", "大风"],
+        },
+    ]
+    with factory() as db:
+        proposal = persist_model_proposal(db, uuid.UUID(task["id"]), 1, custom_schema)
+        assert proposal is not None
+        db.commit()
+        proposal_id = str(proposal.id)
+
+    invalid_option = client.post(
+        f"/api/tasks/{task['id']}/form/submit",
+        json={
+            "proposal_id": proposal_id,
+            "expected_revision": 1,
+            "client_request_id": "custom-invalid-option",
+            "values": {"fabric_type": "皮革", "weather_preferences": ["小雨"]},
+        },
+    )
+    assert invalid_option.status_code == 422
+    assert client.get(f"/api/tasks/{task['id']}").json()["current_revision"] == 1
+
+    invalid_unknown = client.post(
+        f"/api/tasks/{task['id']}/form/submit",
+        json={
+            "proposal_id": proposal_id,
+            "expected_revision": 1,
+            "client_request_id": "custom-invalid-unknown",
+            "values": {
+                "fabric_type": "尼龙",
+                "weather_preferences": ["小雨"],
+                "owner_id": "forged",
+            },
+        },
+    )
+    assert invalid_unknown.status_code == 422
+    assert client.get(f"/api/tasks/{task['id']}").json()["current_revision"] == 1
+
+    submitted = client.post(
+        f"/api/tasks/{task['id']}/form/submit",
+        json={
+            "proposal_id": proposal_id,
+            "expected_revision": 1,
+            "client_request_id": "custom-valid",
+            "values": {
+                "fabric_type": "尼龙",
+                "weather_preferences": ["小雨", "大风"],
+            },
+        },
+    )
+    assert submitted.status_code == 201, submitted.json()
+    assert submitted.json()["task"]["conditions"] == {
+        "fabric_type": "尼龙",
+        "weather_preferences": ["小雨", "大风"],
+    }
 
 
 def test_dynamic_form_rejects_stale_revision_and_cross_account_access(
