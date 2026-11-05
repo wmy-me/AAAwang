@@ -1,7 +1,7 @@
 ## 023 高德 MCP 天气能力（部分完成/受阻）
 
 - 已接入真实高德 `maps_weather`：initialize、list_tools、上海 call_tool 均成功；新增天气能力路由、无城市澄清、共享预算 Worker 分支、天气快照迁移、私有读取 API 和网页展示。
-- 天气适配器、路由和地点回归自动测试通过；前端 lint/build 通过，lint 保留 3 条既有 Hook warning。完整真实 DeepSeek/独立 Worker/PostgreSQL/浏览器闭环、双账号隔离及天气专项取消/租约/预算证据尚待补齐，不能标记整体完成。详见[023报告](reports/023-amap-weather-mcp-report.md)。
+- 已完成真实 DeepSeek、独立 Worker、PostgreSQL、真实高德 MCP、SSE 和双账号隔离天气闭环；修复并测试了 `请查询上海天气` 的城市解析，后端全量 `143 passed`，前端 lint/build 通过（保留 3 条既有 Hook warning）。浏览器交互/刷新和天气专项故障、取消、租约、预算逐项证据尚待补齐，不能标记整体完成。详见[023报告](reports/023-amap-weather-mcp-report.md)。
 
 ## 022 Agent 职责与包结构整理（已完成）
 

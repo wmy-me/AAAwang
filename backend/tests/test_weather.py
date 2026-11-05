@@ -9,6 +9,7 @@ from mcp.types import CallToolResult, Tool
 from life_agent.core.config import McpServiceConfig, Settings
 from life_agent.tools.maps import WeatherQueryError, normalize_forecasts, query_weather
 from life_agent.tools.mcp import McpAuthenticationError
+from life_agent.worker.runner import _weather_city
 
 
 def configured_settings() -> Settings:
@@ -102,3 +103,8 @@ def test_query_weather_maps_authentication_error() -> None:
             query_weather(configured_settings(), "上海", mcp_client=RaisingClient())
         )
     assert error.value.code == "authentication_failed"
+
+
+def test_weather_city_parser_removes_request_prefix() -> None:
+    assert _weather_city("查询城市天气", "请查询上海天气") == "上海"
+    assert _weather_city("查询城市天气", "北京的天气") == "北京"

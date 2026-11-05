@@ -82,13 +82,23 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
     if value is None:
         raise ToolLoopError("能力决策不是有效 JSON，已拒绝执行。")
     visible_ids = {item.capability_id for item in visible}
-    if _decision_needs_correction(value, visible_ids):
+    request_text = f"{claim.goal} {claim.input_message or ''}"
+    selected_ids = value.get("capability_ids", [])
+    weather_request_without_selection = (
+        "weather_forecast" in visible_ids
+        and has_weather_city(request_text)
+        and not (
+            isinstance(selected_ids, list) and "weather_forecast" in selected_ids
+        )
+    )
+    if _decision_needs_correction(value, visible_ids) or weather_request_without_selection:
         correction = (
             prompt
             + "\n上一轮输出："
             + response.text[:400]
             + "\n上一轮的 kind 与 reason/能力选择不一致。请重新输出严格 JSON；"
             "若 reason 表明需要采购能力，kind 必须是 capabilities 且 capability_ids 非空；"
+            "若用户明确询问城市天气且可见集合包含 weather_forecast，必须选择 weather_forecast；"
             "否则保持 direct/clarification 并说明理由。"
         )
         response = asyncio.run(
