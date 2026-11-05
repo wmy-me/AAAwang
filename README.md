@@ -1,64 +1,67 @@
-# 生活采买智能体
+# 生活采买智能体（AAAwang）
 
-基于大语言模型与 MCP 的多场景生活服务智能体，围绕日常采买、美食发现、出行规划和经营采购，提供有来源、可调整的推荐方案。Java 服务用于模拟外部 MCP、验证接入方式，为后续扩展其他 MCP 服务做准备。
+一个以自然语言任务为入口的生活采买 Agent 毕业设计项目。用户可以描述采买目标，系统按当前任务与已确认条件决定直接回答、追问，或调用受控的地点与商品查询能力；候选、来源、任务版本和方案可在网页中查看与调整。
 
-**当前阶段：P1 最小能力验证已完成，P2 正在建设。** 001–003 验证模型与 MCP；004–006 完成认证、私有对话与任务条件版本；007–010 完成持久化 Run、Worker、事件/SSE，以及真实 DeepSeek→shopping-mcp→PostgreSQL 购物 Run 闭环和中断恢复；011 完成开发数据库配置收敛；012 完成最小 LangGraph `shopping_agent` 主从委派及真实 API/Worker/PostgreSQL 闭环；013 完成网页登录与购物 Agent 工作台（含登出刷新和独立 SSE 补读）。完整多 Agent、自然语言多轮对话、方案和投稿仍未实现。
+**项目状态（截至 2026-11-05）：处于 P4 阶段。** [001–021 任务](docs/vibe%20coding/README.md)已按各自范围实施并记录验收；[022 Agent 职责与包结构整理](docs/vibe%20coding/022-agent-responsibility-structure.md)已写成执行文档，尚未实施。P4 的搜索、天气与更多生活场景，以及 P5 知识检索、P6 出行规划、P7 集成交付仍在后续计划中。详见[路线图](docs/roadmap.md)与[进度记录](docs/progress.md)。
 
-## 当前实现边界
+## 已实现
 
-- **Python 主后端**：FastAPI 提供健康、认证、私有对话、用户消息、任务与条件版本、持久化 Run/结果/事件接口；已有 DeepSeek、通用 MCP、有限工具循环、后台 Worker、PostgreSQL/Alembic 与服务端 Cookie 会话；LangGraph 已有最小 `shopping_agent` 主从委派图，无检查点或完整多 Agent。
-- **网页**：React + TypeScript + Vite 购物工作台，提供注册/登录、私有对话、购物任务条件版本、`shopping_agent` Run、取消、SSE 状态同步和受限结果展示；不包含自然语言多轮对话或伪造业务数据。
-- **Java 服务**：shopping-mcp 已提供 Streamable HTTP `/mcp` 与只读模拟商品查询；travel-mcp、local-life-mcp 仍只有健康检查骨架。
-- **数据库**：`infra/compose.yaml` 默认提供项目专用 pgvector PostgreSQL（宿主 `55432`）；MySQL、Redis、MinIO 仅在 `optional` profile 启用。Python 通过正式迁移持久化用户、登录会话、私有对话、用户消息、任务、条件版本、Run、Run 事件和购物结果，Java 不连接该数据库。
-- **未实现**：自然语言多轮对话、助手消息持久化、完整多 Agent、方案、投稿和订单等业务模块。
-
-## 技术栈与版本
-
-| 子工程 | 技术 | 本轮实际版本 | 版本依据 |
-| --- | --- | --- | --- |
-| `backend/` | Python + FastAPI + LangGraph，uv 管理 | Python 3.12.13；FastAPI 0.162.0；LangGraph 1.2.19；uvicorn 0.54.0 | `pyproject.toml`、`uv.lock`、`.python-version` |
-| `web/` | React + TypeScript + Vite，npm 管理 | Node 22.23.2；React 19.3.1；Vite 8.3.5；TypeScript 7.0.2 | `package.json`、`package-lock.json`、根目录 `.nvmrc` |
-| `mcp-services/` | Java + Spring Boot，Maven Wrapper | JDK 21.0.12；Spring Boot 4.1.2；Maven Wrapper 3.9.16 | 父子 `pom.xml`、`.mvn/wrapper/` |
-
-Node 22.23.2 满足 Vite 8 的 `^20.19.0 || >=22.12.0` 要求；本轮沿用本机已安装的受支持版本，而非文档建议的 Node 24。当前 create-vite 模板使用 **Oxlint** 作为 lint 工具（`npm run lint`），项目保留了模板自带的 lint 配置。
-
-## 项目目录
-
-| 路径 | 职责 |
+| 能力 | 当前范围 |
 | --- | --- |
-| `backend/` | Python 主系统，一个 uv 工程；未来 API 与 Worker 共享 |
-| `backend/src/life_agent/main.py` | FastAPI 应用入口 |
-| `backend/src/life_agent/core/config.py` | `pydantic-settings` 应用配置 |
-| `backend/src/life_agent/api/` | 健康、认证、私有对话与任务 API 路由及受信当前用户依赖 |
-| `backend/src/life_agent/agents/` | 主协调、信息发现、采买规划、出行子图预留目录 |
-| `backend/src/life_agent/tools/` | 已有通用 MCP 客户端；地图、搜索、知识检索预留 |
-| `backend/src/life_agent/modules/` | 已有认证、私有对话与任务版本服务；投稿、方案等模块待实现 |
-| `backend/src/life_agent/db/` | SQLAlchemy 用户、会话、对话、消息、任务、条件版本模型与请求级数据库会话 |
-| `backend/migrations/` | Alembic 正式数据库迁移 |
-| `backend/src/life_agent/worker/` | 后台执行器预留说明（无运行入口） |
-| `web/` | React + TypeScript + Vite 网页 |
-| `mcp-services/` | Maven 父工程与三个 Spring Boot 子模块 |
-| `contracts/` | 已有认证、私有对话、任务版本 REST 与 shopping MCP 工具契约；SSE 与卡片协议预留 |
-| `infra/` | 可选本地 PostgreSQL 与本地环境模板 |
-| `mobile/android/` | Android 扩展端说明（本轮不生成工程） |
-| `docs/` | 项目定位、设计、AI 执行任务、进度、报告与指南分层管理 |
+| 自然语言任务 | 已选购物任务的多轮对话、任务目标与条件版本；模型在受控能力集合中选择直答、追问、地点、商品或组合执行 |
+| 动态表单 | 模型按任务提出经服务端校验的字段；目前仅开放购物任务的 `item`、`people`、`quantity`、`budget`，不是每轮必填；确认后产生新任务版本、消息和 Run |
+| 候选与方案 | 查询 Java MCP 的**模拟商品**，保存候选快照；服务端复算数量、金额与预算，支持不可变方案调整及历史版本读取 |
+| 真实地点查询 | 高德地图 MCP 的 `maps_text_search` 已完成真实查询；地点结果单独保存并标记来源，不当作商品报价或库存 |
+| 执行与隔离 | PostgreSQL 持久化用户、任务、消息、Run、事件、表单、候选与结果；独立 Worker 负责租约、取消、fencing；SSE 推送状态，网页刷新可重读，私有资源按用户隔离 |
+| Agent 与工具约束 | 已有有限的 LangGraph 购物主从委派；模型决策受能力注册、服务配置、MCP `list_tools()` 发现结果、schema 白名单和单 Run 共享预算约束 |
 
-## 快速开始
+**数据边界：** Java `shopping-mcp` 返回演示用模拟商品及价格；高德只提供地点信息。系统当前用于查询与规划，尚无真实商品价格/库存、交易下单或支付能力。现有主从购物图不等于完整开放式多 Agent；`agents/coordinator/` 等包的职责归位属于待执行的 022。
 
-三个子工程可独立启动。完整步骤与常见问题见 [开发指南](docs/guides/development.md)。
+## 技术组成
 
-### 1. Python API
+- **Python 主后端：** FastAPI、LangGraph、DeepSeek、官方 MCP Python SDK、SQLAlchemy、Alembic；API 与独立 Worker 共用一个 uv 工程。
+- **网页：** React、TypeScript、Vite，提供登录、任务对话、动态表单、Run 状态、地点与购物方案展示。
+- **Java 模拟 MCP：** Spring Boot 多模块；`shopping-mcp` 有只读商品查询工具，`travel-mcp` 与 `local-life-mcp` 目前只有基础骨架。Java 服务用于模拟成熟外部 MCP 的接入；Python 客户端也已接入独立的真实高德地图 MCP。
+- **存储：** 项目 Compose 默认启动 PostgreSQL 17（pgvector 镜像），由 Alembic 管理当前业务表；镜像包含 pgvector 不表示 RAG 已实现。MySQL、Redis、MinIO 处于可选 profile，当前主线不依赖它们。
+
+## 本地运行
+
+需要 Python 3.12、uv、Node.js 22、npm、JDK 21、Docker Compose。以下命令从仓库根目录开始；API、Worker、网页与 Java 服务分别占用终端。所有真实密钥只放在被 Git 忽略的根目录 `.env`。
+
+### 1. 配置并启动数据库
 
 ```bash
+cp -n .env.example .env
+docker compose --env-file .env -f infra/compose.yaml up -d postgres --wait
 cd backend
 uv sync --locked
 uv run alembic upgrade head
+```
+
+默认 PostgreSQL 映射到宿主 `127.0.0.1:55432`。如使用现有 PostgreSQL，调整根目录 `.env` 中的 `DATABASE_URL`，按实际环境执行迁移即可；无需再启动项目 Compose。运行模型任务前设置 `LLM_API_KEY`。本地数据库、模型和服务可分别启动，但完整任务链路需要它们同时可用。
+
+### 2. 启动 API 与 Worker
+
+分别打开两个终端，在 `backend/` 执行：
+
+```bash
 uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 ```
 
-验证：<http://127.0.0.1:8000/api/health>、<http://127.0.0.1:8000/docs>
+```bash
+uv run python -m life_agent.worker.runner
+```
 
-### 2. 网页
+API 健康检查：<http://127.0.0.1:8000/api/health>；接口文档：<http://127.0.0.1:8000/docs>。健康检查只证明 API 进程响应，不代表模型、MCP 或数据库联通。
+
+### 3. 启动模拟商品 MCP 与网页
+
+分别在新终端执行：
+
+```bash
+cd mcp-services
+./mvnw -pl shopping-mcp spring-boot:run
+```
 
 ```bash
 cd web
@@ -66,58 +69,46 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
-打开 <http://127.0.0.1:5173>，注册或登录后可创建私有对话、购物任务并运行 `shopping_agent`；API 未启动时页面显示真实错误。
+打开 <http://127.0.0.1:5173> 注册或登录，创建购物任务并通过对话提出需求。项目模板的 `MCP_SERVICES` 指向本地 `shopping-mcp`。如需真实地点查询，在本地 `.env` 设置 `MAP_MCP_KEY` 并将 `MAP_MCP_ENABLED` 设为 `true`；不要将密钥写入仓库、命令或报告。地图服务目前只验证 `maps_text_search`，其他高德工具不在已验收范围内。
 
-### 3. Java 服务（可选，独立启动）
+### 4. 基础检查
+
+```bash
+cd backend
+uv run pytest -q
+uv run ruff check src scripts tests
+uv run alembic check
+```
+
+```bash
+cd web
+npm run lint
+npm run build
+```
 
 ```bash
 cd mcp-services
-./mvnw -pl shopping-mcp spring-boot:run
-# 另外两个模块：travel-mcp、local-life-mcp
+./mvnw -B -ntp verify
 ```
 
-### 4. 可选的本地 PostgreSQL
+历史联调与验收结果以对应[执行报告](docs/reports/)为准；这些命令不会自动验证当前机器的 DeepSeek Key 或高德 Key。
 
-```bash
-cp -n .env.example .env
-docker compose --env-file .env -f infra/compose.yaml up -d postgres
-docker compose --env-file .env -f infra/compose.yaml ps
-```
+## 目录与文档
 
-Python 认证、私有对话与任务接口需要该数据库并先执行 Alembic 迁移；健康接口与应用导入不主动连接数据库。
+| 路径 | 用途 |
+| --- | --- |
+| `backend/src/life_agent/agents/` | 现有购物主从图；协调、发现、采买职责的包结构整理见 022 |
+| `backend/src/life_agent/modules/` | 认证、对话、任务、能力、表单、Run、方案等业务模块 |
+| `backend/src/life_agent/tools/` | 通用 MCP 客户端、地点适配器和预留工具目录 |
+| `backend/src/life_agent/worker/` | 独立数据库 Worker 与 Run 执行 |
+| `web/` | React 网页 |
+| `mcp-services/` | Java 模拟外部 MCP 服务 |
+| `infra/` | 项目本地数据库 Compose 与可选基础服务 |
+| `docs/vibe coding/` | 供 Claude、Codex 等执行者读取的编号任务 |
+| `docs/reports/` | 各任务的实现、真实联调和验收报告 |
 
-## 端口
+从[文档导航](docs/README.md)、[路线图](docs/roadmap.md)和[任务索引](docs/vibe%20coding/README.md)查看完整规划。最近阶段的证据见 [020 能力决策与预算报告](docs/reports/020-model-capability-budget-report.md)、[021 动态表单报告](docs/reports/021-dynamic-task-forms-report.md)。
 
-| 服务 | 地址 | 健康检查 |
-| --- | --- | --- |
-| 网页（Vite 开发服务器） | <http://127.0.0.1:5173> | 页面可打开 |
-| Python API | <http://127.0.0.1:8000> | `/api/health`、`/docs` |
-| shopping-mcp | <http://127.0.0.1:8101> | `/actuator/health` |
-| travel-mcp | <http://127.0.0.1:8102> | `/actuator/health` |
-| local-life-mcp | <http://127.0.0.1:8103> | `/actuator/health` |
-| PostgreSQL（可选） | `127.0.0.1:55432` | 容器自身 `pg_isready` |
+## 后续方向
 
-所有服务默认只绑定回环地址，不对外网开放。
-
-## 开发文档
-
-- [文档导航](docs/README.md)
-- [项目定位与主线](docs/overview/project.md)
-- [开发路线图](docs/roadmap.md)
-- [当前进度](docs/progress.md)
-- [001 模型连通报告](docs/reports/001-llm-connection-report.md)
-- [002 MCP 接入报告](docs/reports/002-mcp-integration-report.md)
-- [003 工具调用报告](docs/reports/003-llm-mcp-tool-loop-report.md)
-- [004 账号认证执行任务](docs/vibe%20coding/004-auth-foundation.md)与[报告](docs/reports/004-auth-foundation-report.md)
-- [005 私有对话与消息执行任务](docs/vibe%20coding/005-private-conversations.md)与[报告](docs/reports/005-private-conversations-report.md)
-- [006 私有任务与条件版本执行任务](docs/vibe%20coding/006-task-revisions.md)与[报告](docs/reports/006-task-revisions-report.md)
-- [Claude / Codex 执行任务](docs/vibe%20coding/README.md)
-
-- [开发说明：安装、启动、检查与常见问题](docs/guides/development.md)
-- [初始化报告：实际完成项与验证结果](docs/reports/000-initialization-report.md)
-- [项目初始设计包](docs/design/生活采买智能体_项目初始设计包.md)
-- [课题项目计划书](docs/overview/生活采买智能体_课题项目计划书.md)
-
-## 明确留到下一阶段
-
-LangGraph 状态图、多 Agent、run/Worker、方案及其跨用户隔离、SSE、投稿与知识库、地图/搜索/天气、Android 工程、订单与支付，以及完整页面设计。详见 `docs/guides/development.md` 的“后续阶段”一节。
+先完成 [022 Agent 职责与包结构整理](docs/vibe%20coding/022-agent-responsibility-structure.md)，再按独立任务扩展搜索、天气及更多采买场景；投稿、文档解析与 RAG 检索属于 P5，出行规划属于 P6，全应用部署与论文演示属于 P7。交易、预订和支付是后续扩展，不属于当前查询规划闭环。
