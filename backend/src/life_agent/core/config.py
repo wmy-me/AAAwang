@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     map_mcp_timeout_seconds: float = Field(default=20.0, gt=0)
     map_mcp_enabled: bool = False
     map_mcp_tool_name: str = "maps_text_search"
+    map_mcp_weather_tool_name: str = "maps_weather"
     run_worker_lease_seconds: int = Field(default=30, gt=0)
     run_worker_poll_seconds: float = Field(default=1.0, gt=0)
     run_worker_max_attempts: int = Field(default=3, ge=1, le=20)
@@ -85,13 +86,22 @@ class Settings(BaseSettings):
                 raise ValueError("MAP_MCP_ENABLED=true 时必须配置 MAP_MCP_KEY。")
             if not self.map_mcp_tool_name.strip():
                 raise ValueError("MAP_MCP_TOOL_NAME 不能为空。")
+            if not self.map_mcp_weather_tool_name.strip():
+                raise ValueError("MAP_MCP_WEATHER_TOOL_NAME 不能为空。")
             self.mcp_services["map"] = McpServiceConfig(
                 url=self.map_mcp_url,
                 timeout_seconds=self.map_mcp_timeout_seconds,
                 enabled=True,
                 auth_token=self.map_mcp_key,
                 auth_query_parameter="key",
-                allowed_tool_names=(self.map_mcp_tool_name.strip(),),
+                allowed_tool_names=tuple(
+                    dict.fromkeys(
+                        (
+                            self.map_mcp_tool_name.strip(),
+                            self.map_mcp_weather_tool_name.strip(),
+                        )
+                    )
+                ),
             )
         return self
 

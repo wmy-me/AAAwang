@@ -109,9 +109,11 @@ async def search_places(
     config = settings.mcp_services.get(service_id)
     if config is None or not config.enabled:
         raise _error("not_configured")
-    if len(config.allowed_tool_names) != 1:
+    tool_name = settings.map_mcp_tool_name
+    if tool_name not in config.allowed_tool_names and len(config.allowed_tool_names) == 1:
+        tool_name = config.allowed_tool_names[0]
+    if tool_name not in config.allowed_tool_names:
         raise _error("protocol_error")
-    tool_name = config.allowed_tool_names[0]
     client = mcp_client or McpClient(settings)
     try:
         async with client.connect(service_id) as connection:

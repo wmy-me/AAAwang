@@ -20,6 +20,7 @@ from life_agent.db.models import (
     ShoppingRunResult,
     Task,
     TaskRevision,
+    WeatherSnapshot,
 )
 from life_agent.modules.tasks.consistency import (
     GoalConflictError,
@@ -125,6 +126,7 @@ def create_run(
         "shopping_research",
         "shopping_agent",
         "map_places",
+        "weather",
         "capability_router",
     }:
         raise ValueError("unsupported run execution type")
@@ -133,6 +135,7 @@ def create_run(
         "shopping_research",
         "shopping_agent",
         "map_places",
+        "weather",
         "capability_router",
     } and task.domain != "shopping":
         raise ValueError("shopping execution requires a shopping task")
@@ -390,6 +393,26 @@ def _finish_claim(
                         observed_at=observed_at,
                     )
                 )
+        if shopping_result.get("weather") is not None:
+            weather = dict(shopping_result["weather"])
+            source = dict(weather.get("source", {}))
+            queried_at = datetime.fromisoformat(
+                str(weather.get("queried_at", now.isoformat()))
+            )
+            db.add(
+                WeatherSnapshot(
+                    run_id=run.id,
+                    owner_id=run.owner_id,
+                    task_id=run.task_id,
+                    task_revision_id=run.task_revision_id,
+                    revision=run.revision,
+                    city=str(weather.get("city", ""))[:120],
+                    source_service=str(source.get("service_id", "map"))[:64],
+                    source_tool=str(source.get("tool", ""))[:128],
+                    queried_at=queried_at,
+                    forecasts=list(weather.get("forecasts", [])),
+                )
+            )
         if shopping_artifacts is not None:
             candidates_by_product: dict[str, ShoppingCandidate] = {}
             for draft in shopping_artifacts.get("candidates", []):
@@ -603,6 +626,7 @@ def get_shopping_result(
         "shopping_research",
         "shopping_agent",
         "map_places",
+        "weather",
         "capability_router",
         "capability_decision",
         "direct_answer",
@@ -627,6 +651,21 @@ def get_map_places(
             .order_by(MapPlace.name, MapPlace.id)
         )
     )
+
+
+def get_weather_snapshot(
+    db: Session, owner_id: uuid.UUID, run_id: uuid.UUID
+) -> WeatherSnapshot:
+    _owned_run(db, owner_id, run_id)
+    snapshot = db.scalar(
+        select(WeatherSnapshot).where(
+            WeatherSnapshot.run_id == run_id,
+            WeatherSnapshot.owner_id == owner_id,
+        )
+    )
+    if snapshot is None:
+        raise RunNotFoundError
+    return snapshot
 
 
 def get_shopping_artifacts(

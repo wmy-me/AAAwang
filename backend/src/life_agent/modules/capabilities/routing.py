@@ -58,6 +58,17 @@ _CAPABILITIES = {
         input_schema={"type": "object", "required": ["keywords"]},
         timeout_seconds=20.0,
     ),
+    "weather_forecast": CapabilitySpec(
+        capability_id="weather_forecast",
+        agent_id="discovery",
+        task_domain="shopping",
+        service_id="map",
+        allowed_tool_names=("maps_weather",),
+        read_only=True,
+        result_type="weather_forecast",
+        input_schema={"type": "object", "required": ["city"]},
+        timeout_seconds=20.0,
+    ),
 }
 
 _MAP_PATTERN = re.compile(
@@ -65,12 +76,19 @@ _MAP_PATTERN = re.compile(
     r"|(?:(?:在|到|位于)\s*[^，。；;,\s]{2,20}?\s*(?:找|查|搜|看))"
 )
 _PRODUCT_PATTERN = re.compile(r"(买|购买|商品|奖品|彩色铅笔|预算|数量|人数|候选|采购)")
+_WEATHER_PATTERN = re.compile(r"(天气|气温|温度|下雨|降雨|晴阴|预报)")
 _CITY_PATTERN = re.compile(
     r"(?:在|到|位于)\s*([^，。；;,\s]{2,20}?)(?=\s*(?:找|查|搜|看|的|附近|周边|有|$))"
     r"|(?:查询|查找|搜索)\s*([一-鿿]{2,8}?)(?=(?:的)?(?:附近|周边|礼品|超市|商场|门店|店铺|地点|位置|店))"
     r"|(?:看看|看一下|查查|找找|查询|查找|搜索|找)\s*([一-鿿]{2,8}?)(?:市|区|县)?(?:附近|周边)"
     r"|([一-鿿]{2,8}?)(?:市|区|县)?(?:附近|周边)"
 )
+_WEATHER_CITY_PATTERN = re.compile(
+    r"(?:查询|查|搜索|看看|看一下|了解|告诉我)?\s*"
+    r"([一-鿿]{2,12}?)(?:市)?\s*(?:的)?\s*(?:天气|气温|温度|预报|会下雨)"
+    r"|(?:天气|气温|温度|预报)\s*(?:查询|查|看)?\s*([一-鿿]{2,12}?)(?:市)?"
+)
+_WEATHER_NON_CITY_WORDS = {"怎么", "怎么样", "如何", "好吗", "可以吗"}
 
 
 def get_capability(capability_id: str) -> CapabilitySpec:
@@ -134,6 +152,14 @@ def has_location_scope(text: str) -> bool:
     return _has_city(text)
 
 
+def has_weather_city(text: str) -> bool:
+    """Return whether a weather request names a city or adcode-like scope."""
+    return any(
+        any(group and group not in _WEATHER_NON_CITY_WORDS for group in match.groups())
+        for match in _WEATHER_CITY_PATTERN.finditer(text)
+    )
+
+
 def route_task_turn(content: str, *, task_domain: str = "shopping") -> CapabilityDecision:
     """Choose trusted capabilities; model or user input cannot choose tools."""
     if task_domain != "shopping":
@@ -143,6 +169,7 @@ def route_task_turn(content: str, *, task_domain: str = "shopping") -> Capabilit
         return CapabilityDecision(RouteKind.CLARIFICATION, clarification="请告诉我需要查询或购买什么。")
     wants_map = bool(_MAP_PATTERN.search(text))
     wants_product = bool(_PRODUCT_PATTERN.search(text))
+    wants_weather = bool(_WEATHER_PATTERN.search(text))
     capability_ids: list[str] = []
     if wants_map:
         if not _has_city(text):
@@ -151,6 +178,13 @@ def route_task_turn(content: str, *, task_domain: str = "shopping") -> Capabilit
                 clarification="请先告诉我需要查询的城市或位置范围。",
             )
         capability_ids.append("map_place_search")
+    if wants_weather:
+        if not has_weather_city(text):
+            return CapabilityDecision(
+                RouteKind.CLARIFICATION,
+                clarification="请先告诉我需要查询天气的城市。",
+            )
+        capability_ids.append("weather_forecast")
     if wants_product:
         capability_ids.append("shopping_product_discovery")
     if not capability_ids:

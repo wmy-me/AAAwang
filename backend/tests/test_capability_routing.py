@@ -13,6 +13,7 @@ from life_agent.modules.capabilities import (
     [
         ("买彩色铅笔作为奖品", (RouteKind.CAPABILITIES, ("shopping_product_discovery",))),
         ("在上海找礼品店", (RouteKind.CAPABILITIES, ("map_place_search",))),
+        ("查询上海天气", (RouteKind.CAPABILITIES, ("weather_forecast",))),
         (
             "在上海找礼品店并给我推荐奖品",
             (RouteKind.CAPABILITIES, ("map_place_search", "shopping_product_discovery")),
@@ -27,6 +28,12 @@ def test_route_task_turn_selects_registered_capabilities(content, expected) -> N
 
 def test_map_request_without_city_asks_before_calling() -> None:
     decision = route_task_turn("找一家礼品店")
+    assert decision.kind is RouteKind.CLARIFICATION
+    assert decision.capability_ids == ()
+
+
+def test_weather_request_without_city_asks_before_calling() -> None:
+    decision = route_task_turn("天气怎么样")
     assert decision.kind is RouteKind.CLARIFICATION
     assert decision.capability_ids == ()
 

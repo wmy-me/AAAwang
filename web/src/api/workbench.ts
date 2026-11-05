@@ -1,4 +1,4 @@
-export type ApiErrorCode = 401 | 403 | 404 | 409 | 422 | 502 | 503
+export type ApiErrorCode = 401 | 403 | 404 | 409 | 422 | 502 | 503 | 504
 
 export class ApiError extends Error {
   status: number
@@ -77,7 +77,7 @@ export interface Run {
   task_revision_id: string
   revision: number
   conditions: Conditions
-  execution_type: 'diagnostic' | 'capability_decision' | 'direct_answer' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'capability_router'
+  execution_type: 'diagnostic' | 'capability_decision' | 'direct_answer' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'weather' | 'capability_router'
   capability_ids: string[] | null
   decision: Record<string, unknown> | null
   budget: Record<string, unknown> | null
@@ -158,6 +158,27 @@ export interface MapPlace {
   source_service: string
   source_tool: string
   observed_at: string
+}
+
+export interface WeatherSnapshot {
+  run_id: string
+  revision: number
+  city: string
+  source_service: string
+  source_tool: string
+  queried_at: string
+  forecasts: Array<{
+    date: string | null
+    week: string | null
+    day_weather: string | null
+    night_weather: string | null
+    day_temperature: string | null
+    night_temperature: string | null
+    day_wind: string | null
+    night_wind: string | null
+    day_wind_power: string | null
+    night_wind_power: string | null
+  }>
 }
 
 export interface ShoppingAdjustment {
@@ -314,6 +335,7 @@ export const api = {
   shoppingArtifacts: (runId: string) =>
     request<ShoppingArtifacts>(`/runs/${runId}/shopping-artifacts`),
   mapPlaces: (runId: string) => request<MapPlace[]>(`/runs/${runId}/map-places`),
+  weather: (runId: string) => request<WeatherSnapshot>(`/runs/${runId}/weather`),
   shoppingAdjustments: (taskId: string) =>
     request<ShoppingAdjustmentList>(`/tasks/${taskId}/shopping-adjustments`),
   createShoppingAdjustment: (

@@ -15,6 +15,7 @@ RunExecutionType = Literal[
     "shopping_research",
     "shopping_agent",
     "map_places",
+    "weather",
     "capability_router",
 ]
 RunEventType = Literal[
@@ -142,6 +143,31 @@ class MapPlaceResponse(BaseModel):
     source_service: str
     source_tool: str
     observed_at: datetime
+
+
+class WeatherForecastResponse(BaseModel):
+    date: str | None
+    week: str | None
+    day_weather: str | None
+    night_weather: str | None
+    day_temperature: str | None
+    night_temperature: str | None
+    day_wind: str | None
+    night_wind: str | None
+    day_wind_power: str | None
+    night_wind_power: str | None
+
+
+class WeatherSnapshotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    run_id: uuid.UUID
+    revision: int
+    city: str
+    source_service: str
+    source_tool: str
+    queried_at: datetime
+    forecasts: list[WeatherForecastResponse]
 
 
 class RunList(BaseModel):

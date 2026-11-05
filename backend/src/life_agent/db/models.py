@@ -287,6 +287,9 @@ class Run(Base):
     map_places: Mapped[list["MapPlace"]] = relationship(
         back_populates="run", cascade="all, delete-orphan", passive_deletes=True
     )
+    weather_snapshot: Mapped["WeatherSnapshot | None"] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class RunEvent(Base):
@@ -360,6 +363,31 @@ class MapPlace(Base):
     source_tool: Mapped[str] = mapped_column(String(128))
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     run: Mapped[Run] = relationship(back_populates="map_places")
+
+
+class WeatherSnapshot(Base):
+    __tablename__ = "weather_snapshots"
+    __table_args__ = (Index("ix_weather_snapshots_task_revision", "task_id", "revision"),)
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_revisions.id", ondelete="CASCADE")
+    )
+    revision: Mapped[int] = mapped_column(Integer)
+    city: Mapped[str] = mapped_column(String(120))
+    source_service: Mapped[str] = mapped_column(String(64))
+    source_tool: Mapped[str] = mapped_column(String(128))
+    queried_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    forecasts: Mapped[list[dict[str, object]]] = mapped_column(JSON)
+    run: Mapped[Run] = relationship(back_populates="weather_snapshot")
 
 
 class ShoppingCandidate(Base):

@@ -88,6 +88,8 @@ def run_once(worker_id: str) -> bool:
                 execution_type = (
                     "capability_router"
                     if len(selected) > 1
+                    else "weather"
+                    if selected == ("weather_forecast",)
                     else "map_places"
                     if selected == ("map_place_search",)
                     else "shopping_agent"
@@ -213,6 +215,27 @@ def run_once(worker_id: str) -> bool:
                 with get_session_factory()() as result_db:
                     persist_model_proposal(
                         result_db, claim.task_id, claim.revision,
+                        (claim.decision or {}).get("form_schema"),
+                    )
+                    if is_cancel_requested(result_db, claim):
+                        budget.stop("cancelled")
+                        return cancel_claim(result_db, claim, budget.snapshot())
+                    return complete_claim(
+                        result_db,
+                        claim,
+                        shopping_result=result,
+                        budget=budget.snapshot(),
+                        decision=_decision_for_completion(claim),
+                        execution_type=claim.execution_type,
+                        capability_ids=claim.capability_ids,
+                    )
+            if claim.execution_type == "weather":
+                result = _run_weather_with_lease(settings, claim, budget)
+                with get_session_factory()() as result_db:
+                    persist_model_proposal(
+                        result_db,
+                        claim.task_id,
+                        claim.revision,
                         (claim.decision or {}).get("form_schema"),
                     )
                     if is_cancel_requested(result_db, claim):
@@ -429,6 +452,60 @@ def _run_map_places_with_lease(settings, claim, budget=None):
     }
 
 
+_WEATHER_CITY_PATTERNS = (
+    re.compile(
+        r"(?:查询|查|搜索|看看|看一下|了解|告诉我)?\s*"
+        r"([一-鿿]{2,12}?)(?:市)?\s*(?:的)?\s*(?:天气|气温|温度|预报|会下雨)"
+    ),
+    re.compile(
+        r"(?:天气|气温|温度|预报)\s*(?:查询|查|看)?\s*"
+        r"([一-鿿]{2,12}?)(?:市)?"
+    ),
+)
+
+
+def _weather_city(goal: str, input_message: str | None) -> str | None:
+    text = (input_message or goal).strip()
+    for pattern in _WEATHER_CITY_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _run_weather_with_lease(settings, claim, budget=None):
+    from life_agent.tools.maps import query_weather
+
+    city = _weather_city(claim.goal, claim.input_message)
+    if not city:
+        return {
+            "answer": "请先告诉我需要查询天气的城市。",
+            "source": {"service_id": "map", "tool": None, "simulated": False},
+            "execution_version": "023-v1",
+            "decision_type": "clarification",
+            "delegated": False,
+            "mcp_call_count": 0,
+        }
+    if budget is not None:
+        budget.reserve("mcp")
+    result = asyncio.run(
+        asyncio.wait_for(
+            query_weather(settings, city),
+            timeout=settings.map_mcp_timeout_seconds,
+        )
+    )
+    forecasts = result["forecasts"]
+    return {
+        "answer": f"已查询 {result['city']} 的天气，返回 {len(forecasts)} 天预报。",
+        "source": result["source"],
+        "execution_version": "023-v1",
+        "decision_type": "direct_answer",
+        "delegated": False,
+        "mcp_call_count": 1,
+        "weather": result,
+    }
+
+
 def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = False, budget=None):
     from life_agent.agents.discovery.service import run_product_discovery
 
@@ -525,9 +602,9 @@ def _bounded_json(value: object) -> object:
 
 
 def _safe_error(error: Exception) -> str:
-    from life_agent.tools.maps import MapPlaceSearchError
+    from life_agent.tools.maps import MapPlaceSearchError, WeatherQueryError
 
-    if isinstance(error, MapPlaceSearchError):
+    if isinstance(error, (MapPlaceSearchError, WeatherQueryError)):
         return f"map_{error.code}"
     if isinstance(error, (ToolLoopError, LLMRequestError)):
         return str(error)[:500]
@@ -550,11 +627,15 @@ def _validate_claim_capabilities(claim) -> None:
         ("shopping_product_discovery",),
     ):
         raise ToolLoopError("商品 Run 的能力快照无效。")
-    if claim.execution_type == "capability_router" and claim.capability_ids not in (
-        ("map_place_search", "shopping_product_discovery"),
-        ("shopping_product_discovery", "map_place_search"),
+    if claim.execution_type == "weather" and claim.capability_ids not in (
+        (),
+        ("weather_forecast",),
     ):
-        raise ToolLoopError("组合 Run 缺少能力快照。")
+        raise ToolLoopError("天气 Run 的能力快照无效。")
+    if claim.execution_type == "capability_router":
+        allowed = {"map_place_search", "shopping_product_discovery", "weather_forecast"}
+        if len(claim.capability_ids) < 2 or not set(claim.capability_ids) <= allowed:
+            raise ToolLoopError("组合 Run 缺少能力快照。")
 
 
 def _run_capability_router_with_lease(settings, claim, budget=None):
@@ -562,6 +643,7 @@ def _run_capability_router_with_lease(settings, claim, budget=None):
     selected = set(claim.capability_ids)
     map_result = None
     shopping_result = None
+    weather_result = None
     artifacts = None
     if "map_place_search" in selected:
         map_result = _run_map_places_with_lease(settings, claim, budget)
@@ -601,17 +683,28 @@ def _run_capability_router_with_lease(settings, claim, budget=None):
             "delegated": shopping_agent.delegated,
             "mcp_call_count": shopping_agent.mcp_call_count,
         }
-    if map_result is not None and shopping_result is not None:
-        shopping_result["answer"] = f"{map_result['answer']}\n{shopping_result['answer']}"
-        shopping_result["map_source"] = map_result["source"]
-        shopping_result["places"] = map_result["places"]
-        shopping_result["query"] = map_result["query"]
-        shopping_result["city"] = map_result["city"]
-        shopping_result["observed_at"] = map_result["observed_at"]
-        shopping_result["mcp_call_count"] = int(shopping_result["mcp_call_count"]) + int(
+    if "weather_forecast" in selected:
+        weather_result = _run_weather_with_lease(settings, claim, budget)
+    primary = shopping_result or map_result or weather_result
+    if primary is None:
+        return None, artifacts
+    if weather_result is not None and primary is not weather_result:
+        primary["answer"] = f"{primary['answer']}\n{weather_result['answer']}"
+        primary["weather"] = weather_result.get("weather")
+        primary["mcp_call_count"] = int(primary.get("mcp_call_count", 0)) + int(
+            weather_result.get("mcp_call_count", 0)
+        )
+    if map_result is not None and primary is not map_result:
+        primary["answer"] = f"{map_result['answer']}\n{primary['answer']}"
+        primary["map_source"] = map_result["source"]
+        primary["places"] = map_result["places"]
+        primary["query"] = map_result["query"]
+        primary["city"] = map_result["city"]
+        primary["observed_at"] = map_result["observed_at"]
+        primary["mcp_call_count"] = int(primary.get("mcp_call_count", 0)) + int(
             map_result["mcp_call_count"]
         )
-    return shopping_result or map_result, artifacts
+    return primary, artifacts
 
 
 def run_forever(worker_id: str) -> None:

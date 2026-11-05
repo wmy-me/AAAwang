@@ -13,7 +13,11 @@ from typing import Any
 from life_agent.core.budget import RunBudget
 from life_agent.core.llm import ToolLoopError
 from life_agent.core.llm.deepseek import call_deepseek
-from life_agent.modules.capabilities import has_location_scope, visible_capabilities
+from life_agent.modules.capabilities import (
+    has_location_scope,
+    has_weather_city,
+    visible_capabilities,
+)
 from life_agent.tools.mcp import McpClient, McpClientError
 
 logger = logging.getLogger(__name__)
@@ -68,6 +72,8 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
         "当用户明确要求补充条件或整理采购方案且关键信息缺失时，可以提出对应字段；"
         "普通只读探索不要为了补字段而阻断。"
         "budget、people、quantity 不是固定必填项。"
+        "8. 本轮明确询问某个城市天气、气温或预报时，选择 weather_forecast；"
+        "天气查询必须有明确城市，不能根据用户位置或任务历史猜测。"
     )
     response = asyncio.run(
         call_deepseek(settings, prompt, budget=budget, max_tokens=512)
@@ -113,6 +119,16 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
             "capability_ids": [],
             "clarification": "请先告诉我需要查询的城市或位置范围。",
             "reason": "后端校验发现地图查询缺少位置范围",
+            "decision_source": "deepseek_structured_worker",
+        }
+    if "weather_forecast" in selected and not has_weather_city(
+        f"{claim.goal} {claim.input_message or ''}"
+    ):
+        return {
+            "kind": "clarification",
+            "capability_ids": [],
+            "clarification": "请先告诉我需要查询天气的城市。",
+            "reason": "后端校验发现天气查询缺少城市",
             "decision_source": "deepseek_structured_worker",
         }
     raw_clarification = value.get("clarification")

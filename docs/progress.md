@@ -1,3 +1,8 @@
+## 023 高德 MCP 天气能力（部分完成/受阻）
+
+- 已接入真实高德 `maps_weather`：initialize、list_tools、上海 call_tool 均成功；新增天气能力路由、无城市澄清、共享预算 Worker 分支、天气快照迁移、私有读取 API 和网页展示。
+- 天气适配器、路由和地点回归自动测试通过；前端 lint/build 通过，lint 保留 3 条既有 Hook warning。完整真实 DeepSeek/独立 Worker/PostgreSQL/浏览器闭环、双账号隔离及天气专项取消/租约/预算证据尚待补齐，不能标记整体完成。详见[023报告](reports/023-amap-weather-mcp-report.md)。
+
 ## 022 Agent 职责与包结构整理（已完成）
 
 - 已新增并接入生产路径的职责入口：`agents/coordinator/` 持有领域提示词、模型 JSON 解析、纠正重试和可见集校验，`agents/discovery/` 负责有界商品发现与提示词，`agents/procurement/` 负责确定性候选/方案边界；`worker/runner.py` 只负责 Run 生命周期、租约、取消、fencing、终态事务和分派。

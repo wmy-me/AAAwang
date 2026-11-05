@@ -113,7 +113,7 @@ cd backend
 uv run python scripts/check_mcp.py --service shopping
 ```
 
-默认配置位于 `MCP_SERVICES`，按服务 ID 保存 URL、`streamable_http` 传输、超时、启用状态和可选认证。高德地图 MCP 使用 `https://mcp.amap.com/mcp`，Key 通过 `auth_token` 注入、`auth_query_parameter=key` 传输；不要把真实 Key 写进 URL、日志或契约。地图地点查询的 allowlist 使用真实 `list_tools` 结果核对后再固定，模拟和真实配置示例见根目录 `.env.example` 与 `contracts/mcp/map-place-search.md`。读取配置或启动 API 不会建立连接。shopping-mcp 只绑定回环地址，MCP 端点为 `/mcp`，模拟契约见 `contracts/mcp/`。
+默认配置位于 `MCP_SERVICES`，按服务 ID 保存 URL、`streamable_http` 传输、超时、启用状态和可选认证。高德地图 MCP 使用 `https://mcp.amap.com/mcp`，Key 通过 `auth_token` 注入、`auth_query_parameter=key` 传输；不要把真实 Key 写进 URL、日志或契约。地图地点和天气工具的 allowlist 使用真实 `list_tools` 结果核对后再固定，天气工具名通过 `MAP_MCP_WEATHER_TOOL_NAME` 配置，默认是 `maps_weather`。天气结果通过认证的 `GET /api/runs/{run_id}/weather` 读取。模拟和真实配置示例见根目录 `.env.example` 与 `contracts/mcp/`。读取配置或启动 API 不会建立连接。shopping-mcp 只绑定回环地址，MCP 端点为 `/mcp`。
 
 ### 3.4 LLM 与 MCP 工具闭环
 

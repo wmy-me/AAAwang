@@ -9,6 +9,7 @@ import {
   type DynamicFormProposal,
   type Message,
   type MapPlace,
+  type WeatherSnapshot,
   type Run,
   type RunResult,
   type ShoppingAdjustment,
@@ -39,6 +40,7 @@ function App() {
   const [adjustmentVersion, setAdjustmentVersion] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [mapPlaces, setMapPlaces] = useState<MapPlace[]>([]);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   const [mapQuery, setMapQuery] = useState("");
   const [mapCity, setMapCity] = useState("");
   const [mapBusy, setMapBusy] = useState(false);
@@ -118,6 +120,7 @@ function App() {
       setResult(null);
       setArtifacts(null);
       setMapPlaces([]);
+      setWeather(null);
       setMessages([]);
       setError("登录状态已失效，请重新登录。");
       return;
@@ -180,6 +183,7 @@ function App() {
     setResult(null);
     setArtifacts(null);
     setMapPlaces([]);
+    setWeather(null);
     setMessages([]);
     setConversationId("");
     setNotice("已退出当前账号。");
@@ -368,6 +372,10 @@ function App() {
         currentRun?.execution_type === "shopping_agent" ||
         currentRun?.execution_type === "shopping_research";
       setMapPlaces(isMapRun ? await api.mapPlaces(runId) : []);
+      const isWeatherRun =
+        currentRun?.execution_type === "weather" ||
+        currentRun?.execution_type === "capability_router";
+      setWeather(isWeatherRun ? await api.weather(runId) : null);
       setArtifacts(isShoppingRun ? await api.shoppingArtifacts(runId) : null);
       if (task) {
         const history = await api.shoppingAdjustments(task.id);
@@ -705,6 +713,7 @@ function App() {
                       <RunDetail
                         run={selectedRun}
                         result={result}
+                        weather={weather}
                         onCancel={async () => {
                           if (!selectedRun) return;
                           try {
@@ -1335,11 +1344,13 @@ function TaskCard({
 function RunDetail({
   run,
   result,
+  weather,
   artifacts = null,
   onCancel,
 }: {
   run: Run | null;
   result: RunResult | null;
+  weather: WeatherSnapshot | null;
   artifacts?: ShoppingArtifacts | null;
   onCancel: () => void;
 }) {
@@ -1389,7 +1400,7 @@ function RunDetail({
       ) : run.status === "cancelled" ? (
         <div className="result-empty">本次运行已取消，没有生成结果。</div>
       ) : result ? (
-        <ResultView result={result} artifacts={artifacts} />
+        <ResultView result={result} artifacts={artifacts} weather={weather} />
       ) : (
         <div className="result-empty">结果尚未读回，正在重试…</div>
       )}
@@ -1429,9 +1440,11 @@ function RunExecutionSummary({ run }: { run: Run }) {
 function ResultView({
   result,
   artifacts,
+  weather,
 }: {
   result: RunResult;
   artifacts: ShoppingArtifacts | null;
+  weather: WeatherSnapshot | null;
 }) {
   const source = result.source;
   const plan = artifacts?.plan;
@@ -1490,6 +1503,34 @@ function ResultView({
           {plan.unknown_fees && <small className="fee-note">{plan.note}</small>}
         </div>
       )}
+      {weather && <WeatherPanel weather={weather} />}
+    </div>
+  );
+}
+
+function WeatherPanel({ weather }: { weather: WeatherSnapshot }) {
+  return (
+    <div className="candidate-list">
+      <div className="result-label">
+        <span>WEATHER / {weather.city}</span>
+        <span>{weather.source_service} / {weather.source_tool}</span>
+      </div>
+      {weather.forecasts.map((forecast) => (
+        <div className="candidate-row" key={`${forecast.date}-${forecast.week}`}>
+          <div>
+            <strong>{forecast.date || "未知日期"}</strong>
+            <small>
+              {forecast.day_weather || "未知"} / {forecast.night_weather || "未知"}
+              {forecast.day_wind
+                ? ` · ${forecast.day_wind} ${forecast.day_wind_power || ""}`
+                : ""}
+            </small>
+          </div>
+          <span>
+            {forecast.day_temperature || "?"}° / {forecast.night_temperature || "?"}°
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
