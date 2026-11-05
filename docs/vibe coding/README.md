@@ -54,6 +54,7 @@
 | 020 | [模型能力决策与跨 Agent 共享预算](020-model-capability-budget.md) | 已完成；共享预算、结构化模型决策、实时 MCP 发现交集、受控 MCP 服务关闭/工具下线/错服务/schema 不兼容/执行前二次校验、真实 Worker 终止、Chromium 刷新和 Java `verify` 均已验收，见[报告](../reports/020-model-capability-budget-report.md) |
 | 021 | [自然语言任务与动态表单](021-dynamic-task-forms.md) | 已完成；提议/确认、模型 schema 校验、无预算探索、多目标、目标修改重提议、条件合并、旧表单/旧 Run、并发幂等、双入口 Run 和无头 Chromium 已验证；travel/日期等控件留给后续任务，见[报告](../reports/021-dynamic-task-forms-report.md) |
 | 022 | [Agent 职责与包结构整理](022-agent-responsibility-structure.md) | 已完成；coordinator 持有领域决策/提示词/解析，discovery/procurement 入口接入生产路径；shopping-mcp 退出根因已定位并采用 detached 启动，真实商品/地图组合、动态表单、浏览器、权限和预算回归通过，见[报告](../reports/022-agent-responsibility-structure-report.md) |
+| 023 | [真实高德天气 MCP 查询与任务内展示](023-amap-weather-mcp.md) | 待执行；真实天气工具发现、受控调用、Run 快照/私有展示及地点/购物回归以任务验收为准 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
