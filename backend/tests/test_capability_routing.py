@@ -14,6 +14,7 @@ from life_agent.modules.capabilities import (
         ("买彩色铅笔作为奖品", (RouteKind.CAPABILITIES, ("shopping_product_discovery",))),
         ("在上海找礼品店", (RouteKind.CAPABILITIES, ("map_place_search",))),
         ("查询上海天气", (RouteKind.CAPABILITIES, ("weather_forecast",))),
+        ("查一下最新的上海旅行攻略", (RouteKind.CAPABILITIES, ("web_search",))),
         (
             "在上海找礼品店并给我推荐奖品",
             (RouteKind.CAPABILITIES, ("map_place_search", "shopping_product_discovery")),
@@ -47,6 +48,33 @@ def test_registered_capabilities_are_read_only_and_allowlisted() -> None:
     assert get_capability("map_place_search").read_only is True
     assert get_capability("map_place_search").allowed_tool_names == ("maps_text_search",)
     assert get_capability("map_place_search").timeout_seconds > 0
+    assert get_capability("web_search").read_only is True
+    assert get_capability("web_search").allowed_tool_names == ("tavily_search",)
+
+
+def test_web_search_visibility_requires_tavily_and_query_schema() -> None:
+    visible = visible_capabilities(
+        task_domain="shopping",
+        enabled_services={"tavily"},
+        discovered_tools={
+            "tavily": {
+                "tavily_search": {
+                    "type": "object",
+                    "required": ["query"],
+                }
+            }
+        },
+    )
+
+    assert tuple(spec.capability_id for spec in visible) == ("web_search",)
+
+
+def test_web_search_is_hidden_without_tavily_service() -> None:
+    assert visible_capabilities(
+        task_domain="shopping",
+        enabled_services=set(),
+        discovered_tools={"tavily": {"tavily_search": {"type": "object"}}},
+    ) == ()
 
 
 def test_visible_capabilities_require_configured_and_discovered_intersection() -> None:

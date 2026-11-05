@@ -21,6 +21,7 @@ from life_agent.db.models import (
     Task,
     TaskRevision,
     WeatherSnapshot,
+    WebSearchResult,
 )
 from life_agent.modules.tasks.consistency import (
     GoalConflictError,
@@ -128,6 +129,7 @@ def create_run(
         "map_places",
         "weather",
         "capability_router",
+        "web_search",
     }:
         raise ValueError("unsupported run execution type")
     if execution_type in {
@@ -137,6 +139,7 @@ def create_run(
         "map_places",
         "weather",
         "capability_router",
+        "web_search",
     } and task.domain != "shopping":
         raise ValueError("shopping execution requires a shopping task")
     existing = db.scalar(
@@ -413,6 +416,33 @@ def _finish_claim(
                     forecasts=list(weather.get("forecasts", [])),
                 )
             )
+        if shopping_result.get("web_search") is not None:
+            search = dict(shopping_result["web_search"])
+            source = dict(search.get("source", {}))
+            observed_at = datetime.fromisoformat(
+                str(search.get("observed_at", now.isoformat()))
+            )
+            for item in search.get("results", []):
+                url = str(item.get("url", ""))[:2000]
+                if not url:
+                    continue
+                db.add(
+                    WebSearchResult(
+                        run_id=run.id,
+                        owner_id=run.owner_id,
+                        task_id=run.task_id,
+                        task_revision_id=run.task_revision_id,
+                        revision=run.revision,
+                        result_key=hashlib.sha256(url.encode()).hexdigest()[:64],
+                        title=str(item.get("title") or "未命名来源")[:300],
+                        url=url,
+                        summary=(str(item["summary"])[:1000] if item.get("summary") else None),
+                        published_at=(str(item["published_at"])[:80] if item.get("published_at") else None),
+                        source_service=str(item.get("source_service") or source.get("service_id", "tavily"))[:64],
+                        source_tool=str(item.get("source_tool") or source.get("tool", ""))[:128],
+                        observed_at=observed_at,
+                    )
+                )
         if shopping_artifacts is not None:
             candidates_by_product: dict[str, ShoppingCandidate] = {}
             for draft in shopping_artifacts.get("candidates", []):
@@ -666,6 +696,19 @@ def get_weather_snapshot(
     if snapshot is None:
         raise RunNotFoundError
     return snapshot
+
+
+def get_web_search_results(
+    db: Session, owner_id: uuid.UUID, run_id: uuid.UUID
+) -> list[WebSearchResult]:
+    _owned_run(db, owner_id, run_id)
+    return list(
+        db.scalars(
+            select(WebSearchResult)
+            .where(WebSearchResult.run_id == run_id, WebSearchResult.owner_id == owner_id)
+            .order_by(WebSearchResult.id)
+        )
+    )
 
 
 def get_shopping_artifacts(

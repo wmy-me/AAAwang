@@ -77,7 +77,7 @@ export interface Run {
   task_revision_id: string
   revision: number
   conditions: Conditions
-  execution_type: 'diagnostic' | 'capability_decision' | 'direct_answer' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'weather' | 'capability_router'
+  execution_type: 'diagnostic' | 'capability_decision' | 'direct_answer' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'weather' | 'web_search' | 'capability_router'
   capability_ids: string[] | null
   decision: Record<string, unknown> | null
   budget: Record<string, unknown> | null
@@ -179,6 +179,19 @@ export interface WeatherSnapshot {
     day_wind_power: string | null
     night_wind_power: string | null
   }>
+}
+
+export interface WebSearchResult {
+  id: string
+  run_id: string
+  revision: number
+  title: string
+  url: string
+  summary: string | null
+  published_at: string | null
+  source_service: string
+  source_tool: string
+  observed_at: string
 }
 
 export interface ShoppingAdjustment {
@@ -336,6 +349,7 @@ export const api = {
     request<ShoppingArtifacts>(`/runs/${runId}/shopping-artifacts`),
   mapPlaces: (runId: string) => request<MapPlace[]>(`/runs/${runId}/map-places`),
   weather: (runId: string) => request<WeatherSnapshot>(`/runs/${runId}/weather`),
+  webSearch: (runId: string) => request<WebSearchResult[]>(`/runs/${runId}/web-search`),
   shoppingAdjustments: (taskId: string) =>
     request<ShoppingAdjustmentList>(`/tasks/${taskId}/shopping-adjustments`),
   createShoppingAdjustment: (

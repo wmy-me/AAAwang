@@ -290,6 +290,9 @@ class Run(Base):
     weather_snapshot: Mapped["WeatherSnapshot | None"] = relationship(
         back_populates="run", cascade="all, delete-orphan", passive_deletes=True
     )
+    web_search_results: Mapped[list["WebSearchResult"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class RunEvent(Base):
@@ -388,6 +391,38 @@ class WeatherSnapshot(Base):
     queried_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     forecasts: Mapped[list[dict[str, object]]] = mapped_column(JSON)
     run: Mapped[Run] = relationship(back_populates="weather_snapshot")
+
+
+class WebSearchResult(Base):
+    __tablename__ = "web_search_results"
+    __table_args__ = (
+        UniqueConstraint("run_id", "result_key", name="uq_web_search_run_result"),
+        Index("ix_web_search_task_revision", "task_id", "revision"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_revisions.id", ondelete="CASCADE")
+    )
+    revision: Mapped[int] = mapped_column(Integer)
+    result_key: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(300))
+    url: Mapped[str] = mapped_column(String(2000))
+    summary: Mapped[str | None] = mapped_column(Text)
+    published_at: Mapped[str | None] = mapped_column(String(80))
+    source_service: Mapped[str] = mapped_column(String(64))
+    source_tool: Mapped[str] = mapped_column(String(128))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    run: Mapped[Run] = relationship(back_populates="web_search_results")
 
 
 class ShoppingCandidate(Base):

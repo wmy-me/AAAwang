@@ -26,6 +26,7 @@ from life_agent.modules.runs.schemas import (
     ShoppingPlanResponse,
     ShoppingRunResultResponse,
     WeatherSnapshotResponse,
+    WebSearchResultResponse,
 )
 from life_agent.modules.runs.service import (
     IdempotencyConflictError,
@@ -38,6 +39,7 @@ from life_agent.modules.runs.service import (
     get_shopping_artifacts,
     get_shopping_result,
     get_weather_snapshot,
+    get_web_search_results,
     list_events,
     list_runs,
 )
@@ -200,6 +202,19 @@ def weather(
     except SQLAlchemyError as exc:
         raise _storage_unavailable() from exc
     return WeatherSnapshotResponse.model_validate(value)
+
+
+@router.get("/runs/{run_id}/web-search", response_model=list[WebSearchResultResponse])
+def web_search(
+    run_id: uuid.UUID, db: Database, current_user: CurrentUser
+) -> list[WebSearchResultResponse]:
+    try:
+        items = get_web_search_results(db, current_user.id, run_id)
+    except RunNotFoundError as exc:
+        raise _not_found() from exc
+    except SQLAlchemyError as exc:
+        raise _storage_unavailable() from exc
+    return [WebSearchResultResponse.model_validate(item) for item in items]
 
 
 @router.get("/runs/{run_id}/events", response_model=RunEventList)

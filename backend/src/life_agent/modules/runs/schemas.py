@@ -17,6 +17,7 @@ RunExecutionType = Literal[
     "map_places",
     "weather",
     "capability_router",
+    "web_search",
 ]
 RunEventType = Literal[
     "run.queued",
@@ -168,6 +169,21 @@ class WeatherSnapshotResponse(BaseModel):
     source_tool: str
     queried_at: datetime
     forecasts: list[WeatherForecastResponse]
+
+
+class WebSearchResultResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    run_id: uuid.UUID
+    revision: int
+    title: str
+    url: str
+    summary: str | None
+    published_at: str | None
+    source_service: str
+    source_tool: str
+    observed_at: datetime
 
 
 class RunList(BaseModel):

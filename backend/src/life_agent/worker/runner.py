@@ -92,6 +92,8 @@ def run_once(worker_id: str) -> bool:
                     if selected == ("weather_forecast",)
                     else "map_places"
                     if selected == ("map_place_search",)
+                    else "web_search"
+                    if selected == ("web_search",)
                     else "shopping_agent"
                     if selected == ("shopping_product_discovery",)
                     else "direct_answer"
@@ -231,6 +233,27 @@ def run_once(worker_id: str) -> bool:
                     )
             if claim.execution_type == "weather":
                 result = _run_weather_with_lease(settings, claim, budget)
+                with get_session_factory()() as result_db:
+                    persist_model_proposal(
+                        result_db,
+                        claim.task_id,
+                        claim.revision,
+                        (claim.decision or {}).get("form_schema"),
+                    )
+                    if is_cancel_requested(result_db, claim):
+                        budget.stop("cancelled")
+                        return cancel_claim(result_db, claim, budget.snapshot())
+                    return complete_claim(
+                        result_db,
+                        claim,
+                        shopping_result=result,
+                        budget=budget.snapshot(),
+                        decision=_decision_for_completion(claim),
+                        execution_type=claim.execution_type,
+                        capability_ids=claim.capability_ids,
+                    )
+            if claim.execution_type == "web_search":
+                result = _run_web_search_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
                     persist_model_proposal(
                         result_db,
@@ -507,6 +530,40 @@ def _run_weather_with_lease(settings, claim, budget=None):
     }
 
 
+def _web_search_query(goal: str, input_message: str | None) -> str:
+    text = (input_message or goal).strip()
+    text = re.sub(
+        r"^(?:请|帮我|麻烦|想了解|我想了解|搜索|查询|网上查|网页搜索)\s*", "", text
+    )
+    return text[:500] or goal[:500]
+
+
+def _run_web_search_with_lease(settings, claim, budget=None):
+    from life_agent.tools.search import search_web
+
+    query = _web_search_query(claim.goal, claim.input_message)
+    if budget is not None:
+        budget.reserve("mcp")
+    result = asyncio.run(
+        asyncio.wait_for(
+            search_web(settings, query),
+            timeout=settings.tavily_mcp_timeout_seconds,
+        )
+    )
+    return {
+        "answer": (
+            f"已搜索公开网页，查询“{query}”，返回 {len(result['results'])} 条来源。"
+            "网页摘要仅作为外部资料，不代表已验证的商品报价、库存或事实。"
+        ),
+        "source": result["source"],
+        "execution_version": "027-v1",
+        "decision_type": "direct_answer",
+        "delegated": False,
+        "mcp_call_count": 1,
+        "web_search": result,
+    }
+
+
 def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = False, budget=None):
     from life_agent.agents.discovery.service import run_product_discovery
 
@@ -633,8 +690,18 @@ def _validate_claim_capabilities(claim) -> None:
         ("weather_forecast",),
     ):
         raise ToolLoopError("天气 Run 的能力快照无效。")
+    if claim.execution_type == "web_search" and claim.capability_ids not in (
+        (),
+        ("web_search",),
+    ):
+        raise ToolLoopError("网页搜索 Run 的能力快照无效。")
     if claim.execution_type == "capability_router":
-        allowed = {"map_place_search", "shopping_product_discovery", "weather_forecast"}
+        allowed = {
+            "map_place_search",
+            "shopping_product_discovery",
+            "weather_forecast",
+            "web_search",
+        }
         if len(claim.capability_ids) < 2 or not set(claim.capability_ids) <= allowed:
             raise ToolLoopError("组合 Run 缺少能力快照。")
 
@@ -645,6 +712,7 @@ def _run_capability_router_with_lease(settings, claim, budget=None):
     map_result = None
     shopping_result = None
     weather_result = None
+    web_search_result = None
     artifacts = None
     if "map_place_search" in selected:
         map_result = _run_map_places_with_lease(settings, claim, budget)
@@ -686,7 +754,9 @@ def _run_capability_router_with_lease(settings, claim, budget=None):
         }
     if "weather_forecast" in selected:
         weather_result = _run_weather_with_lease(settings, claim, budget)
-    primary = shopping_result or map_result or weather_result
+    if "web_search" in selected:
+        web_search_result = _run_web_search_with_lease(settings, claim, budget)
+    primary = shopping_result or map_result or weather_result or web_search_result
     if primary is None:
         return None, artifacts
     if weather_result is not None and primary is not weather_result:
@@ -704,6 +774,13 @@ def _run_capability_router_with_lease(settings, claim, budget=None):
         primary["observed_at"] = map_result["observed_at"]
         primary["mcp_call_count"] = int(primary.get("mcp_call_count", 0)) + int(
             map_result["mcp_call_count"]
+        )
+    if web_search_result is not None and primary is not web_search_result:
+        primary["answer"] = f"{primary['answer']}\n{web_search_result['answer']}"
+        primary["web_search"] = web_search_result["web_search"]
+        primary["web_source"] = web_search_result["source"]
+        primary["mcp_call_count"] = int(primary.get("mcp_call_count", 0)) + int(
+            web_search_result["mcp_call_count"]
         )
     return primary, artifacts
 

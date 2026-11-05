@@ -69,6 +69,17 @@ _CAPABILITIES = {
         input_schema={"type": "object", "required": ["city"]},
         timeout_seconds=20.0,
     ),
+    "web_search": CapabilitySpec(
+        capability_id="web_search",
+        agent_id="discovery",
+        task_domain="shopping",
+        service_id="tavily",
+        allowed_tool_names=("tavily_search",),
+        read_only=True,
+        result_type="web_search_results",
+        input_schema={"type": "object", "required": ["query"]},
+        timeout_seconds=30.0,
+    ),
 }
 
 _MAP_PATTERN = re.compile(
@@ -89,6 +100,10 @@ _WEATHER_CITY_PATTERN = re.compile(
     r"|(?:天气|气温|温度|预报)\s*(?:查询|查|看)?\s*([一-鿿]{2,12}?)(?:市)?"
 )
 _WEATHER_NON_CITY_WORDS = {"怎么", "怎么样", "如何", "好吗", "可以吗"}
+_WEB_SEARCH_PATTERN = re.compile(
+    r"(搜索网页|网上查|网页资料|公开资料|最新信息|新闻|攻略|评测|口碑|知识|介绍|"
+    r"研究|目的地|景点|怎么选|如何选择|推荐.*(?:网站|资料))"
+)
 
 
 def get_capability(capability_id: str) -> CapabilitySpec:
@@ -170,6 +185,7 @@ def route_task_turn(content: str, *, task_domain: str = "shopping") -> Capabilit
     wants_map = bool(_MAP_PATTERN.search(text))
     wants_product = bool(_PRODUCT_PATTERN.search(text))
     wants_weather = bool(_WEATHER_PATTERN.search(text))
+    wants_web_search = bool(_WEB_SEARCH_PATTERN.search(text))
     capability_ids: list[str] = []
     if wants_map:
         if not _has_city(text):
@@ -187,6 +203,8 @@ def route_task_turn(content: str, *, task_domain: str = "shopping") -> Capabilit
         capability_ids.append("weather_forecast")
     if wants_product:
         capability_ids.append("shopping_product_discovery")
+    if wants_web_search:
+        capability_ids.append("web_search")
     if not capability_ids:
         return CapabilityDecision(RouteKind.DIRECT)
     return CapabilityDecision(RouteKind.CAPABILITIES, tuple(capability_ids))

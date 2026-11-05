@@ -75,6 +75,9 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
         "budget、people、quantity 不是固定必填项。"
         "8. 本轮明确询问某个城市天气、气温或预报时，选择 weather_forecast；"
         "天气查询必须有明确城市，不能根据用户位置或任务历史猜测。"
+        "9. 本轮明确询问公开网页资料、最新信息、新闻、攻略、评测、知识或目的地介绍时，"
+        "若 web_search 在授权集合中可见则选择 web_search；搜索结果只是外部证据，"
+        "不得把网页摘要当成已验证报价、库存或事实。"
     )
     response = asyncio.run(
         call_deepseek(

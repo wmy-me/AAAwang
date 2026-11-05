@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     map_mcp_enabled: bool = False
     map_mcp_tool_name: str = "maps_text_search"
     map_mcp_weather_tool_name: str = "maps_weather"
+    tavily_mcp_url: str = "https://mcp.tavily.com/mcp/"
+    tavily_mcp_key: SecretStr | None = None
+    tavily_mcp_timeout_seconds: float = Field(default=30.0, gt=0)
+    tavily_mcp_enabled: bool = False
+    tavily_mcp_tool_name: str = "tavily_search"
     run_worker_lease_seconds: int = Field(default=30, gt=0)
     run_worker_poll_seconds: float = Field(default=1.0, gt=0)
     run_worker_max_attempts: int = Field(default=3, ge=1, le=20)
@@ -102,6 +107,19 @@ class Settings(BaseSettings):
                         )
                     )
                 ),
+            )
+        if self.tavily_mcp_enabled:
+            if self.tavily_mcp_key is None or not self.tavily_mcp_key.get_secret_value().strip():
+                raise ValueError("TAVILY_MCP_ENABLED=true 时必须配置 TAVILY_MCP_KEY。")
+            if not self.tavily_mcp_tool_name.strip():
+                raise ValueError("TAVILY_MCP_TOOL_NAME 不能为空。")
+            self.mcp_services["tavily"] = McpServiceConfig(
+                url=self.tavily_mcp_url,
+                timeout_seconds=self.tavily_mcp_timeout_seconds,
+                enabled=True,
+                auth_token=self.tavily_mcp_key,
+                auth_query_parameter="tavilyApiKey",
+                allowed_tool_names=(self.tavily_mcp_tool_name.strip(),),
             )
         return self
 

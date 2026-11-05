@@ -10,6 +10,7 @@ import {
   type Message,
   type MapPlace,
   type WeatherSnapshot,
+  type WebSearchResult,
   type Run,
   type RunResult,
   type ShoppingAdjustment,
@@ -41,6 +42,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mapPlaces, setMapPlaces] = useState<MapPlace[]>([]);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
+  const [webSearchResults, setWebSearchResults] = useState<WebSearchResult[]>([]);
   const [mapQuery, setMapQuery] = useState("");
   const [mapCity, setMapCity] = useState("");
   const [mapBusy, setMapBusy] = useState(false);
@@ -121,6 +123,7 @@ function App() {
       setArtifacts(null);
       setMapPlaces([]);
       setWeather(null);
+      setWebSearchResults([]);
       setMessages([]);
       setError("登录状态已失效，请重新登录。");
       return;
@@ -184,6 +187,7 @@ function App() {
     setArtifacts(null);
     setMapPlaces([]);
     setWeather(null);
+    setWebSearchResults([]);
     setMessages([]);
     setConversationId("");
     setNotice("已退出当前账号。");
@@ -376,6 +380,10 @@ function App() {
         currentRun?.execution_type === "weather" ||
         currentRun?.execution_type === "capability_router";
       setWeather(isWeatherRun ? await api.weather(runId) : null);
+      const isWebSearchRun =
+        currentRun?.execution_type === "web_search" ||
+        currentRun?.execution_type === "capability_router";
+      setWebSearchResults(isWebSearchRun ? await api.webSearch(runId) : []);
       setArtifacts(isShoppingRun ? await api.shoppingArtifacts(runId) : null);
       if (task) {
         const history = await api.shoppingAdjustments(task.id);
@@ -714,6 +722,7 @@ function App() {
                         run={selectedRun}
                         result={result}
                         weather={weather}
+                        webSearchResults={webSearchResults}
                         onCancel={async () => {
                           if (!selectedRun) return;
                           try {
@@ -1345,12 +1354,14 @@ function RunDetail({
   run,
   result,
   weather,
+  webSearchResults,
   artifacts = null,
   onCancel,
 }: {
   run: Run | null;
   result: RunResult | null;
   weather: WeatherSnapshot | null;
+  webSearchResults: WebSearchResult[];
   artifacts?: ShoppingArtifacts | null;
   onCancel: () => void;
 }) {
@@ -1400,7 +1411,7 @@ function RunDetail({
       ) : run.status === "cancelled" ? (
         <div className="result-empty">本次运行已取消，没有生成结果。</div>
       ) : result ? (
-        <ResultView result={result} artifacts={artifacts} weather={weather} />
+        <ResultView result={result} artifacts={artifacts} weather={weather} webSearchResults={webSearchResults} />
       ) : (
         <div className="result-empty">结果尚未读回，正在重试…</div>
       )}
@@ -1441,10 +1452,12 @@ function ResultView({
   result,
   artifacts,
   weather,
+  webSearchResults,
 }: {
   result: RunResult;
   artifacts: ShoppingArtifacts | null;
   weather: WeatherSnapshot | null;
+  webSearchResults: WebSearchResult[];
 }) {
   const source = result.source;
   const plan = artifacts?.plan;
@@ -1504,6 +1517,32 @@ function ResultView({
         </div>
       )}
       {weather && <WeatherPanel weather={weather} />}
+      {webSearchResults.length > 0 && <WebSearchPanel results={webSearchResults} />}
+    </div>
+  );
+}
+
+function WebSearchPanel({ results }: { results: WebSearchResult[] }) {
+  return (
+    <div className="candidate-list">
+      <div className="result-label">
+        <span>PUBLIC WEB SOURCES</span>
+        <span>{results[0]?.source_service} / {results[0]?.source_tool}</span>
+      </div>
+      {results.map((item) => (
+        <div className="candidate-row" key={item.id}>
+          <div>
+            <a href={item.url} target="_blank" rel="noreferrer">
+              <strong>{item.title}</strong>
+            </a>
+            <small>
+              {item.summary || "未提供摘要"}
+              {item.published_at ? ` · 发布 ${item.published_at}` : ""}
+            </small>
+          </div>
+          <span>{new Date(item.observed_at).toLocaleString()}</span>
+        </div>
+      ))}
     </div>
   );
 }
