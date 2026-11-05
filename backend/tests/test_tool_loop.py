@@ -247,9 +247,11 @@ def test_multiple_tool_calls_are_rejected_before_execution() -> None:
     model_name = probe.completions.requests[0]["tools"][0]["function"]["name"]
     message = model_message(tool_name=model_name, arguments='{"keyword":"笔"}')
     message.tool_calls.append(message.tool_calls[0])
-    client = FakeModelClient([message])
+    retry = model_message(tool_name=model_name, arguments='{"keyword":"本"}')
+    retry.tool_calls.append(retry.tool_calls[0])
+    client = FakeModelClient([message, retry])
 
-    with pytest.raises(ToolLoopError, match="多个工具调用"):
+    with pytest.raises(ToolLoopError, match="纠正后仍返回多个"):
         asyncio.run(
             run_tool_loop(
                 settings(),
@@ -262,13 +264,16 @@ def test_multiple_tool_calls_are_rejected_before_execution() -> None:
         )
 
     assert connection.calls == []
+    assert len(client.completions.requests) == 2
 
 
 def test_forced_tool_call_without_tool_call_fails_before_execution() -> None:
     connection = FakeConnection()
-    client = FakeModelClient([model_message("我不想调用工具。")])
+    client = FakeModelClient(
+        [model_message("我不想调用工具。"), model_message("仍然不调用工具。")]
+    )
 
-    with pytest.raises(ToolLoopError, match="必需的工具调用"):
+    with pytest.raises(ToolLoopError, match="纠正后仍未返回工具调用"):
         asyncio.run(
             run_tool_loop(
                 settings(),
@@ -283,6 +288,47 @@ def test_forced_tool_call_without_tool_call_fails_before_execution() -> None:
 
     assert client.completions.requests[0]["tool_choice"] == "required"
     assert connection.calls == []
+
+
+def test_multiple_tool_calls_are_corrected_once_then_execute_one_call() -> None:
+    connection = FakeConnection()
+    probe = FakeModelClient([model_message("probe")])
+    asyncio.run(
+        run_tool_loop(
+            settings(),
+            "probe",
+            service_id="shopping",
+            allowed_tool_names={"search_products"},
+            model_client=cast(AsyncOpenAI, probe),
+            mcp_client=cast(Any, FakeMcpClient(connection)),
+        )
+    )
+    model_name = probe.completions.requests[0]["tools"][0]["function"]["name"]
+    invalid = model_message(tool_name=model_name, arguments='{"keyword":"笔"}')
+    invalid.tool_calls.append(invalid.tool_calls[0])
+    client = FakeModelClient(
+        [
+            invalid,
+            model_message(tool_name=model_name, arguments='{"keyword":"本"}'),
+            model_message("纠正后完成。"),
+        ]
+    )
+
+    result = asyncio.run(
+        run_tool_loop(
+            settings(),
+            "test",
+            service_id="shopping",
+            allowed_tool_names={"search_products"},
+            model_client=cast(AsyncOpenAI, client),
+            mcp_client=cast(Any, FakeMcpClient(connection)),
+        )
+    )
+
+    assert result.answer == "纠正后完成。"
+    assert result.model_requests == 3
+    assert result.tool_calls == 1
+    assert connection.calls == [("search_products", {"keyword": "本"})]
 
 
 def test_empty_result_is_returned_to_model_as_success() -> None:

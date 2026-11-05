@@ -87,6 +87,19 @@ def message(content: str | None = None, *, tool: str | None = None, arguments: s
     return SimpleNamespace(content=content, tool_calls=calls)
 
 
+def messages(*calls: tuple[str, str]) -> SimpleNamespace:
+    return SimpleNamespace(
+        content=None,
+        tool_calls=[
+            SimpleNamespace(
+                id=f"delegate-{index}",
+                function=SimpleNamespace(name=name, arguments=arguments),
+            )
+            for index, (name, arguments) in enumerate(calls, start=1)
+        ],
+    )
+
+
 def settings() -> Settings:
     return Settings(llm_api_key=SecretStr("test-key"))
 
@@ -150,6 +163,89 @@ def test_plain_text_is_corrected_with_one_bounded_retry() -> None:
     assert result.delegated is False
     assert len(supervisor.completions.requests) == 2
     assert result.source["model_requests"] == 2
+
+
+def test_multiple_delegations_are_corrected_before_any_mcp_call() -> None:
+    supervisor = FakeModel(
+        [
+            messages(
+                ("delegate_shopping_discovery", json.dumps({"keyword": "铅笔"})),
+                ("delegate_shopping_discovery", json.dumps({"keyword": "文具"})),
+            ),
+            message(
+                tool="delegate_shopping_discovery",
+                arguments=json.dumps({"keyword": "铅笔", "limit": 2}),
+            ),
+            message("已根据模拟商品查询结果整理回复。"),
+        ]
+    )
+    discovery = FakeModel(
+        [
+            message(
+                tool=_model_tool_name("shopping:search_products"),
+                arguments=json.dumps({"keyword": "铅笔", "limit": 2}),
+            ),
+            message("模拟候选：铅笔套装。"),
+        ]
+    )
+    connection = FakeConnection()
+    result = asyncio.run(
+        run_shopping_agent(
+            settings(),
+            "给学生买铅笔奖品",
+            {"budget": 20},
+            model_client=supervisor,
+            discovery_model_client=discovery,
+            mcp_client=FakeMcp(connection),
+        )
+    )
+    assert result.decision_type == "delegated_discovery"
+    assert len(supervisor.completions.requests) == 3
+    assert result.source["model_requests"] == 5
+    assert result.mcp_call_count == 1
+    assert connection.calls == [("search_products", {"keyword": "铅笔", "limit": 2})]
+    correction = supervisor.completions.requests[1]["messages"][-1]["content"]
+    assert "任何委派都没有执行" in correction
+    assert len(supervisor.completions.requests[0]["messages"][0]["content"]) > 0
+
+
+def test_invalid_delegation_is_corrected_once_and_still_cannot_call_unknown_tool() -> None:
+    supervisor = FakeModel(
+        [
+            message(tool="unknown_delegate", arguments=json.dumps({"keyword": "铅笔"})),
+            message(json.dumps({"decision_type": "clarification", "answer": "请补充预算。"})),
+        ]
+    )
+    connection = FakeConnection()
+    result = asyncio.run(
+        run_shopping_agent(
+            settings(), "买铅笔", {}, model_client=supervisor, mcp_client=FakeMcp(connection)
+        )
+    )
+    assert result.decision_type == "clarification"
+    assert result.mcp_call_count == 0
+    assert connection.calls == []
+    assert len(supervisor.completions.requests) == 2
+
+
+def test_invalid_decision_correction_respects_shared_model_budget() -> None:
+    from life_agent.core.budget import BudgetExceededError, BudgetLimits, RunBudget
+
+    supervisor = FakeModel(
+        [message(tool="unknown_delegate", arguments="{}"), message("不会执行")]
+    )
+    budget = RunBudget(limits=BudgetLimits(model_requests=1))
+    try:
+        asyncio.run(
+            run_shopping_agent(
+                settings(), "买铅笔", {}, model_client=supervisor, budget=budget
+            )
+        )
+    except BudgetExceededError as exc:
+        assert "model_budget_exhausted" in str(exc)
+    else:
+        raise AssertionError("expected shared model budget exhaustion")
+    assert len(supervisor.completions.requests) == 1
 
 
 def test_two_unstructured_replies_fail_safely_without_touching_mcp() -> None:

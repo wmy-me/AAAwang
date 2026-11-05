@@ -5,6 +5,12 @@
 - 真实商品 Run `445a8f9a-b180-47b0-8229-18a9ead33c9c` 通过真实 DeepSeek、独立 Worker、PostgreSQL 和 Java 模拟 `shopping-mcp`；Chrome 账号 `agent025_browser_retry_1793857946966` 完成商品任务、候选查看和刷新重读。一次模型返回多个委派被服务端一次委派上限安全拒绝，重试成功。
 - 地图/天气/能力路由/Worker/工具循环专项 `59 passed`，后端全量 `152 passed`，Ruff 通过；前端未因本任务修改，沿用 024 已验证的 build/lint 结果。详见[025报告](reports/025-backend-agent-organization-report.md)。
 
+## 026 商品发现 Agent 委派决策有界纠错（已完成）
+
+- 主 Agent 和 discovery MCP tool loop 各增加一次有界纠错；首次非法响应不执行委派或 MCP，修正后仍非法则明确失败，不静默选择第一项，不扩大白名单或预算。
+- 受控 FakeModel 覆盖多委派/多工具调用、未知或非法响应、纠正后失败和共享预算；专项 `22 passed`，后端全量 `156 passed`，Ruff 与 compileall 通过。
+- 真实 API/Worker 商品链路继续使用真实 DeepSeek、PostgreSQL 和 Java 模拟 `shopping-mcp`；Chrome 账号 `agent026_browser_retry_1793858976960` 完成商品任务并在刷新后恢复同一 Run、候选和模拟来源。真实 Run 正常完成，不将其描述为真实模型自然触发纠错。详见[026报告](reports/026-agent-delegation-recovery-report.md)。
+
 ## 024 Agent 结构、系统提示词与 Skill 分层（已完成）
 
 - 已将唯一商品发现 LangGraph 迁移至 `agents/discovery/graph.py`，拆出 `state.py`、`nodes.py`、可信角色提示、共享来源规则和受限 Skill loader；`shopping.py` 仅保留兼容导出，生产入口通过 discovery service 使用新图。coordinator 角色提示也已迁出，Worker 仍只负责 Run 生命周期和执行分派。

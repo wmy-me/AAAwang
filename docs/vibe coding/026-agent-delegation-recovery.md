@@ -1,6 +1,6 @@
 # 026：商品发现 Agent 委派决策的有界纠错
 
-- 状态：待执行
+- 状态：已完成
 - 阶段：P4，现有 Agent 可靠性
 - 参考基线：`232cba71cbfc6913fe5e7fdf66c4f81f46171be9`，执行前核对最新 HEAD。
 - 前置：[025 报告](../reports/025-backend-agent-organization-report.md)记录浏览器首轮因模型返回多个委派被拒绝，用户重试后成功。

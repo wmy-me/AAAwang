@@ -111,6 +111,33 @@ def _tool_result_json(value: Any) -> str:
     return serialized
 
 
+def _assistant_tool_message(message: Any) -> dict[str, Any]:
+    calls = list(message.tool_calls or [])
+    return {
+        "role": "assistant",
+        "content": message.content,
+        "tool_calls": [
+            {
+                "id": call.id,
+                "type": "function",
+                "function": {
+                    "name": call.function.name,
+                    "arguments": call.function.arguments,
+                },
+            }
+            for call in calls
+        ],
+    }
+
+
+def _tool_correction_message(error: ToolLoopError) -> str:
+    return (
+        f"工具调用校验错误：{error}。上一次请求未执行任何工具。"
+        "请只返回一个已授权工具调用，参数必须符合工具 schema；不要并行调用、"
+        "调用未知工具或在本轮直接请求第二个工具。"
+    )
+
+
 async def run_tool_loop(
     settings: Settings,
     prompt: str,
@@ -161,24 +188,65 @@ async def run_tool_loop(
                 if not first.choices:
                     raise LLMRequestError("DeepSeek 返回空响应：没有候选结果。")
                 message = first.choices[0].message
+                model_requests = 1
                 tool_calls = list(message.tool_calls or [])
                 if not tool_calls:
                     if force_tool_call:
-                        raise ToolLoopError("模型未返回必需的工具调用，已停止执行。")
-                    answer = (message.content or "").strip()
-                    if not answer:
-                        raise LLMRequestError("DeepSeek 返回空响应：没有文本或工具调用。")
-                    return ToolLoopResult(
-                        answer=answer,
-                        model_called_tool=False,
-                        service_id=service_id,
-                        protocol_version=connection.protocol_version,
-                        discovered_tools=tuple(tool.qualified_name for tool in discovered),
+                        first_error = ToolLoopError(
+                            "模型未返回必需的工具调用，已停止执行。"
+                        )
+                    else:
+                        answer = (message.content or "").strip()
+                        if not answer:
+                            raise LLMRequestError(
+                                "DeepSeek 返回空响应：没有文本或工具调用。"
+                            )
+                        return ToolLoopResult(
+                            answer=answer,
+                            model_called_tool=False,
+                            service_id=service_id,
+                            protocol_version=connection.protocol_version,
+                            discovered_tools=tuple(
+                                tool.qualified_name for tool in discovered
+                            ),
+                        )
+                else:
+                    first_error = (
+                        ToolLoopError("模型返回多个工具调用，超过本轮一次调用上限。")
+                        if len(tool_calls) != 1
+                        else None
                     )
+                if first_error is not None:
+                    messages.extend(
+                        [
+                            _assistant_tool_message(message),
+                            {
+                                "role": "user",
+                                "content": _tool_correction_message(first_error),
+                            },
+                        ]
+                    )
+                    retry = await create_deepseek_completion(
+                        settings,
+                        active_model,
+                        budget=budget,
+                        messages=messages,
+                        tools=model_tools,
+                        tool_choice="required" if force_tool_call else "auto",
+                        parallel_tool_calls=False if force_tool_call else None,
+                        max_tokens=256,
+                    )
+                    model_requests += 1
+                    if not retry.choices:
+                        raise LLMRequestError(
+                            "DeepSeek 纠正后返回空响应：没有候选结果。"
+                        )
+                    message = retry.choices[0].message
+                    tool_calls = list(message.tool_calls or [])
+                if not tool_calls:
+                    raise ToolLoopError("纠正后仍未返回工具调用，已停止执行。")
                 if len(tool_calls) != 1:
-                    if not force_tool_call:
-                        raise ToolLoopError("模型返回多个工具调用，超过本轮一次调用上限。")
-                    tool_calls = tool_calls[:1]
+                    raise ToolLoopError("纠正后仍返回多个工具调用，未执行工具。")
 
                 tool_call = tool_calls[0]
                 exposed = mapping.get(tool_call.function.name)
@@ -204,20 +272,7 @@ async def run_tool_loop(
                 serialized_result = _tool_result_json(tool_payload)
                 messages.extend(
                     [
-                        {
-                            "role": "assistant",
-                            "content": message.content,
-                            "tool_calls": [
-                                {
-                                    "id": tool_call.id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": tool_call.function.name,
-                                        "arguments": tool_call.function.arguments,
-                                    },
-                                }
-                            ],
-                        },
+                        _assistant_tool_message(message),
                         {
                             "role": "tool",
                             "tool_call_id": tool_call.id,
@@ -248,7 +303,7 @@ async def run_tool_loop(
                     discovered_tools=tuple(tool.qualified_name for tool in discovered),
                     called_tool=exposed.discovered.qualified_name,
                     tool_result=tool_payload,
-                    model_requests=2,
+                    model_requests=model_requests + 1,
                     tool_calls=1,
                 )
 

@@ -69,6 +69,9 @@ class ShoppingAgentResult:
 
 
 _DECISION_CORRECTION = (
+    "上一次决策未通过服务端校验，且其中的任何委派都没有执行。"
+    "请只选择以下一种合法结果：至多一个 delegate_shopping_discovery 委派，"
+    "或一个 direct_answer/clarification JSON；不要返回多个委派、未知工具或无效参数。"
     "请只返回一个 JSON 对象，不要 Markdown 代码块或额外说明："
     '{"decision_type":"direct_answer|clarification|delegated_discovery","answer":"..."}。'
     "如果需要查询商品候选，请改用委派工具调用。"
@@ -171,6 +174,27 @@ def _decision_from_message(
     return decision, answer, None
 
 
+def _assistant_decision_message(message: Any) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "role": "assistant",
+        "content": message.content,
+    }
+    calls = list(message.tool_calls or [])
+    if calls:
+        payload["tool_calls"] = [
+            {
+                "id": call.id,
+                "type": "function",
+                "function": {
+                    "name": call.function.name,
+                    "arguments": call.function.arguments,
+                },
+            }
+            for call in calls
+        ]
+    return payload
+
+
 async def _supervisor_decide(
     settings: Settings,
     goal: str,
@@ -178,7 +202,7 @@ async def _supervisor_decide(
     model_client: AsyncOpenAI | None,
     budget: RunBudget | None = None,
 ) -> tuple[str, str, dict[str, object] | None, int]:
-    """Decide once; retry the JSON contract at most once when formatting fails."""
+    """Decide once and correct one invalid response without executing it."""
     messages = _supervisor_messages(goal, conditions)
     tools = [delegate_tool()]
     async with open_deepseek_client(settings, model_client) as client:
@@ -194,17 +218,17 @@ async def _supervisor_decide(
         if not response.choices:
             raise LLMRequestError("主 Agent 返回空响应。")
         message = response.choices[0].message
-        if message.tool_calls:
+        try:
             decision, answer, request = _decision_from_message(message)
             return decision, answer, request, 1
-        try:
-            decision, answer = _parse_decision(message.content)
-            return decision, answer, None, 1
-        except LLMRequestError:
+        except LLMRequestError as first_error:
             retry_messages = [
                 *messages,
-                {"role": "assistant", "content": message.content or ""},
-                {"role": "user", "content": _DECISION_CORRECTION},
+                _assistant_decision_message(message),
+                {
+                    "role": "user",
+                    "content": f"校验错误：{first_error}\n{_DECISION_CORRECTION}",
+                },
             ]
             retry = await create_deepseek_completion(
                 settings,
@@ -217,7 +241,10 @@ async def _supervisor_decide(
             )
     if not retry.choices:
         raise LLMRequestError("主 Agent 纠正后仍返回空响应。")
-    decision, answer, request = _decision_from_message(retry.choices[0].message)
+    try:
+        decision, answer, request = _decision_from_message(retry.choices[0].message)
+    except LLMRequestError as second_error:
+        raise LLMRequestError(f"主 Agent 纠正后仍返回无效决策：{second_error}") from second_error
     return decision, answer, request, 2
 
 
