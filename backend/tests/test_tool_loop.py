@@ -329,6 +329,11 @@ def test_multiple_tool_calls_are_corrected_once_then_execute_one_call() -> None:
     assert result.model_requests == 3
     assert result.tool_calls == 1
     assert connection.calls == [("search_products", {"keyword": "本"})]
+    assert all(
+        len(item.get("tool_calls") or ()) < 2
+        for item in client.completions.requests[1]["messages"]
+        if item["role"] == "assistant"
+    )
 
 
 def test_empty_result_is_returned_to_model_as_success() -> None:

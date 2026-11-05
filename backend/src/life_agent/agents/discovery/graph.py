@@ -175,24 +175,12 @@ def _decision_from_message(
 
 
 def _assistant_decision_message(message: Any) -> dict[str, object]:
-    payload: dict[str, object] = {
+    """Keep a rejected response in context without invalid tool-call replay."""
+    return {
         "role": "assistant",
-        "content": message.content,
+        "content": (message.content or "").strip()
+        or "上一次响应未通过服务端校验。",
     }
-    calls = list(message.tool_calls or [])
-    if calls:
-        payload["tool_calls"] = [
-            {
-                "id": call.id,
-                "type": "function",
-                "function": {
-                    "name": call.function.name,
-                    "arguments": call.function.arguments,
-                },
-            }
-            for call in calls
-        ]
-    return payload
 
 
 async def _supervisor_decide(

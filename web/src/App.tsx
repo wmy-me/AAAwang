@@ -103,12 +103,12 @@ function App() {
   }, [task]);
 
   useEffect(() => {
-    if (!task) {
-      if (conversationId) void refreshConversationMessages(conversationId);
+    if (!conversationId) {
+      setMessages([]);
       return;
     }
-    void refreshTaskMessages(task.conversation_id, task.id);
-  }, [conversationId, task]);
+    void refreshConversationMessages(conversationId);
+  }, [conversationId]);
 
   function handleError(value: unknown) {
     if (isAuthError(value)) {
@@ -303,15 +303,6 @@ function App() {
     }
   }
 
-  async function refreshTaskMessages(conversation: string, taskId: string) {
-    try {
-      const page = await api.messages(conversation);
-      setMessages(page.items.filter((message) => message.task_id === taskId));
-    } catch (value) {
-      handleError(value);
-    }
-  }
-
   async function refreshConversationMessages(conversation: string) {
     try {
       const page = await api.messages(conversation);
@@ -397,10 +388,8 @@ function App() {
         const history = await api.shoppingAdjustments(task.id);
         setAdjustments(history.items);
         setAdjustmentVersion(history.current_version);
-        void refreshTaskMessages(task.conversation_id, task.id);
-      } else {
-        void refreshConversationMessages(conversationId);
       }
+      void refreshConversationMessages(conversationId);
     } catch (value) {
       if (!(value instanceof ApiError && value.status === 404))
         handleError(value);
@@ -746,8 +735,6 @@ function App() {
           {conversationId && (
             <TaskChat
               messages={messages}
-              artifacts={artifacts}
-              webSearchResults={webSearchResults}
               input={chatInput}
               busy={turnSubmitting}
               onInput={setChatInput}
@@ -839,16 +826,12 @@ function MapSearch({
 
 function TaskChat({
   messages,
-  artifacts,
-  webSearchResults,
   input,
   busy,
   onInput,
   onSubmit,
 }: {
   messages: Message[];
-  artifacts: ShoppingArtifacts | null;
-  webSearchResults: WebSearchResult[];
   input: string;
   busy: boolean;
   onInput: (value: string) => void;
@@ -872,15 +855,14 @@ function TaskChat({
             >
               <span>{message.role === "assistant" ? "助手" : "你"}</span>
               <p>{message.content}</p>
+              {message.role === "assistant" && message.run_id && (
+                <MessageResultCards runId={message.run_id} />
+              )}
             </div>
           ))
         ) : (
           <div className="chat-empty">说说你的目标、问题或想法。</div>
         )}
-        <ConversationResultCards
-          artifacts={artifacts}
-          webSearchResults={webSearchResults}
-        />
       </div>
       <form
         className="chat-composer"
@@ -906,6 +888,57 @@ function TaskChat({
         </button>
       </form>
     </section>
+  );
+}
+
+function MessageResultCards({ runId }: { runId: string }) {
+  const [artifacts, setArtifacts] = useState<ShoppingArtifacts | null>(null);
+  const [webSearchResults, setWebSearchResults] = useState<WebSearchResult[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const run = await api.getRun(runId);
+        if (!active) return;
+        const shopping =
+          run.execution_type === "shopping_agent" ||
+          run.execution_type === "shopping_research" ||
+          run.execution_type === "capability_router";
+        const search =
+          run.execution_type === "web_search" ||
+          run.execution_type === "capability_router";
+        if (shopping) {
+          try {
+            const result = await api.shoppingArtifacts(runId);
+            if (active) setArtifacts(result);
+          } catch (value) {
+            if (!(value instanceof ApiError && value.status === 404)) throw value;
+          }
+        }
+        if (search) {
+          try {
+            const result = await api.webSearch(runId);
+            if (active) setWebSearchResults(result);
+          } catch (value) {
+            if (!(value instanceof ApiError && value.status === 404)) throw value;
+          }
+        }
+      } catch {
+        /* A card is optional; keep the assistant text visible. */
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [runId]);
+
+  return (
+    <ConversationResultCards
+      artifacts={artifacts}
+      webSearchResults={webSearchResults}
+    />
   );
 }
 

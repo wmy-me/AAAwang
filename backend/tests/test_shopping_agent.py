@@ -206,6 +206,12 @@ def test_multiple_delegations_are_corrected_before_any_mcp_call() -> None:
     assert connection.calls == [("search_products", {"keyword": "铅笔", "limit": 2})]
     correction = supervisor.completions.requests[1]["messages"][-1]["content"]
     assert "任何委派都没有执行" in correction
+    rejected = [
+        item
+        for item in supervisor.completions.requests[1]["messages"]
+        if item["role"] == "assistant"
+    ][-1]
+    assert "tool_calls" not in rejected
     assert len(supervisor.completions.requests[0]["messages"][0]["content"]) > 0
 
 

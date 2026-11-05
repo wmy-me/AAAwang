@@ -130,6 +130,15 @@ def _assistant_tool_message(message: Any) -> dict[str, Any]:
     }
 
 
+def _assistant_correction_message(message: Any) -> dict[str, Any]:
+    """Do not replay rejected tool calls without matching tool messages."""
+    return {
+        "role": "assistant",
+        "content": (message.content or "").strip()
+        or "上一次工具调用未通过服务端校验。",
+    }
+
+
 def _tool_correction_message(error: ToolLoopError) -> str:
     return (
         f"工具调用校验错误：{error}。上一次请求未执行任何工具。"
@@ -219,7 +228,7 @@ async def run_tool_loop(
                 if first_error is not None:
                     messages.extend(
                         [
-                            _assistant_tool_message(message),
+                            _assistant_correction_message(message),
                             {
                                 "role": "user",
                                 "content": _tool_correction_message(first_error),

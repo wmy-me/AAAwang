@@ -12,7 +12,7 @@ from typing import Any
 
 from life_agent.agents.shared.prompt_loader import load_prompt
 from life_agent.core.budget import RunBudget
-from life_agent.core.llm import ToolLoopError
+from life_agent.core.llm import LLMConfigurationError, LLMRequestError, ToolLoopError
 from life_agent.core.llm.deepseek import call_deepseek
 from life_agent.modules.capabilities import (
     has_location_scope,
@@ -22,6 +22,113 @@ from life_agent.modules.capabilities import (
 from life_agent.tools.mcp import McpClient, McpClientError
 
 logger = logging.getLogger(__name__)
+
+
+def classify_conversation_turn(
+    settings,
+    content: str,
+    history: list[dict[str, str]],
+    tasks: list[dict[str, object]],
+) -> dict[str, object]:
+    """Classify one conversation turn without creating a task for casual chat."""
+    recent = "\n".join(
+        f"{item['role']}: {item['content'][:400]}" for item in history[-8:]
+    ) or "（无历史）"
+    task_lines = "\n".join(
+        f"- {item['id']}: {str(item.get('goal', ''))[:120]}"
+        for item in tasks[:20]
+    ) or "（无任务）"
+    prompt = (
+        "你是对话入口的受限路由器。只输出一个 JSON 对象，不要 Markdown。\n"
+        '{"intent":"chat|task|update_task|ambiguous","task_id":null,'
+        '"clarification":null,"reason":"简短原因"}\n'
+        "intent 规则：\n"
+        "- chat：问候、闲聊、能力介绍、普通知识问答，不需要购物任务或工具。\n"
+        "- task：用户要求购买/查询商品、地点、天气、公开网页资料，或需要调用业务能力；"
+        "若明确延续某个已有任务，task_id 填其 ID，否则 task_id=null 表示新建任务。\n"
+        "- update_task：用户明确修改已有任务的条件（例如“预算改为180元”）；"
+        "task_id 必须指向一个已有任务。任务列表超过一个时，本轮消息必须明确提到"
+        "任务名称、目标或 ID 才能选择；仅说新条件而没有指代对象时用 ambiguous。\n"
+        "- ambiguous：多个任务都可能相关、指代不清或无法安全关联；"
+        "填写一句自然语言 clarification，不猜任务。\n"
+        "任务列表：\n"
+        f"{task_lines}\n"
+        "最近对话：\n"
+        f"{recent}\n"
+        f"本轮用户消息：{content}\n"
+        "只分类，不执行工具，不创建任务，不修改条件。"
+    )
+    try:
+        response = asyncio.run(
+            call_deepseek(settings, prompt, max_tokens=256)
+        )
+        value = _decision_json(response.text)
+    except (LLMConfigurationError, LLMRequestError):
+        logger.warning("conversation classifier unavailable; using safe local fallback")
+        value = None
+    if value is None:
+        return _fallback_conversation_classification(content, tasks)
+    intent = value.get("intent")
+    if intent not in {"chat", "task", "update_task", "ambiguous"}:
+        return _fallback_conversation_classification(content, tasks)
+    task_id = value.get("task_id")
+    if not isinstance(task_id, str) or not task_id:
+        task_id = None
+    valid_ids = {str(item["id"]) for item in tasks}
+    if task_id is not None and task_id not in valid_ids:
+        return {
+            "intent": "ambiguous",
+            "task_id": None,
+            "clarification": "我无法安全确定要修改哪个任务，请说明任务名称或重新描述目标。",
+            "reason": "模型返回了不在当前对话中的任务 ID",
+        }
+    if intent == "update_task" and task_id is None:
+        return {
+            "intent": "ambiguous",
+            "task_id": None,
+            "clarification": "当前对话关联了多个任务，请说明要修改哪一个。",
+            "reason": "更新意图缺少唯一任务",
+        }
+    clarification = value.get("clarification")
+    return {
+        "intent": intent,
+        "task_id": task_id,
+        "clarification": (
+            str(clarification)[:500]
+            if isinstance(clarification, str) and clarification.strip()
+            else "请说明你想继续哪个任务或补充目标。"
+            if intent == "ambiguous"
+            else None
+        ),
+        "reason": str(value.get("reason"))[:500] if value.get("reason") else None,
+    }
+
+
+def _fallback_conversation_classification(
+    content: str, tasks: list[dict[str, object]]
+) -> dict[str, object]:
+    """Keep chat/task behavior safe when the pre-routing model is unavailable."""
+    from life_agent.modules.capabilities import RouteKind, route_task_turn
+
+    decision = route_task_turn(content)
+    if decision.kind is RouteKind.DIRECT:
+        return {"intent": "chat", "task_id": None, "reason": "本地安全回退"}
+    if len(tasks) > 1 and not task_words_are_new(content):
+        return {
+            "intent": "ambiguous",
+            "task_id": None,
+            "clarification": "当前对话关联了多个任务，请说明要继续哪一个。",
+            "reason": "本地安全回退发现多任务歧义",
+        }
+    return {
+        "intent": "task",
+        "task_id": str(tasks[0]["id"]) if len(tasks) == 1 else None,
+        "reason": "本地安全回退",
+    }
+
+
+def task_words_are_new(content: str) -> bool:
+    return any(token in content for token in ("新任务", "另一个任务", "新建"))
 
 
 def decide_capabilities(settings, claim, budget) -> dict[str, object]:

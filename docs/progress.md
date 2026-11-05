@@ -112,13 +112,14 @@
 
 ## 代码现状
 
-## 029 纯对话入口与 Agent 自主执行（执行中）
+## 029 纯对话入口与 Agent 自主执行（已完成）
 
-- 新增会话级自然语言回合入口：新会话可直接发送消息；普通问候持久化 assistant 消息且不创建 task/Run；采买消息自动创建 shopping task、revision 和 Run。旧 task chat、Run、revision、SSE 与 API 保留兼容。
-- 前端默认显示会话消息区和固定输入框，不再要求用户先创建任务或填写动态表单；真实 Chromium 已验证新建对话、问候、刷新重读。
-- 真实 PostgreSQL、DeepSeek、独立 Worker 和 shopping-mcp 已验证：普通问候无 task/Run；彩色铅笔采买 Run `7f1c1f15-75b4-443f-871b-4acc5c717d97` 完成并持久化模拟商品来源。另一次奖品请求因 DeepSeek HTTP 400 安全失败，未伪造结果。
-- 后端全量 `169 passed`，Ruff、compileall、Alembic check 和前端 build 通过；前端 lint 仍有 2 条既有 Hook warning。详见[029报告](reports/029-conversation-first-agent-report.md)。
-- **尚未完成：** 普通对话的 taskless Worker/Run/SSE/取消/共享预算、会话级多轮 revision、商品/网页结果卡、第二账号新入口浏览器隔离和完整 029 验收。当前不启动 030。
+- 新增会话级自然语言回合入口和模型级对话路由器：根据最近消息与任务列表判断 `chat/task/update_task/ambiguous`，不再用关键词预筛决定是否创建任务；普通问候走 taskless Worker Run，采买/工具请求创建或关联 task，任务更新创建 revision，多任务无明确指代时强制澄清。
+- 普通对话已复用 taskless Worker Run、租约/fencing、取消与终态持久化；前端默认显示全部会话消息和固定输入框，不再以创建任务或填写表单为前置。
+- 每条 assistant 消息按自身 `run_id` 加载商品/来源卡，历史消息卡片不被新 Run 覆盖；刷新后消息与卡片恢复，第二账号浏览器无会话/卡片，API 读取 404。
+- 已定位 HTTP 400 根因：纠正重试回放带 `tool_calls` 的 assistant 消息但缺少对应 tool 消息；discovery 与 tool loop 已改为回放纯文本纠正消息，真实采买复跑完成。
+- 真实 DeepSeek、独立 Worker、PostgreSQL、shopping-mcp 和 Chromium 已验证聊天、采买、预算 revision、多任务澄清、商品卡和受控来源卡；后端全量 `175 passed`，会话专项 `11 passed`，Ruff、compileall、Alembic check、前端 build 通过（2 条既有 lint warning）。详见[029报告](reports/029-conversation-first-agent-report.md)。
+- 边界：公开搜索来源卡使用受控快照验证（027 已有真实 Tavily 证据）；API 内对话分类调用未计入 RunBudget；未单独强制模拟 SSE 断线重连。当前不启动 030。
 
 | 能力 | 事实与证据 |
 | --- | --- |

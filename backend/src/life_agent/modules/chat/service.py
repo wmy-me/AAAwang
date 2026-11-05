@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from life_agent.agents.coordinator.service import classify_conversation_turn
+from life_agent.core.config import get_settings
 from life_agent.db.models import Conversation, Message, Run, Task, TaskRevision
 from life_agent.modules.capabilities import route_task_turn
 from life_agent.modules.runs.service import create_run
@@ -151,6 +153,123 @@ def _new_shopping_task(
     return task, revision
 
 
+def _conversation_history(db: Session, conversation_id: uuid.UUID) -> list[dict[str, str]]:
+    messages = list(
+        db.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(8)
+        )
+    )
+    return [
+        {"role": message.role, "content": message.content}
+        for message in reversed(messages)
+    ]
+
+
+def _conversation_tasks(
+    db: Session, conversation_id: uuid.UUID
+) -> list[Task]:
+    return list(
+        db.scalars(
+            select(Task)
+            .where(Task.conversation_id == conversation_id)
+            .order_by(Task.updated_at.desc(), Task.id.desc())
+        )
+    )
+
+
+def _explicit_task_reference(content: str, tasks: list[Task]) -> bool:
+    lowered = content.casefold()
+    return any(
+        str(task.id).casefold() in lowered or task.goal.casefold() in lowered
+        for task in tasks
+    )
+
+
+def _task_snapshot(db: Session, task: Task) -> TaskRevision:
+    snapshot = db.scalar(
+        select(TaskRevision).where(
+            TaskRevision.task_id == task.id,
+            TaskRevision.revision == task.current_revision,
+        )
+    )
+    if snapshot is None:
+        raise ChatTurnConflictError
+    return snapshot
+
+
+def _taskless_conversation_run(
+    db: Session,
+    owner_id: uuid.UUID,
+    conversation: Conversation,
+    message: Message,
+    client_turn_id: str,
+    decision: dict[str, object] | None = None,
+) -> ConversationTurn:
+    run = create_run(
+        db,
+        owner_id,
+        None,
+        None,
+        f"conversation:{client_turn_id}",
+        "direct_answer",
+        input_message_id=message.id,
+        decision=decision,
+        commit=False,
+    )
+    message.run_id = run.id
+    conversation.updated_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(message)
+    db.refresh(run)
+    return ConversationTurn(message, None, run, None, {}, True)
+
+
+def _task_conversation_run(
+    db: Session,
+    owner_id: uuid.UUID,
+    conversation: Conversation,
+    message: Message,
+    client_turn_id: str,
+    task: Task,
+    revision: TaskRevision,
+) -> ConversationTurn:
+    run = create_run(
+        db,
+        owner_id,
+        task.id,
+        revision.revision,
+        f"conversation:{client_turn_id}",
+        "capability_decision",
+        input_message_id=message.id,
+        decision={
+            "kind": "pending",
+            "capability_ids": [],
+            "decision_source": "deepseek_structured_worker",
+        },
+        commit=False,
+    )
+    message.task_id = task.id
+    message.run_id = run.id
+    conversation.updated_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(message)
+    db.refresh(run)
+    db.refresh(task)
+    return ConversationTurn(message, None, run, task, dict(revision.conditions), True)
+
+
+def _clarification_decision(text: str) -> dict[str, object]:
+    return {
+        "kind": "clarification",
+        "capability_ids": [],
+        "clarification": text[:500],
+        "decision_source": "deepseek_structured_worker",
+    }
+
+
 def submit_conversation_turn(
     db: Session,
     owner_id: uuid.UUID,
@@ -164,6 +283,48 @@ def submit_conversation_turn(
     if existing is not None:
         return existing
     conversation = _owned_conversation(db, owner_id, conversation_id)
+    tasks = _conversation_tasks(db, conversation.id)
+    classification = classify_conversation_turn(
+        get_settings(),
+        content,
+        _conversation_history(db, conversation.id),
+        [
+            {
+                "id": str(task.id),
+                "goal": task.goal,
+                "revision": task.current_revision,
+                "domain": task.domain,
+            }
+            for task in tasks
+        ],
+    )
+    if (
+        len(tasks) > 1
+        and classification.get("task_id")
+        and classification.get("intent") in {"task", "update_task"}
+        and not _explicit_task_reference(content, tasks)
+    ):
+        classification = {
+            **classification,
+            "intent": "ambiguous",
+            "task_id": None,
+            "clarification": "当前对话关联了多个任务。请说明要修改哪个任务，或提供任务名称。",
+        }
+    budget_update = _budget_update(content)
+    if budget_update is not None and classification.get("intent") == "task":
+        if len(tasks) == 1:
+            classification = {
+                **classification,
+                "intent": "update_task",
+                "task_id": str(tasks[0].id),
+            }
+        elif len(tasks) > 1:
+            classification = {
+                **classification,
+                "intent": "ambiguous",
+                "task_id": None,
+                "clarification": "当前对话关联了多个任务，请说明要修改哪一个的预算。",
+            }
     message = Message(
         conversation_id=conversation.id,
         client_message_id=client_turn_id,
@@ -173,125 +334,114 @@ def submit_conversation_turn(
     )
     db.add(message)
     db.flush()
-    budget = _budget_update(content)
-    if budget is not None:
-        tasks = list(
-            db.scalars(
-                select(Task)
-                .where(Task.conversation_id == conversation.id)
-                .order_by(Task.updated_at.desc(), Task.id.desc())
-            )
-        )
-        if len(tasks) == 1:
-            task = tasks[0]
-            current = db.scalar(
-                select(TaskRevision).where(
-                    TaskRevision.task_id == task.id,
-                    TaskRevision.revision == task.current_revision,
+
+    intent = classification.get("intent")
+    if intent == "ambiguous":
+        return _taskless_conversation_run(
+            db,
+            owner_id,
+            conversation,
+            message,
+            client_turn_id,
+            _clarification_decision(
+                str(
+                    classification.get("clarification")
+                    or "请说明你想继续哪个任务或补充目标。"
                 )
-            )
-            if current is None:
-                raise ChatTurnConflictError
-            conditions = dict(current.conditions)
-            conditions["budget"] = budget
-            revision = create_revision(
+            ),
+        )
+    if intent == "chat":
+        return _taskless_conversation_run(
+            db, owner_id, conversation, message, client_turn_id
+        )
+    if intent == "update_task":
+        selected = [
+            task
+            for task in tasks
+            if str(task.id) == classification.get("task_id")
+        ]
+        if not selected and len(tasks) == 1:
+            selected = tasks
+        if len(selected) != 1 or selected[0].domain != "shopping":
+            return _taskless_conversation_run(
                 db,
                 owner_id,
-                task.id,
-                task.current_revision,
-                None,
-                conditions,
-                "由会话自然语言更新预算",
-                confirm_goal_conflict=True,
-                commit=False,
+                conversation,
+                message,
+                client_turn_id,
+                _clarification_decision(
+                    "我无法安全确定要修改哪个任务，请说明任务名称或重新描述目标。"
+                ),
             )
-            message.task_id = task.id
-            run = create_run(
+        task = selected[0]
+        current = _task_snapshot(db, task)
+        conditions = dict(current.conditions)
+        if budget_update is not None:
+            conditions["budget"] = budget_update
+        else:
+            conditions = _infer_conditions(
+                content, conditions, _latest_assistant(db, task.id)
+            )
+        if conditions == current.conditions:
+            return _taskless_conversation_run(
                 db,
                 owner_id,
-                task.id,
-                revision.revision,
-                f"conversation:{client_turn_id}",
-                "capability_decision",
-                input_message_id=message.id,
-                decision={
-                    "kind": "pending",
-                    "capability_ids": [],
-                    "decision_source": "deepseek_structured_worker",
-                },
-                commit=False,
+                conversation,
+                message,
+                client_turn_id,
+                _clarification_decision(
+                    "我没有识别到要修改的条件，请直接说明新的预算、人数或数量。"
+                ),
             )
-            message.run_id = run.id
-            conversation.updated_at = datetime.now(UTC)
-            db.commit()
-            db.refresh(message)
-            db.refresh(run)
-            db.refresh(task)
-            return ConversationTurn(message, None, run, task, dict(revision.conditions), True)
-        if len(tasks) > 1:
-            run = create_run(
-                db,
-                owner_id,
-                None,
-                None,
-                f"conversation:{client_turn_id}",
-                "direct_answer",
-                input_message_id=message.id,
-                decision={
-                    "kind": "clarification",
-                    "capability_ids": [],
-                    "clarification": "当前对话关联了多个购物任务。请说明要调整哪个任务的预算。",
-                },
-                commit=False,
-            )
-            message.run_id = run.id
-            conversation.updated_at = datetime.now(UTC)
-            db.commit()
-            db.refresh(message)
-            db.refresh(run)
-            return ConversationTurn(message, None, run, None, {}, True)
-    if _looks_like_shopping(content):
-        task, revision = _new_shopping_task(db, conversation.id, content)
-        message.task_id = task.id
-        run = create_run(
+        revision = create_revision(
             db,
             owner_id,
             task.id,
-            revision.revision,
-            f"conversation:{client_turn_id}",
-            "capability_decision",
-            input_message_id=message.id,
-            decision={
-                "kind": "pending",
-                "capability_ids": [],
-                "decision_source": "deepseek_structured_worker",
-            },
+            task.current_revision,
+            None,
+            conditions,
+            "由会话自然语言更新条件",
+            confirm_goal_conflict=True,
             commit=False,
         )
-        message.run_id = run.id
-        conversation.updated_at = datetime.now(UTC)
-        db.commit()
-        db.refresh(message)
-        db.refresh(run)
-        db.refresh(task)
-        return ConversationTurn(message, None, run, task, dict(revision.conditions), True)
-
-    run = create_run(
-        db,
-        owner_id,
-        None,
-        None,
-        f"conversation:{client_turn_id}",
-        "direct_answer",
-        input_message_id=message.id,
-        commit=False,
+        return _task_conversation_run(
+            db, owner_id, conversation, message, client_turn_id, task, revision
+        )
+    if intent == "task":
+        selected = [
+            task
+            for task in tasks
+            if str(task.id) == classification.get("task_id")
+        ]
+        if len(selected) == 1 and selected[0].domain == "shopping":
+            task = selected[0]
+            current = _task_snapshot(db, task)
+            conditions = _infer_conditions(
+                content, dict(current.conditions), _latest_assistant(db, task.id)
+            )
+            revision = current
+            if conditions != current.conditions:
+                revision = create_revision(
+                    db,
+                    owner_id,
+                    task.id,
+                    task.current_revision,
+                    None,
+                    conditions,
+                    "由会话自然语言补充条件",
+                    confirm_goal_conflict=True,
+                    commit=False,
+                )
+            return _task_conversation_run(
+                db, owner_id, conversation, message, client_turn_id, task, revision
+            )
+        task, revision = _new_shopping_task(db, conversation.id, content)
+        return _task_conversation_run(
+            db, owner_id, conversation, message, client_turn_id, task, revision
+        )
+    return _taskless_conversation_run(
+        db, owner_id, conversation, message, client_turn_id
     )
-    message.run_id = run.id
-    conversation.updated_at = datetime.now(UTC)
-    db.commit()
-    db.refresh(message)
-    db.refresh(run)
-    return ConversationTurn(message, None, run, None, {}, True)
 
 
 def _owned_task(
