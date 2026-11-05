@@ -2,7 +2,7 @@
 
 ## 结论
 
-028 已完成。本次扩展了受控动态表单的字段能力，同时保留 021 的 shopping 默认四字段、任务 revision、确认幂等、历史读取和预算复算语义。未新增数据库迁移：`TaskRevision.conditions` 与 `DynamicFormProposal.schema/confirmed_values` 已是 JSON 快照，新增字段在服务层完成 domain-aware 校验后复用既有原子 revision 写入。
+028 部分完成，尚未达到任务验收：真实模型/Worker/PostgreSQL/浏览器场景尚未验证，当前字段 ID 与选项仍限定在预注册列表，尚不支持模型按受控 schema 提议新的业务字段。本次扩展了受控动态表单的字段能力，同时保留 021 的 shopping 默认四字段、任务 revision、确认幂等、历史读取和预算复算语义。未新增数据库迁移：`TaskRevision.conditions` 与 `DynamicFormProposal.schema/confirmed_values` 已是 JSON 快照，新增字段在服务层完成 domain-aware 校验后复用既有原子 revision 写入。
 
 ## 实现
 
