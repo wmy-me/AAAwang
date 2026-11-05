@@ -28,7 +28,7 @@
 
 ## 待补真实验收
 
-在本地 `backend/.env` 设置 `TAVILY_MCP_KEY` 并将 `TAVILY_MCP_ENABLED=true` 后，执行 Tavily 官方 MCP 的握手、工具发现和一次搜索；随后用真实 DeepSeek、独立 Worker、PostgreSQL 和浏览器验证来源展示、同一 Run 刷新重读及第二用户隔离。不得在报告、日志或聊天中记录 key。
+用户后续说明已在本地 `backend/.env` 配置网页搜索 API；尚未验证其变量名及有效性。更正配置说明：当前 Settings 默认只读取仓库根目录 `.env`（进程环境变量可覆盖），不会自动读取 `backend/.env`。按 027 任务的配置核对步骤安全处理，在实际生效的配置中设置 `TAVILY_MCP_KEY` 并将 `TAVILY_MCP_ENABLED=true` 后，执行 Tavily 官方 MCP 的握手、工具发现和一次搜索；随后用真实 DeepSeek、独立 Worker、PostgreSQL 和浏览器验证来源展示、同一 Run 刷新重读及第二用户隔离。不得在报告、日志或聊天中记录 key。
 
 ## 数据与幂等边界
 
