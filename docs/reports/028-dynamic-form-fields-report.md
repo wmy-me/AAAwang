@@ -2,7 +2,7 @@
 
 ## 结论
 
-028 已完成。此前 `8bebb53` 的版本仍把字段限制在预设注册表；本轮已改为“模型生成业务字段、服务端校验受控 schema、用户确认后写入 revision”，并补齐真实模型/Worker/PostgreSQL/浏览器场景。同时保留 021 的 shopping 默认四字段、任务 revision、确认幂等、历史读取和预算复算语义。未新增数据库迁移：`TaskRevision.conditions` 与 `DynamicFormProposal.schema/confirmed_values` 已是 JSON 快照。
+028 部分完成：动态字段已有实现和一个真实模型/Worker/数据库场景；网页实际填写提交、第二个真实场景及动态字段经 revision 接口写入的校验边界尚待补证。此前 `8bebb53` 的版本仍把字段限制在预设注册表；本轮已改为“模型生成业务字段、服务端校验受控 schema、用户确认后写入 revision”，并记录真实模型/Worker/PostgreSQL 场景及 Chrome 打开、刷新和接口读取。同时保留 021 的 shopping 默认四字段、任务 revision、确认幂等、历史读取和预算复算语义。未新增数据库迁移：`TaskRevision.conditions` 与 `DynamicFormProposal.schema/confirmed_values` 已是 JSON 快照。
 
 ## 实现
 
