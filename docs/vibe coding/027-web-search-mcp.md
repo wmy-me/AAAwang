@@ -1,6 +1,6 @@
 # 027：公开网页搜索 MCP 与来源引用
 
-- 状态：受阻（实现与替身验证完成，真实 Tavily/浏览器验收待本地 key）
+- 状态：已完成
 - 所属阶段：P4 真实信息与更多采买场景
 - 规划基线：`9595bdc663b5a6ff91e7d0d99625ec2b9a0c4aca`；执行前核对 HEAD。
 - 前置：[026 报告](../reports/026-agent-delegation-recovery-report.md)

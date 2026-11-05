@@ -2,7 +2,7 @@
 
 ## 结论
 
-027 的受控公开网页搜索实现已完成，后端、前端、迁移和测试替身验证通过；真实 Tavily 协议、真实 DeepSeek 选择、独立 Worker 搜索 Run 和浏览器验收暂受本地缺少 `TAVILY_MCP_KEY` 阻塞。密钥不通过聊天提供，待用户在本地环境补齐后再做真实验收。
+027 的受控公开网页搜索实现和真实验收已完成。真实 Tavily 协议、真实 DeepSeek 选择、独立 Worker 搜索 Run、PostgreSQL 持久化、Chrome 刷新重读和双用户隔离均已通过。Tavily key 只通过本次 API/Worker 进程环境提供，未写入仓库或报告。
 
 ## 已实现
 
@@ -24,11 +24,19 @@
 - `npm run build`：通过。
 - 搜索替身覆盖服务缺失、空/非法来源、公开 URL 规范化、schema 不兼容、鉴权和超时错误，以及 key 不出现在错误文本。
 
-以上测试使用受控替身，不代表已连接 Tavily。当前没有执行真实 `initialize/list_tools/call_tool`、真实 DeepSeek 选择、真实 Worker 搜索 Run 或浏览器搜索流程。
+## 真实闭环证据
 
-## 待补真实验收
+- 真实 MCP 直连：`tavily_enabled=True`，`tavily_service_configured=True`，实际使用 `tavily_search` 返回 10 条公开来源。
+- 真实 Run：`dda09f3d-5792-4244-a112-b9468d969e13` 完成，`execution_type=web_search`，能力为 `web_search`；Run 决策来源为 `deepseek_structured_worker`，模型请求 1 次，MCP 尝试 1 次，来源快照持久化 10 条。
+- 数据库刷新重读：同一会话重新读取 `/api/runs/{run_id}/web-search` 返回 10 条来源。
+- Chrome 刷新：真实 Chrome page 中刷新前后 Run 与来源接口均为 HTTP 200，来源数量均为 10。
+- 第二用户隔离：第二用户读取同一 Run 和 `/web-search` 均返回 HTTP 404。
 
-用户后续说明已在本地 `backend/.env` 配置网页搜索 API；尚未验证其变量名及有效性。更正配置说明：当前 Settings 默认只读取仓库根目录 `.env`（进程环境变量可覆盖），不会自动读取 `backend/.env`。按 027 任务的配置核对步骤安全处理，在实际生效的配置中设置 `TAVILY_MCP_KEY` 并将 `TAVILY_MCP_ENABLED=true` 后，执行 Tavily 官方 MCP 的握手、工具发现和一次搜索；随后用真实 DeepSeek、独立 Worker、PostgreSQL 和浏览器验证来源展示、同一 Run 刷新重读及第二用户隔离。不得在报告、日志或聊天中记录 key。
+以上替身测试与真实证据分开记录；真实 Tavily MCP、DeepSeek、Worker、PostgreSQL 和 Chrome 验收均已执行。
+
+## 密钥与复现
+
+本次验收使用进程环境提供的本地 key 启动 API 和 Worker，并设置 `TAVILY_MCP_ENABLED=true`；项目未改写 key，也未在报告、日志或聊天中记录 key。当前 Settings 默认只读取仓库根目录 `.env`（进程环境变量可覆盖），不会自动读取 `backend/.env`；后续复现应在根目录 `.env` 或等价进程环境中配置。外部只读搜索可重试，不承诺 exactly-once。
 
 ## 数据与幂等边界
 
