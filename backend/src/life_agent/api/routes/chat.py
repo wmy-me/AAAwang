@@ -7,10 +7,16 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from life_agent.api.dependencies import CurrentUser, Database
 from life_agent.api.routes.auth import require_trusted_origin
-from life_agent.modules.chat.schemas import TaskChatTurnCreate, TaskChatTurnResponse
+from life_agent.modules.chat.schemas import (
+    ConversationTurnCreate,
+    ConversationTurnResponse,
+    TaskChatTurnCreate,
+    TaskChatTurnResponse,
+)
 from life_agent.modules.chat.service import (
     ChatTurnConflictError,
     ChatTurnNotFoundError,
+    submit_conversation_turn,
     submit_turn,
 )
 from life_agent.modules.conversations.schemas import MessageResponse
@@ -19,6 +25,60 @@ from life_agent.modules.tasks.consistency import GoalConflictError
 from life_agent.modules.tasks.schemas import TaskResponse
 
 router = APIRouter(prefix="/conversations")
+
+
+@router.post(
+    "/{conversation_id}/turns",
+    response_model=ConversationTurnResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def submit_conversation(
+    conversation_id: uuid.UUID,
+    body: ConversationTurnCreate,
+    response: Response,
+    db: Database,
+    current_user: CurrentUser,
+) -> ConversationTurnResponse:
+    try:
+        turn = submit_conversation_turn(
+            db,
+            current_user.id,
+            conversation_id,
+            body.client_turn_id,
+            body.content.strip(),
+        )
+    except ChatTurnNotFoundError as exc:
+        raise _not_found() from exc
+    except ChatTurnConflictError as exc:
+        raise HTTPException(status_code=409, detail="回合请求 ID 已用于不同消息。") from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="对话暂时不可用。") from exc
+    if not turn.created:
+        response.status_code = status.HTTP_200_OK
+    return ConversationTurnResponse(
+        message=MessageResponse.model_validate(turn.message),
+        assistant_message=(
+            MessageResponse.model_validate(turn.assistant_message)
+            if turn.assistant_message is not None
+            else None
+        ),
+        run=RunResponse.model_validate(turn.run) if turn.run is not None else None,
+        task=(TaskResponse.model_validate({
+            "id": turn.task.id,
+            "conversation_id": turn.task.conversation_id,
+            "domain": turn.task.domain,
+            "goal": turn.task.goal,
+            "current_revision": turn.task.current_revision,
+            "conditions": turn.conditions,
+            "goal_conflicts": None,
+            "goal_resolution": None,
+            "goal_legacy": False,
+            "created_at": turn.task.created_at,
+            "updated_at": turn.task.updated_at,
+        }) if turn.task is not None else None),
+    )
 
 
 def _not_found() -> HTTPException:

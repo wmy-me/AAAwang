@@ -252,6 +252,13 @@ export interface ChatTurnResponse {
   assistant_message: Message | null
 }
 
+export interface ConversationTurnResponse {
+  message: Message
+  assistant_message: Message | null
+  run: Run | null
+  task: Task | null
+}
+
 export interface FormSubmitResponse {
   message: Message
   run: Run
@@ -385,6 +392,15 @@ export const api = {
     request<ChatTurnResponse>(
       `/conversations/${conversationId}/tasks/${taskId}/turns`,
       json({ client_turn_id: clientTurnId, content, task_id: taskId, expected_revision: expectedRevision }),
+    ),
+  submitConversationTurn: (
+    conversationId: string,
+    clientTurnId: string,
+    content: string,
+  ) =>
+    request<ConversationTurnResponse>(
+      `/conversations/${conversationId}/turns`,
+      json({ client_turn_id: clientTurnId, content }),
     ),
 }
 

@@ -26,6 +26,20 @@ class TaskChatTurnResponse(BaseModel):
     assistant_message: MessageResponse | None = None
 
 
+class ConversationTurnCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_turn_id: StrictStr = Field(min_length=1, max_length=128)
+    content: StrictStr = Field(min_length=1, max_length=8000)
+
+
+class ConversationTurnResponse(BaseModel):
+    message: MessageResponse
+    assistant_message: MessageResponse | None = None
+    run: RunResponse | None = None
+    task: TaskResponse | None = None
+
+
 class TaskChatMessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

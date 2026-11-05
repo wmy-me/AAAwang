@@ -105,11 +105,11 @@ function App() {
 
   useEffect(() => {
     if (!task) {
-      setMessages([]);
+      if (conversationId) void refreshConversationMessages(conversationId);
       return;
     }
     void refreshTaskMessages(task.conversation_id, task.id);
-  }, [task]);
+  }, [conversationId, task]);
 
   function handleError(value: unknown) {
     if (isAuthError(value)) {
@@ -313,18 +313,25 @@ function App() {
     }
   }
 
+  async function refreshConversationMessages(conversation: string) {
+    try {
+      const page = await api.messages(conversation);
+      setMessages(page.items);
+    } catch (value) {
+      handleError(value);
+    }
+  }
+
   async function submitChatTurn() {
     const content = chatInput.trim();
-    if (!task || !conversationId || !content || turnSubmitting) return;
+    if (!conversationId || !content || turnSubmitting) return;
     setTurnSubmitting(true);
     setError("");
     try {
-      const turn = await api.submitTurn(
+      const turn = await api.submitConversationTurn(
         conversationId,
-        task.id,
         crypto.randomUUID(),
         content,
-        task.current_revision,
       );
       setChatInput("");
       setMessages((items) => [
@@ -332,20 +339,22 @@ function App() {
         turn.message,
         ...(turn.assistant_message ? [turn.assistant_message] : []),
       ]);
-      setTask(turn.task);
-      void api.getDynamicForm(turn.task.id).then(setDynamicForm).catch(handleError);
-      setRuns((items) => [
-        turn.run,
-        ...items.filter((item) => item.id !== turn.run.id),
-      ]);
-      selectRun(turn.run);
-      setNotice("本轮消息已保存，Run 正在处理。");
+      if (turn.task) {
+        setTask(turn.task);
+        void api.getDynamicForm(turn.task.id).then(setDynamicForm).catch(handleError);
+      }
+      if (turn.run) {
+        setRuns((items) => [
+          turn.run!,
+          ...items.filter((item) => item.id !== turn.run!.id),
+        ]);
+        selectRun(turn.run);
+        setNotice("本轮消息已保存，Agent 正在处理。");
+      } else {
+        setNotice("助手已回复，消息已保存。");
+      }
     } catch (value) {
-      if (value instanceof ApiError && value.status === 409 && task) {
-        const fresh = await api.getTask(task.id);
-        setTask(fresh);
-        setNotice("任务版本已变化，已刷新最新条件；请重新发送本轮消息。");
-      } else handleError(value);
+      handleError(value);
     } finally {
       setTurnSubmitting(false);
     }
@@ -574,7 +583,7 @@ function App() {
                 把一次采购，<em>说清楚。</em>
               </h1>
               <p className="intro">
-                先固定目标和条件，再让 Agent 在当前版本上执行一次可追溯的查询。
+                直接说出你想解决的事，Agent 会在需要时整理条件并调用受控能力。
               </p>
             </div>
             <div className="head-note">
@@ -602,7 +611,7 @@ function App() {
             <EmptyWorkspace onCreate={createConversation} disabled={busy} />
           ) : (
             <>
-              <section className="task-section">
+              {task && <section className="task-section">
                 <div className="section-bar">
                   <div>
                     <span className="eyebrow">01 / TASK BRIEF</span>
@@ -614,21 +623,6 @@ function App() {
                     </span>
                   )}
                 </div>
-                {!task && !showTaskForm && (
-                  <div className="empty-panel">
-                    <div className="empty-icon">＋</div>
-                    <div>
-                      <h3>先建立一个明确的目标</h3>
-                      <p>例如：为两个人买一盒彩色铅笔，预算不超过 15 元。</p>
-                    </div>
-                    <button
-                      className="button button-primary"
-                      onClick={() => setShowTaskForm(true)}
-                    >
-                      创建任务
-                    </button>
-                  </div>
-                )}
                 {showTaskForm && (
                   <TaskForm
                     busy={busy}
@@ -681,7 +675,7 @@ function App() {
                     }}
                   />
                 )}
-              </section>
+              </section>}
               {task && (
                 <section className="run-section">
                   <div className="section-bar">
@@ -748,7 +742,7 @@ function App() {
               )}
             </>
           )}
-          {task && (
+          {conversationId && (
             <TaskChat
               messages={messages}
               input={chatInput}
@@ -857,10 +851,10 @@ function TaskChat({
     <section className="chat-section">
       <div className="section-bar">
         <div>
-          <span className="eyebrow">02 / TASK CHAT</span>
-          <h2>继续补充条件</h2>
+          <span className="eyebrow">02 / CONVERSATION</span>
+          <h2>和助手聊聊</h2>
         </div>
-        <span className="section-meta">消息会绑定当前任务</span>
+        <span className="section-meta">消息会保存在当前对话</span>
       </div>
       <div className="chat-history">
         {messages.length ? (
@@ -874,7 +868,7 @@ function TaskChat({
             </div>
           ))
         ) : (
-          <div className="chat-empty">告诉助手还缺什么条件，例如“25 人”。</div>
+          <div className="chat-empty">说说你的目标、问题或想法。</div>
         )}
       </div>
       <form
@@ -887,7 +881,7 @@ function TaskChat({
         <input
           value={input}
           onChange={(event) => onInput(event.target.value)}
-          placeholder="补充人数、预算、数量或物品"
+          placeholder="输入消息，例如：给 25 个学生买奖品，预算 200 元"
           maxLength={2000}
           disabled={busy}
         />

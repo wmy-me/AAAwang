@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from life_agent.core.config import Settings, get_settings
+from life_agent.core.llm.deepseek import LLMResult
 from life_agent.db.base import Base
-from life_agent.db.models import Message
+from life_agent.db.models import Message, Run, Task
 from life_agent.db.session import get_db
 from life_agent.main import app
 
@@ -210,3 +211,62 @@ def test_rejects_anonymous_forged_cross_site_and_invalid_inputs(
     assert client.get(f"/api/conversations/{conversation_id}").json()["title"] == (
         "Private"
     )
+
+
+def test_conversation_turn_answers_without_creating_a_task_and_is_idempotent(
+    conversation_context: tuple[TestClient, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, factory = conversation_context
+    register_and_login(client, "alice")
+    conversation_id = create_conversation(client, "Chat")['id']
+
+    async def fake_call(*_args, **_kwargs) -> LLMResult:
+        return LLMResult(text="你好，我可以帮你梳理生活采买需求。")
+
+    monkeypatch.setattr("life_agent.modules.chat.service.call_deepseek", fake_call)
+    payload = {"client_turn_id": "chat-1", "content": "你好"}
+    created = client.post(f"/api/conversations/{conversation_id}/turns", json=payload)
+    retried = client.post(f"/api/conversations/{conversation_id}/turns", json=payload)
+
+    assert created.status_code == 201
+    assert created.json()["task"] is None
+    assert created.json()["run"] is None
+    assert created.json()["assistant_message"]["content"].startswith("你好")
+    assert retried.status_code == 200
+    assert retried.json() == created.json()
+    with factory() as db:
+        assert db.scalar(select(func.count()).select_from(Task)) == 0
+        assert db.scalar(select(func.count()).select_from(Run)) == 0
+        assert db.scalar(select(func.count()).select_from(Message)) == 2
+
+
+def test_conversation_turn_creates_one_shopping_task_and_run(
+    conversation_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = conversation_context
+    register_and_login(client, "alice")
+    conversation_id = create_conversation(client, "Shopping")['id']
+    payload = {
+        "client_turn_id": "shopping-1",
+        "content": "给 25 个学生买奖品，预算 200 元",
+    }
+    created = client.post(f"/api/conversations/{conversation_id}/turns", json=payload)
+    retried = client.post(f"/api/conversations/{conversation_id}/turns", json=payload)
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["assistant_message"] is None
+    assert body["task"]["domain"] == "shopping"
+    assert body["task"]["conditions"] == {
+        "people": 25,
+        "quantity": 25,
+        "item": "奖品",
+        "budget": 200.0,
+    }
+    assert body["run"]["execution_type"] == "capability_decision"
+    assert retried.status_code == 200
+    assert retried.json() == body
+    with factory() as db:
+        assert db.scalar(select(func.count()).select_from(Task)) == 1
+        assert db.scalar(select(func.count()).select_from(Run)) == 1
