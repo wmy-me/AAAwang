@@ -2,7 +2,7 @@
 
 - 已接入受控 `web_search` 能力和 Tavily Streamable HTTP 配置预留，结果按 owner/task/revision/Run 私有保存，并通过私有 API 和网页独立展示；不与模拟商品、地图或天气结果混合。
 - 已覆盖服务缺失、schema 不兼容、非法/内网 URL、空结果、鉴权、超时和密钥不泄露等替身路径；后端全量 `164 passed`，Ruff、compileall、迁移升级/Alembic check 和前端 lint/build 通过。
-- 当前 `TAVILY_MCP_KEY` 尚未配置，因此未宣称真实 Tavily `initialize/list_tools/call_tool`、真实 DeepSeek 选择、独立 Worker 搜索 Run 或浏览器闭环。待本地设置 `TAVILY_MCP_KEY` 并启用 `TAVILY_MCP_ENABLED=true` 后补验收。详见[027报告](reports/027-web-search-mcp-report.md)。
+- 原验收时未检测到 `TAVILY_MCP_KEY`，真实 Tavily `initialize/list_tools/call_tool`、DeepSeek 选择、独立 Worker 搜索 Run 和浏览器闭环未验证。用户后续说明已在本地 `backend/.env` 放入网页 API；当前 Settings 默认读取仓库根目录 `.env`，实际变量名和生效情况待安全核对，再依照 027 补验收。详见[027报告](reports/027-web-search-mcp-report.md)。
 
 ## 025 后端 Agent、Skill 与 Tools 结构整理（已完成）
 
