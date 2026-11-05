@@ -57,6 +57,7 @@
 | 023 | [扩展现有高德 MCP 的天气能力](023-amap-weather-mcp.md) | 已完成；真实 MCP、DeepSeek→独立 Worker→PostgreSQL→私有 API/SSE、浏览器查询/刷新、双账号隔离及天气专项回归均通过，见[报告](../reports/023-amap-weather-mcp-report.md) |
 | 024 | [Agent 结构、系统提示词与 Skill 分层](024-agent-prompt-skill-structure.md) | 已完成；唯一商品发现图、可信角色提示、按需 `teacher_rewards` Skill、真实商品 Run、Chrome 刷新和全量回归通过，见[报告](../reports/024-agent-prompt-skill-structure-report.md) |
 | 025 | [整理后端 Agent、Skill 与 Tools 结构](025-backend-agent-organization.md) | 已完成；Agent/Skill/Tools 依赖收敛、真实商品 Run、Chrome 刷新、地图天气专项回归和后端全量通过，见[报告](../reports/025-backend-agent-organization-report.md) |
+| 026 | [商品发现 Agent 委派决策的有界纠错](026-agent-delegation-recovery.md) | 待执行；修复多委派等无效模型响应导致首次 Run 失败的问题 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
