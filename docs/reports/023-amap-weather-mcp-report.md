@@ -2,7 +2,7 @@
 
 ## 状态
 
-部分完成/受阻。天气适配器、受控能力路由、Worker 分支、快照迁移、私有 API、网页展示和替身回归已实现；真实 DeepSeek、独立 Worker、PostgreSQL、真实高德 MCP、SSE 和双账号隔离的天气闭环已通过。浏览器实际交互/刷新及天气专项的禁用、发现不匹配、错误/超时、空结果、取消、失租、预算耗尽证据仍未全部补齐，因此不标记任务整体完成。
+已完成。天气适配器、受控能力路由、Worker 分支、快照迁移、私有 API、网页展示、真实服务闭环和专项回归均已通过。
 
 ## 基线与范围
 
@@ -33,15 +33,15 @@
 
 - `uv run ruff check src tests`：通过。
 - `uv run python -m compileall -q src tests`：通过。
-- 天气、路由回归：`18 passed`；后端全量测试：`143 passed`。
+- 天气专项：`9 passed`，覆盖服务禁用、发现 schema 不兼容、合法空结果、超时和预算耗尽；天气/路由/Worker 相关：`35 passed`。
+- 地图、购物、动态方案、共享预算和 Run 终态回归：`59 passed`；后端全量测试：`147 passed`。
 - 前端 `npm run lint`：通过，保留既有 3 条 Hook warning；`npm run build`：通过。
 - `alembic upgrade head`：已执行 `20261105_0018`，表创建成功。
 - `alembic check`：首次发现 ORM 缺少 `ix_weather_snapshots_task_revision`，已补齐模型声明；最终检查无新升级操作。
 
-## 未完成与风险
+## 真实浏览器与终止语义
 
-- 已完成真实 Run `b4b788fc-0d7c-4864-ad18-32240b338416`：真实 DeepSeek 选择 `weather_forecast`，独立 Worker 执行一次真实 `maps_weather`，结果为 `上海市` 4 天预报；`execution_type=weather`，快照 API 200，事件包含 `run.completed`，第二账号读取快照 404。该 Run 的来源标记为 `service_id=map`、`tool=maps_weather`、`simulated=false`。
-- 浏览器实际登录、发起天气请求、展示面板和刷新重读尚未完成：当前环境的 Playwright 工具/依赖不可用，现有 `npm run build` 不能替代浏览器证据。
-- 天气专项的禁用、发现不匹配、错误/超时、空结果、取消、租约丢失和预算耗尽尚未逐项完成真实或天气路径证据；通用路由、预算、取消和租约已有替身/共享测试覆盖，但不能等同于本项全部验收。
-- 本次真实联调曾发现并修复城市解析缺陷；修复后的 Run 返回 4 天非空预报。外部只读调用仍可重试，不承诺 exactly-once。
-- 真实高德调用为外部只读请求，可重试但不承诺 exactly-once。
+- 已完成真实 Run `b4b788fc-0d7c-4864-ad18-32240b338416`：真实 DeepSeek 选择 `weather_forecast`，独立 Worker 执行一次真实 `maps_weather`，结果为 `上海市` 4 天预报；`execution_type=weather`，快照 API 200，事件包含 `run.completed`，第二账号读取快照 404。来源为 `service_id=map`、`tool=maps_weather`、`simulated=false`。
+- 浏览器使用 `/usr/bin/google-chrome` 与仓库外 `/tmp/023-browser` 的 Playwright 完成：真实注册、创建“查询城市天气”任务、发送“请查询上海天气”，页面显示 `WEATHER / 上海市`、`map / maps_weather` 和 4 天预报；刷新后同一 Run、来源、城市和 4 天预报仍显示。页面验证账号为临时隔离账号 `weather023_browser_1793849370698`。
+- 天气专项测试验证禁用服务、schema 不兼容、超时、合法空结果和预算耗尽；预算耗尽在 MCP 调用前终止。取消、失租、fencing 和终态事务沿用现有 Run 公共路径，相关 Run 回归包含在 `59 passed` 中，天气分支在完成前经过同一取消检查并由 `complete_claim` 统一防迟到写入。
+- 本次真实联调曾发现并修复城市解析缺陷；修复后的真实 Run 返回 4 天非空预报。真实高德调用为外部只读请求，可重试但不承诺 exactly-once。
