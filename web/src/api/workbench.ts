@@ -79,8 +79,9 @@ export interface DynamicFormProposal {
 
 export interface Run {
   id: string
-  task_id: string
-  task_revision_id: string
+  conversation_id: string
+  task_id: string | null
+  task_revision_id: string | null
   revision: number
   conditions: Conditions
   execution_type: 'diagnostic' | 'capability_decision' | 'direct_answer' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'weather' | 'web_search' | 'capability_router'

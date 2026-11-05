@@ -1,6 +1,5 @@
 """Transactional conversation and selected-task chat turn services."""
 
-import asyncio
 import re
 import uuid
 from dataclasses import dataclass
@@ -9,8 +8,6 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from life_agent.core.config import get_settings
-from life_agent.core.llm.deepseek import call_deepseek
 from life_agent.db.models import Conversation, Message, Run, Task, TaskRevision
 from life_agent.modules.capabilities import route_task_turn
 from life_agent.modules.runs.service import create_run
@@ -19,6 +16,7 @@ from life_agent.modules.tasks.consistency import (
     check_goal_consistency,
 )
 from life_agent.modules.tasks.schemas import Conditions, validate_conditions
+from life_agent.modules.tasks.service import create_revision
 
 
 class ChatTurnNotFoundError(LookupError):
@@ -93,7 +91,7 @@ def _conversation_turn_existing(
     assistant = db.scalar(
         select(Message).where(
             Message.conversation_id == conversation_id,
-            Message.client_message_id == f"assistant:{message.id}",
+            Message.run_id == run.id if run is not None else False,
             Message.role == "assistant",
         )
     )
@@ -117,6 +115,11 @@ def _looks_like_shopping(content: str) -> bool:
             content,
         )
     )
+
+
+def _budget_update(content: str) -> int | None:
+    match = re.search(r"预算\s*(?:改为|改成|调整为|变为|设为|增加到|降到)?\s*(\d{1,6})\s*元", content)
+    return int(match.group(1)) if match else None
 
 
 def _new_shopping_task(
@@ -170,6 +173,83 @@ def submit_conversation_turn(
     )
     db.add(message)
     db.flush()
+    budget = _budget_update(content)
+    if budget is not None:
+        tasks = list(
+            db.scalars(
+                select(Task)
+                .where(Task.conversation_id == conversation.id)
+                .order_by(Task.updated_at.desc(), Task.id.desc())
+            )
+        )
+        if len(tasks) == 1:
+            task = tasks[0]
+            current = db.scalar(
+                select(TaskRevision).where(
+                    TaskRevision.task_id == task.id,
+                    TaskRevision.revision == task.current_revision,
+                )
+            )
+            if current is None:
+                raise ChatTurnConflictError
+            conditions = dict(current.conditions)
+            conditions["budget"] = budget
+            revision = create_revision(
+                db,
+                owner_id,
+                task.id,
+                task.current_revision,
+                None,
+                conditions,
+                "由会话自然语言更新预算",
+                confirm_goal_conflict=True,
+                commit=False,
+            )
+            message.task_id = task.id
+            run = create_run(
+                db,
+                owner_id,
+                task.id,
+                revision.revision,
+                f"conversation:{client_turn_id}",
+                "capability_decision",
+                input_message_id=message.id,
+                decision={
+                    "kind": "pending",
+                    "capability_ids": [],
+                    "decision_source": "deepseek_structured_worker",
+                },
+                commit=False,
+            )
+            message.run_id = run.id
+            conversation.updated_at = datetime.now(UTC)
+            db.commit()
+            db.refresh(message)
+            db.refresh(run)
+            db.refresh(task)
+            return ConversationTurn(message, None, run, task, dict(revision.conditions), True)
+        if len(tasks) > 1:
+            run = create_run(
+                db,
+                owner_id,
+                None,
+                None,
+                f"conversation:{client_turn_id}",
+                "direct_answer",
+                input_message_id=message.id,
+                decision={
+                    "kind": "clarification",
+                    "capability_ids": [],
+                    "clarification": "当前对话关联了多个购物任务。请说明要调整哪个任务的预算。",
+                },
+                commit=False,
+            )
+            message.run_id = run.id
+            conversation.updated_at = datetime.now(UTC)
+            db.commit()
+            db.refresh(message)
+            db.refresh(run)
+            return ConversationTurn(message, None, run, None, {}, True)
     if _looks_like_shopping(content):
         task, revision = _new_shopping_task(db, conversation.id, content)
         message.task_id = task.id
@@ -196,24 +276,22 @@ def submit_conversation_turn(
         db.refresh(task)
         return ConversationTurn(message, None, run, task, dict(revision.conditions), True)
 
-    prompt = (
-        "你是生活采买助手。请直接、简洁地回答用户消息；普通问候和一般问题不要引导填写表单，"
-        "不要声称查询了未调用的工具。未知信息要明确说明。\n用户消息：" + content
+    run = create_run(
+        db,
+        owner_id,
+        None,
+        None,
+        f"conversation:{client_turn_id}",
+        "direct_answer",
+        input_message_id=message.id,
+        commit=False,
     )
-    answer = asyncio.run(call_deepseek(get_settings(), prompt)).text[:12_000]
-    assistant = Message(
-        conversation_id=conversation.id,
-        client_message_id=f"assistant:{message.id}",
-        role="assistant",
-        content=answer,
-        created_at=datetime.now(UTC),
-    )
-    db.add(assistant)
+    message.run_id = run.id
     conversation.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(message)
-    db.refresh(assistant)
-    return ConversationTurn(message, assistant, None, None, {}, True)
+    db.refresh(run)
+    return ConversationTurn(message, None, run, None, {}, True)
 
 
 def _owned_task(

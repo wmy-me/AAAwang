@@ -24,8 +24,9 @@ class GoalConflictError(ValueError):
 
 def resolve_goal(goal: str, conditions: Conditions, consistency: GoalConsistency) -> str:
     replacements = {
-        "people": str(conditions["people"]),
-        "budget": str(conditions["budget"]),
+        field: str(conditions[field])
+        for field in ("people", "budget")
+        if field in conditions
     }
     resolved = goal
     for conflict in sorted(consistency.conflicts, key=lambda item: str(item["fragment"]), reverse=True):

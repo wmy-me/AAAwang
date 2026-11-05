@@ -56,8 +56,9 @@ class IdempotencyConflictError(ValueError):
 @dataclass(frozen=True)
 class RunClaim:
     run_id: uuid.UUID
-    task_id: uuid.UUID
-    task_revision_id: uuid.UUID
+    conversation_id: uuid.UUID
+    task_id: uuid.UUID | None
+    task_revision_id: uuid.UUID | None
     revision: int
     conditions: dict[str, object]
     goal: str
@@ -103,8 +104,8 @@ def _owned_run(
 def create_run(
     db: Session,
     owner_id: uuid.UUID,
-    task_id: uuid.UUID,
-    expected_revision: int,
+    task_id: uuid.UUID | None,
+    expected_revision: int | None,
     idempotency_key: str,
     execution_type: str = "diagnostic",
     capability_ids: list[str] | tuple[str, ...] | None = None,
@@ -112,6 +113,50 @@ def create_run(
     input_message_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> Run:
+    if task_id is None:
+        if execution_type != "direct_answer" or input_message_id is None:
+            raise ValueError("taskless runs only support direct answers with an input message")
+        input_message = db.scalar(select(Message).where(Message.id == input_message_id))
+        if input_message is None or input_message.conversation_id is None:
+            raise RunNotFoundError
+        existing = db.scalar(
+            select(Run).where(
+                Run.conversation_id == input_message.conversation_id,
+                Run.idempotency_key == idempotency_key,
+            )
+        )
+        if existing is not None:
+            if existing.owner_id != owner_id or existing.execution_type != execution_type:
+                raise IdempotencyConflictError
+            return existing
+        run = Run(
+            conversation_id=input_message.conversation_id,
+            task_id=None,
+            owner_id=owner_id,
+            task_revision_id=None,
+            revision=0,
+            goal=input_message.content[:500],
+            conditions={},
+            idempotency_key=idempotency_key,
+            input_message_id=input_message_id,
+            execution_type=execution_type,
+            capability_ids=[],
+            decision=decision or {"kind": "direct", "capability_ids": []},
+            budget=None,
+            status="queued",
+            attempt=0,
+            fencing_token=0,
+            cancel_requested=False,
+        )
+        db.add(run)
+        db.flush()
+        _append_event(db, run, "run.queued", datetime.now(UTC))
+        if commit:
+            db.commit()
+            db.refresh(run)
+        return run
+    if expected_revision is None:
+        raise ValueError("task runs require an expected revision")
     task = db.scalar(
         select(Task)
         .join(Conversation)
@@ -170,6 +215,7 @@ def create_run(
     if consistency.has_conflict:
         raise GoalConflictError(consistency.conflicts)
     run = Run(
+        conversation_id=task.conversation_id,
         task_id=task.id,
         owner_id=owner_id,
         task_revision_id=snapshot.id,
@@ -276,6 +322,7 @@ def claim_run(
     db.commit()
     return RunClaim(
         run_id=run.id,
+        conversation_id=run.conversation_id,
         task_id=run.task_id,
         task_revision_id=run.task_revision_id,
         revision=run.revision,

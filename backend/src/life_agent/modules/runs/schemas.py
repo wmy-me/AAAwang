@@ -41,9 +41,10 @@ class RunResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    task_id: uuid.UUID
+    conversation_id: uuid.UUID
+    task_id: uuid.UUID | None
     owner_id: uuid.UUID
-    task_revision_id: uuid.UUID
+    task_revision_id: uuid.UUID | None
     revision: int
     goal: str
     conditions: dict[str, object]

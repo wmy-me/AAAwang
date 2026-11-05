@@ -1,6 +1,7 @@
 """Focused API checks for private conversations and message ownership."""
 
 import secrets
+import uuid
 from collections.abc import Iterator
 
 import pytest
@@ -10,9 +11,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from life_agent.core.config import Settings, get_settings
-from life_agent.core.llm.deepseek import LLMResult
 from life_agent.db.base import Base
-from life_agent.db.models import Message, Run, Task
+from life_agent.db.models import Message, Run, Task, TaskRevision
 from life_agent.db.session import get_db
 from life_agent.main import app
 
@@ -215,30 +215,26 @@ def test_rejects_anonymous_forged_cross_site_and_invalid_inputs(
 
 def test_conversation_turn_answers_without_creating_a_task_and_is_idempotent(
     conversation_context: tuple[TestClient, sessionmaker[Session]],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, factory = conversation_context
     register_and_login(client, "alice")
     conversation_id = create_conversation(client, "Chat")['id']
 
-    async def fake_call(*_args, **_kwargs) -> LLMResult:
-        return LLMResult(text="你好，我可以帮你梳理生活采买需求。")
-
-    monkeypatch.setattr("life_agent.modules.chat.service.call_deepseek", fake_call)
     payload = {"client_turn_id": "chat-1", "content": "你好"}
     created = client.post(f"/api/conversations/{conversation_id}/turns", json=payload)
     retried = client.post(f"/api/conversations/{conversation_id}/turns", json=payload)
 
     assert created.status_code == 201
     assert created.json()["task"] is None
-    assert created.json()["run"] is None
-    assert created.json()["assistant_message"]["content"].startswith("你好")
+    assert created.json()["run"]["task_id"] is None
+    assert created.json()["run"]["execution_type"] == "direct_answer"
+    assert created.json()["assistant_message"] is None
     assert retried.status_code == 200
     assert retried.json() == created.json()
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(Task)) == 0
-        assert db.scalar(select(func.count()).select_from(Run)) == 0
-        assert db.scalar(select(func.count()).select_from(Message)) == 2
+        assert db.scalar(select(func.count()).select_from(Run)) == 1
+        assert db.scalar(select(func.count()).select_from(Message)) == 1
 
 
 def test_conversation_turn_creates_one_shopping_task_and_run(
@@ -270,3 +266,43 @@ def test_conversation_turn_creates_one_shopping_task_and_run(
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(Task)) == 1
         assert db.scalar(select(func.count()).select_from(Run)) == 1
+
+
+def test_conversation_turn_updates_budget_and_creates_new_revision(
+    conversation_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = conversation_context
+    register_and_login(client, "alice")
+    conversation_id = create_conversation(client, "Shopping")['id']
+    first = client.post(
+        f"/api/conversations/{conversation_id}/turns",
+        json={
+            "client_turn_id": "shopping-budget-1",
+            "content": "给学生买彩色铅笔，预算 200 元",
+        },
+    )
+    assert first.status_code == 201, first.text
+
+    second = client.post(
+        f"/api/conversations/{conversation_id}/turns",
+        json={
+            "client_turn_id": "shopping-budget-2",
+            "content": "预算改为 180 元",
+        },
+    )
+
+    assert second.status_code == 201, second.text
+    body = second.json()
+    assert body["task"]["current_revision"] == 2
+    assert body["task"]["conditions"]["budget"] == 180.0
+    assert body["run"]["revision"] == 2
+    with factory() as db:
+        revisions = list(
+            db.scalars(
+                select(TaskRevision)
+                .join(Task)
+                .where(TaskRevision.task_id == uuid.UUID(body["task"]["id"]))
+                .order_by(TaskRevision.revision)
+            )
+        )
+        assert revisions[1].goal == "给学生买彩色铅笔，预算 180 元"

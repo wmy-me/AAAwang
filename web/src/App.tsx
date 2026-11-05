@@ -77,11 +77,10 @@ function App() {
       .tasks(conversationId)
       .then((page) => {
         setTasks(page.items);
-        setTask(
-          (current) =>
-            page.items.find((item) => item.id === current?.id) ??
-            page.items[0] ??
-            null,
+        setTask((current) =>
+          current?.conversation_id === conversationId
+            ? page.items.find((item) => item.id === current.id) ?? null
+            : page.items[0] ?? null,
         );
       })
       .catch(handleError);
@@ -399,6 +398,8 @@ function App() {
         setAdjustments(history.items);
         setAdjustmentVersion(history.current_version);
         void refreshTaskMessages(task.conversation_id, task.id);
+      } else {
+        void refreshConversationMessages(conversationId);
       }
     } catch (value) {
       if (!(value instanceof ApiError && value.status === 404))
@@ -745,6 +746,8 @@ function App() {
           {conversationId && (
             <TaskChat
               messages={messages}
+              artifacts={artifacts}
+              webSearchResults={webSearchResults}
               input={chatInput}
               busy={turnSubmitting}
               onInput={setChatInput}
@@ -836,12 +839,16 @@ function MapSearch({
 
 function TaskChat({
   messages,
+  artifacts,
+  webSearchResults,
   input,
   busy,
   onInput,
   onSubmit,
 }: {
   messages: Message[];
+  artifacts: ShoppingArtifacts | null;
+  webSearchResults: WebSearchResult[];
   input: string;
   busy: boolean;
   onInput: (value: string) => void;
@@ -870,6 +877,10 @@ function TaskChat({
         ) : (
           <div className="chat-empty">说说你的目标、问题或想法。</div>
         )}
+        <ConversationResultCards
+          artifacts={artifacts}
+          webSearchResults={webSearchResults}
+        />
       </div>
       <form
         className="chat-composer"
@@ -895,6 +906,45 @@ function TaskChat({
         </button>
       </form>
     </section>
+  );
+}
+
+function ConversationResultCards({
+  artifacts,
+  webSearchResults,
+}: {
+  artifacts: ShoppingArtifacts | null;
+  webSearchResults: WebSearchResult[];
+}) {
+  const candidates = artifacts?.candidates ?? [];
+  const links = webSearchResults.filter((item) => /^https?:\/\//i.test(item.url));
+  if (!candidates.length && !links.length) return null;
+  return (
+    <div className="result-card-grid" aria-label="查询结果">
+      {candidates.map((candidate) => (
+        <article className="result-card" key={candidate.id}>
+          <div className="result-card-kicker">
+            {candidate.simulated ? "模拟商品" : "商品候选"}
+          </div>
+          <h3>{candidate.name}</h3>
+          <p>
+            {candidate.unit_price} {candidate.currency} · {candidate.unit}
+          </p>
+          <small>
+            {candidate.source_service} · {candidate.availability} · 查询于 {formatDate(candidate.queried_at)}
+          </small>
+        </article>
+      ))}
+      {links.map((item) => (
+        <article className="result-card" key={item.id}>
+          <div className="result-card-kicker">网页来源</div>
+          <h3>{item.title}</h3>
+          <p>{item.summary || "未提供摘要"}</p>
+          <small>{item.source_service} · {formatDate(item.observed_at)}</small>
+          <a href={item.url} target="_blank" rel="noreferrer">打开来源</a>
+        </article>
+      ))}
+    </div>
   );
 }
 

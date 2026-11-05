@@ -65,9 +65,10 @@ def run_once(worker_id: str) -> bool:
                         decision.get("clarification") or "请补充必要信息后再试。"
                     )[:12_000]
                     with get_session_factory()() as result_db:
-                        persist_model_proposal(
-                            result_db, claim.task_id, claim.revision, decision.get("form_schema")
-                        )
+                        if claim.task_id is not None:
+                            persist_model_proposal(
+                                result_db, claim.task_id, claim.revision, decision.get("form_schema")
+                            )
                         return complete_claim(
                             result_db,
                             claim,
@@ -118,9 +119,10 @@ def run_once(worker_id: str) -> bool:
                 else:
                     result = _run_direct_answer_with_lease(settings, claim, budget)
                 with get_session_factory()() as result_db:
-                    persist_model_proposal(
-                        result_db, claim.task_id, claim.revision, decision.get("form_schema")
-                    )
+                    if claim.task_id is not None:
+                        persist_model_proposal(
+                            result_db, claim.task_id, claim.revision, decision.get("form_schema")
+                        )
                     if is_cancel_requested(result_db, claim):
                         budget.stop("cancelled")
                         return cancel_claim(result_db, claim, budget.snapshot())

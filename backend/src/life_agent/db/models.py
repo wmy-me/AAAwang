@@ -231,18 +231,24 @@ class Run(Base):
         UniqueConstraint(
             "task_id", "idempotency_key", name="uq_runs_task_idempotency_key"
         ),
+        UniqueConstraint(
+            "conversation_id", "idempotency_key", name="uq_runs_conversation_idempotency_key"
+        ),
         Index("ix_runs_task_created_id", "task_id", desc("created_at"), desc("id")),
         Index("ix_runs_claimable", "status", "lease_until", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    task_id: Mapped[uuid.UUID] = mapped_column(
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("tasks.id", ondelete="CASCADE"), index=True
     )
     owner_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    task_revision_id: Mapped[uuid.UUID] = mapped_column(
+    task_revision_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("task_revisions.id", ondelete="CASCADE")
     )
     input_message_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -269,8 +275,9 @@ class Run(Base):
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
     diagnostic: Mapped[dict[str, object] | None] = mapped_column(JSON)
     error_summary: Mapped[str | None] = mapped_column(String(500))
-    task: Mapped[Task] = relationship(back_populates="runs")
-    task_revision: Mapped[TaskRevision] = relationship()
+    conversation: Mapped[Conversation] = relationship()
+    task: Mapped[Task | None] = relationship(back_populates="runs")
+    task_revision: Mapped[TaskRevision | None] = relationship()
     owner: Mapped[User] = relationship(back_populates="runs")
     shopping_result: Mapped["ShoppingRunResult | None"] = relationship(
         back_populates="run", cascade="all, delete-orphan", passive_deletes=True

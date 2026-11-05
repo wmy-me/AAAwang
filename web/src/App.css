@@ -75,6 +75,13 @@
 .chat-user span { color: #b7c2bb; }
 .chat-assistant { justify-self: start; background: var(--wash); }
 .chat-empty { color: var(--muted); font-size: 14px; }
+.result-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 6px; }
+.result-card { padding: 14px; border: 1px solid var(--line); background: var(--white); }
+.result-card-kicker { color: var(--accent); font: 500 10px 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
+.result-card h3 { margin: 8px 0 6px; font-size: 14px; }
+.result-card p { margin: 0 0 8px; line-height: 1.45; }
+.result-card small { display: block; color: var(--muted); line-height: 1.45; }
+.result-card a { display: inline-block; margin-top: 10px; color: var(--accent-dark); font-size: 12px; }
 .chat-composer { display: flex; gap: 10px; }
 .chat-composer input { flex: 1; min-width: 0; }
 

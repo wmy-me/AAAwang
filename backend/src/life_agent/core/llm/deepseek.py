@@ -36,6 +36,24 @@ class LLMResult:
     total_tokens: int | None = None
 
 
+def _provider_error_detail(exc: APIStatusError) -> str:
+    body = exc.body
+    if not isinstance(body, dict):
+        return ""
+    detail: list[str] = []
+    for key in ("code", "type", "param", "message"):
+        value = body.get(key)
+        if isinstance(value, str) and value.strip():
+            detail.append(f"{key}={value.strip()[:160]}")
+    error = body.get("error")
+    if isinstance(error, dict):
+        for key in ("code", "type", "param", "message"):
+            value = error.get(key)
+            if isinstance(value, str) and value.strip() and f"{key}=" not in detail:
+                detail.append(f"{key}={value.strip()[:160]}")
+    return "; ".join(detail)
+
+
 def _validate_settings(settings: Settings) -> str:
     if settings.llm_provider.casefold() != "deepseek":
         raise LLMConfigurationError(
@@ -106,7 +124,9 @@ async def create_deepseek_completion(
     except APIConnectionError as exc:
         raise LLMRequestError("无法连接 DeepSeek，请检查网络和 LLM_BASE_URL。") from exc
     except APIStatusError as exc:
-        raise LLMRequestError(f"DeepSeek 返回 HTTP {exc.status_code}。") from exc
+        detail = _provider_error_detail(exc)
+        suffix = f"（{detail}）" if detail else "。"
+        raise LLMRequestError(f"DeepSeek 返回 HTTP {exc.status_code}{suffix}") from exc
 
 
 async def call_deepseek(

@@ -5,7 +5,13 @@ from types import SimpleNamespace
 from typing import cast
 
 import pytest
-from openai import APITimeoutError, AsyncOpenAI, AuthenticationError, NotFoundError
+from openai import (
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    NotFoundError,
+)
 from pydantic import SecretStr
 
 import life_agent.core.llm.deepseek as deepseek_module
@@ -96,6 +102,29 @@ def test_provider_failures_are_mapped_to_safe_messages(
     with pytest.raises(LLMRequestError, match=message) as exc_info:
         asyncio.run(call_deepseek(settings, "测试", client=client))
 
+    assert "sensitive provider response" not in str(exc_info.value)
+
+
+def test_provider_http_error_keeps_safe_diagnostic_fields() -> None:
+    settings = Settings(llm_api_key=SecretStr("test-key"))
+    error = APIStatusError(
+        "sensitive provider response",
+        response=SimpleNamespace(status_code=400, request=None, headers={}),
+        body={
+            "error": {
+                "type": "invalid_request_error",
+                "param": "tools",
+                "message": "tools must not be empty",
+                "secret": "must not be exposed",
+            }
+        },
+    )
+    client = cast(AsyncOpenAI, FakeClient(None, error))
+
+    with pytest.raises(LLMRequestError, match="HTTP 400.*param=tools.*tools must not be empty") as exc_info:
+        asyncio.run(call_deepseek(settings, "测试", client=client))
+
+    assert "secret" not in str(exc_info.value)
     assert "sensitive provider response" not in str(exc_info.value)
 
 
