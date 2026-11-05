@@ -1,1 +1,1 @@
-"""Reserved package for tool integrations (not implemented yet)."""
+"""Protocol adapters and bounded tool integrations."""

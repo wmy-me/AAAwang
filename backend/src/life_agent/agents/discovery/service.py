@@ -7,7 +7,7 @@ it does not own Run leases or persistence.
 from typing import Any
 
 from life_agent.agents.discovery.graph import ShoppingAgentResult, run_shopping_agent
-from life_agent.agents.shared.skill_loader import skill_context
+from life_agent.skills import skill_context
 
 __all__ = [
     "ShoppingAgentResult",

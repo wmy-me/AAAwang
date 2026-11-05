@@ -1,3 +1,10 @@
+## 025 后端 Agent、Skill 与 Tools 结构整理（已完成）
+
+- 已将短的 discovery 状态契约和委派工具定义合并到唯一 `agents/discovery/graph.py`，避免只有一个短函数的薄模块；`shopping.py` 仍仅为兼容导出。
+- Skill registry 和场景资产已移至顶层 `life_agent/skills/`，公共 loader 不再反向指向 discovery 私有目录；`agents/shared/` 只保留可信提示资产加载和共享来源规则。Tools 文档与包说明已更新为实际的 MCP、地图/天气适配和授权边界。
+- 真实商品 Run `445a8f9a-b180-47b0-8229-18a9ead33c9c` 通过真实 DeepSeek、独立 Worker、PostgreSQL 和 Java 模拟 `shopping-mcp`；Chrome 账号 `agent025_browser_retry_1793857946966` 完成商品任务、候选查看和刷新重读。一次模型返回多个委派被服务端一次委派上限安全拒绝，重试成功。
+- 地图/天气/能力路由/Worker/工具循环专项 `59 passed`，后端全量 `152 passed`，Ruff 通过；前端未因本任务修改，沿用 024 已验证的 build/lint 结果。详见[025报告](reports/025-backend-agent-organization-report.md)。
+
 ## 024 Agent 结构、系统提示词与 Skill 分层（已完成）
 
 - 已将唯一商品发现 LangGraph 迁移至 `agents/discovery/graph.py`，拆出 `state.py`、`nodes.py`、可信角色提示、共享来源规则和受限 Skill loader；`shopping.py` 仅保留兼容导出，生产入口通过 discovery service 使用新图。coordinator 角色提示也已迁出，Worker 仍只负责 Run 生命周期和执行分派。

@@ -1,6 +1,6 @@
 # 025：整理后端 Agent、Skill 与 Tools 结构
 
-- 状态：待执行
+- 状态：已完成
 - 前置：024 已完成；执行前核对最新提交和工作区。
 - 报告：`docs/reports/025-backend-agent-organization-report.md`
 

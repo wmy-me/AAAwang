@@ -2,9 +2,9 @@
 
 import pytest
 
-from life_agent.agents.discovery.nodes import delegate_tool
+from life_agent.agents.discovery.graph import delegate_tool
 from life_agent.agents.shared.prompt_loader import PromptAssetError, load_prompt
-from life_agent.agents.shared.skill_loader import (
+from life_agent.skills import (
     SkillDefinition,
     register_skill,
     select_skill,
@@ -29,6 +29,7 @@ def test_teacher_skill_is_selected_only_for_matching_scene() -> None:
     teacher = select_skill("给学生买奖品")
     assert teacher is not None
     assert teacher.name == "teacher_rewards"
+    assert teacher.source.endswith("/life_agent/skills/teacher_rewards.md")
     assert "奖品" in skill_context("给学生买奖品")
     assert select_skill("买普通水杯") is None
     assert select_skill("查询上海天气") is None

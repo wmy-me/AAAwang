@@ -5,9 +5,9 @@
 | 子目录 | 后续职责 |
 | --- | --- |
 | `coordinator/` | 受限主协调：结构化决策、能力可见集和执行前 MCP 发现校验；角色提示在 `prompts/system.md` |
-| `discovery/` | 商品发现 `service.py`、唯一真实 `graph.py`、`state.py`/`nodes.py` 和角色提示；场景 Skill 位于 `skills/` |
+| `discovery/` | 商品发现 `service.py`、唯一真实 `graph.py` 和角色提示；场景 Skill 位于顶层 `life_agent/skills/` |
 | `procurement/` | 确定性候选校验、预算计算和采买方案边界 |
-| `shared/` | 可信提示资产加载、共享来源规则和受限 Skill 注册/选择 |
+| `shared/` | 可信提示资产加载和共享来源规则；Skill 注册/选择位于顶层 `life_agent/skills/` |
 | `travel/` | 出行规划子图：交通、酒店与每日行程安排 |
 
 `discovery/graph.py` 是唯一商品 LangGraph 实现；`shopping.py` 只从这里兼容导出，不得再创建第二套购物图或预算对象。图没有检查点或长期记忆，不代表完整通用 Agent。天气能力不是 LangGraph 图，而是 coordinator 选择后的受控 Worker/MCP 路径。
@@ -19,3 +19,4 @@
 - Skill 是场景参考指导，不是工具、MCP 服务或权限授予。通过 `SkillDefinition` 注册，使用受限触发词选择；没有唯一匹配时不加载。
 - 新 Skill 应增加元数据和测试，不能通过 Skill 正文扩大工具白名单、预算、用户身份或数据访问范围。
 - Worker 负责 Run 领取、租约、取消、fencing、事务和分派；Agent 负责有限图和模型上下文，金额与数量仍由服务端确定性校验。
+- Tools 负责 MCP 协议和地图适配，不承载 Agent prompt、场景 Skill、业务金额计算或 Run 租约。

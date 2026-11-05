@@ -3,15 +3,12 @@
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 from langgraph.graph import END, START, StateGraph
 from openai import AsyncOpenAI
 
-from life_agent.agents.discovery.nodes import delegate_tool
-from life_agent.agents.discovery.state import DiscoveryState
 from life_agent.agents.shared.prompt_loader import load_prompt
-from life_agent.agents.shared.skill_loader import skill_context
 from life_agent.core.budget import RunBudget
 from life_agent.core.config import Settings
 from life_agent.core.llm.deepseek import (
@@ -20,10 +17,46 @@ from life_agent.core.llm.deepseek import (
     open_deepseek_client,
 )
 from life_agent.core.llm.tool_loop import ToolLoopResult, run_tool_loop
+from life_agent.skills import skill_context
 from life_agent.tools.mcp import McpClient
 
 DECISIONS = {"direct_answer", "clarification", "delegated_discovery"}
 MAX_DELEGATIONS = 1
+
+
+class DiscoveryState(TypedDict, total=False):
+    goal: str
+    conditions: dict[str, object]
+    decision_type: str
+    delegated: bool
+    discovery_request: dict[str, object]
+    discovery: ToolLoopResult
+    answer: str
+    source: dict[str, object]
+    supervisor_requests: int
+    mcp_call_count: int
+
+
+def delegate_tool() -> dict[str, Any]:
+    return {
+        "type": "function",
+        "function": {
+            "name": "delegate_shopping_discovery",
+            "description": (
+                "委派信息发现 Agent 查询商品候选。仅当查询商品候选能帮助回答当前购物目标时使用；"
+                "缺预算不阻止只读查询。不要用于普通聊天、条件不明且必须先追问的情况。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keyword": {"type": "string", "minLength": 1, "maxLength": 120},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                },
+                "required": ["keyword"],
+                "additionalProperties": False,
+            },
+        },
+    }
 
 
 @dataclass(frozen=True)

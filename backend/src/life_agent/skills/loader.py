@@ -17,7 +17,7 @@ class SkillDefinition:
     source: str
 
 
-_SKILL_ROOT = Path(__file__).parent.parent / "discovery" / "skills"
+_SKILL_ROOT = Path(__file__).parent
 _REGISTERED: dict[str, SkillDefinition] = {}
 
 
@@ -47,7 +47,9 @@ def _parse_skill(path: Path) -> SkillDefinition:
             metadata[key.strip()] = value.strip()
         elif not in_metadata:
             body.append(line)
-    triggers = tuple(item.strip() for item in metadata.get("triggers", "").split(",") if item.strip())
+    triggers = tuple(
+        item.strip() for item in metadata.get("triggers", "").split(",") if item.strip()
+    )
     skill = SkillDefinition(
         name=metadata.get("name", path.stem),
         version=metadata.get("version", "unversioned"),
@@ -67,7 +69,9 @@ def available_skills() -> tuple[SkillDefinition, ...]:
     return tuple(_REGISTERED.values())
 
 
-def select_skill(text: str, *, allowed_names: Iterable[str] | None = None) -> SkillDefinition | None:
+def select_skill(
+    text: str, *, allowed_names: Iterable[str] | None = None
+) -> SkillDefinition | None:
     allowed = set(allowed_names) if allowed_names is not None else None
     matches = [
         skill

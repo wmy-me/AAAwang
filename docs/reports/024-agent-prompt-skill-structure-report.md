@@ -17,7 +17,7 @@
 - `agents/shared/prompt_loader.py`：从可信项目路径加载提示资产；缺失或空文件抛出 `PromptAssetError`。
 - `agents/shared/prompts/source_rules.md`：来源、模拟数据、未知信息和 Skill 权限规则。
 - `agents/shared/skill_loader.py`：受限 `SkillDefinition` 注册、唯一触发匹配和上下文渲染。
-- `agents/discovery/skills/teacher_rewards.md`：`teacher_rewards` v1.0，教师/学生/奖品/班级/学校场景指导。
+- `life_agent/skills/teacher_rewards.md`：`teacher_rewards` v1.0，教师/学生/奖品/班级/学校场景指导。
 - `agents/shopping.py`：兼容旧导入的导出层，不再包含图实现。
 
 系统消息与用户/工具上下文通过 `run_tool_loop(system_prompt=...)` 和 `call_deepseek(system_prompt=...)` 分离。Skill 正文作为参考指导注入 system 资产组合，不能修改工具、MCP allowlist、预算、用户身份或系统安全规则。
