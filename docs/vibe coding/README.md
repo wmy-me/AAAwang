@@ -59,6 +59,7 @@
 | 025 | [整理后端 Agent、Skill 与 Tools 结构](025-backend-agent-organization.md) | 已完成；Agent/Skill/Tools 依赖收敛、真实商品 Run、Chrome 刷新、地图天气专项回归和后端全量通过，见[报告](../reports/025-backend-agent-organization-report.md) |
 | 026 | [商品发现 Agent 委派决策的有界纠错](026-agent-delegation-recovery.md) | 已完成；主 Agent 与 discovery tool loop 各允许一次有界纠错，受控错误零工具执行，真实商品 Run 与 Chrome 刷新回归通过，见[报告](../reports/026-agent-delegation-recovery-report.md) |
 | 027 | [公开网页搜索 MCP 与来源引用](027-web-search-mcp.md) | 已完成；真实 Tavily、DeepSeek、独立 Worker、PostgreSQL、Chrome 刷新和双用户隔离通过，见[报告](../reports/027-web-search-mcp-report.md) |
+| 028 | [扩展动态表单的场景字段](028-dynamic-form-fields.md) | 待执行；支持场景字段、受控控件、版本化确认和旧任务兼容 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
