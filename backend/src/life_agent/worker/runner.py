@@ -60,7 +60,9 @@ def run_once(worker_id: str) -> bool:
                 return cancel_claim(db, claim, budget.snapshot())
             _validate_claim_capabilities(claim)
             if claim.execution_type == "capability_decision":
-                decision = _run_capability_decision(settings, claim, budget)
+                from life_agent.agents.coordinator.service import decide_capabilities
+
+                decision = decide_capabilities(settings, claim, budget)
                 if decision["kind"] == "clarification":
                     clarification = str(
                         decision.get("clarification") or "请补充必要信息后再试。"
@@ -171,10 +173,7 @@ def run_once(worker_id: str) -> bool:
             if claim.execution_type == "shopping_agent":
                 started = time.monotonic()
                 result = _run_shopping_agent_with_lease(settings, claim, budget=budget)
-                from life_agent.modules.shopping_plans.service import (
-                    build_artifacts,
-                    validated_plan_answer,
-                )
+                from life_agent.agents.procurement.service import build_validated_plan
 
                 source = dict(result.source)
                 source.update(
@@ -185,8 +184,8 @@ def run_once(worker_id: str) -> bool:
                         "budget": budget.snapshot(),
                     }
                 )
-                artifacts = build_artifacts(source, claim.conditions)
-                answer = validated_plan_answer(artifacts) or result.answer
+                artifacts, validated_answer = build_validated_plan(source, claim.conditions)
+                answer = validated_answer or result.answer
                 with get_session_factory()() as result_db:
                     persist_model_proposal(
                         result_db, claim.task_id, claim.revision,
@@ -335,6 +334,13 @@ def _decision_json(text: str) -> dict[str, object] | None:
 
 
 def _run_capability_decision(settings, claim, budget) -> dict[str, object]:
+    """Compatibility adapter for tests and older internal callers."""
+    from life_agent.agents.coordinator.service import decide_capabilities
+
+    return decide_capabilities(settings, claim, budget)
+
+
+def _run_capability_decision_impl(settings, claim, budget) -> dict[str, object]:
     """Ask the model for a bounded decision, then validate it server-side."""
     enabled, discovered = _discover_capability_tools(settings, budget)
     visible = visible_capabilities(
@@ -646,7 +652,7 @@ def _run_map_places_with_lease(settings, claim, budget=None):
 
 
 def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = False, budget=None):
-    from life_agent.agents.shopping import run_shopping_agent
+    from life_agent.agents.discovery.service import run_product_discovery
 
     stop = threading.Event()
     lease_lost = threading.Event()
@@ -673,7 +679,7 @@ def _run_shopping_agent_with_lease(settings, claim, *, force_discovery: bool = F
         try:
             result = asyncio.run(
                 asyncio.wait_for(
-                    run_shopping_agent(
+                    run_product_discovery(
                         settings,
                         goal,
                         claim.conditions,

@@ -1,3 +1,10 @@
+## 022 Agent 职责与包结构整理（部分完成，真实组合受阻）
+
+- 已新增并接入生产路径的职责入口：`agents/coordinator/` 负责受限结构化能力决策，`agents/discovery/` 负责有界商品发现适配，`agents/procurement/` 负责确定性候选/方案边界；`worker/runner.py` 继续只负责 Run 生命周期、租约、取消、fencing、终态事务和分派。
+- 保留唯一的 `agents/shopping.py` 图实现和 `modules/shopping_plans/service.py` 计算实现，未新增第二套购物图、能力注册表或预算实例；travel 仍为预留。
+- 结构入口/Worker/购物图/方案专项 `35 passed`，后端全量 `136 passed`，Ruff、compileall、Alembic check、前端 lint/build 通过；前端保留 3 条 Hook warning。
+- 本轮真实 PostgreSQL + DeepSeek + API + 独立 Worker 已完成 coordinator 直答 Run，`direct_answer`、`model_requests=2`、`remote_calls=2`；shopping-mcp 调试会话退出且 8101 不可访问，商品/地图组合和浏览器回归未验收。详见[022报告](reports/022-agent-responsibility-structure-report.md)。
+
 ## 020 模型能力决策与跨 Agent 共享预算（已完成）
 
 - 已实现 `RunBudget` 调用前预占、并发共享、失败计数、墙钟/取消/耗尽终止原因，以及模型、委派、MCP 和总远端调用硬上限；预算专项代码/数据库验收与独立 Worker 的取消、超时、预算耗尽、租约过期和注入式失租终止均已验证。

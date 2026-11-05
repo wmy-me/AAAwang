@@ -1,6 +1,6 @@
 # 022：Agent 职责与包结构整理
 
-- 状态：待执行；本文件只定义下一项任务，不能据此宣称已实现
+- 状态：部分完成；代码入口和职责文档已整理，真实 shopping-mcp 组合回归受阻，不能据此宣称 022 已完成
 - 所属阶段：P4 真实信息与更多采买场景（现有 Agent 架构收敛）
 - 起始分支与代码提交：`main` / `0f8d10b5e4513414573a7f86405b0ff63814e634`；执行前重新核对 HEAD
 - 前置证据：[020 报告](../reports/020-model-capability-budget-report.md)、[021 报告](../reports/021-dynamic-task-forms-report.md)

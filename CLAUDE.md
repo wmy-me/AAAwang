@@ -43,7 +43,7 @@
 
 - `backend/src/life_agent/api/`：HTTP 路由。
 - `backend/src/life_agent/core/`：应用配置。
-- `backend/src/life_agent/agents/`：未来主协调、信息发现、采买规划、出行子图；当前仅 README 和空的 `__init__.py`。
+- `backend/src/life_agent/agents/`：受限主协调、商品信息发现、确定性采买方案入口和出行预留子图；022 已将生产调用归位到 `coordinator/`、`discovery/`、`procurement/`，旧购物图保留兼容入口。
 - `backend/src/life_agent/tools/`：已有通用 MCP 客户端；地图、搜索、知识检索仍为预留。
 - `backend/src/life_agent/modules/`：已有认证、私有对话、任务版本、run 与已选任务对话模块；其他业务模块待后续任务。
 - `backend/src/life_agent/db/`：已有用户、登录会话、私有对话、消息、任务、条件版本与 run 模型及请求级会话；`worker/` 已有最小诊断 runner。

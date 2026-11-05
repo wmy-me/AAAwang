@@ -2,7 +2,7 @@
 
 一个以自然语言任务为入口的生活采买 Agent 毕业设计项目。用户可以描述采买目标，系统按当前任务与已确认条件决定直接回答、追问，或调用受控的地点与商品查询能力；候选、来源、任务版本和方案可在网页中查看与调整。
 
-**项目状态（截至 2026-11-05）：处于 P4 阶段。** [001–021 任务](docs/vibe%20coding/README.md)已按各自范围实施并记录验收；[022 Agent 职责与包结构整理](docs/vibe%20coding/022-agent-responsibility-structure.md)已写成执行文档，尚未实施。P4 的搜索、天气与更多生活场景，以及 P5 知识检索、P6 出行规划、P7 集成交付仍在后续计划中。详见[路线图](docs/roadmap.md)与[进度记录](docs/progress.md)。
+**项目状态（截至 2026-11-05）：处于 P4 阶段。** [001–021 任务](docs/vibe%20coding/README.md)已按各自范围实施并记录验收；022 已完成职责入口整理和代码回归，但真实 shopping-mcp 组合回归受启动故障阻塞，详见[022报告](docs/reports/022-agent-responsibility-structure-report.md)。P4 的搜索、天气与更多生活场景，以及 P5 知识检索、P6 出行规划、P7 集成交付仍在后续计划中。详见[路线图](docs/roadmap.md)与[进度记录](docs/progress.md)。
 
 ## 已实现
 
@@ -15,7 +15,7 @@
 | 执行与隔离 | PostgreSQL 持久化用户、任务、消息、Run、事件、表单、候选与结果；独立 Worker 负责租约、取消、fencing；SSE 推送状态，网页刷新可重读，私有资源按用户隔离 |
 | Agent 与工具约束 | 已有有限的 LangGraph 购物主从委派；模型决策受能力注册、服务配置、MCP `list_tools()` 发现结果、schema 白名单和单 Run 共享预算约束 |
 
-**数据边界：** Java `shopping-mcp` 返回演示用模拟商品及价格；高德只提供地点信息。系统当前用于查询与规划，尚无真实商品价格/库存、交易下单或支付能力。现有主从购物图不等于完整开放式多 Agent；`agents/coordinator/` 等包的职责归位属于待执行的 022。
+**数据边界：** Java `shopping-mcp` 返回演示用模拟商品及价格；高德只提供地点信息。系统当前用于查询与规划，尚无真实商品价格/库存、交易下单或支付能力。现有主从购物图不等于完整开放式多 Agent；022 已归位 coordinator/discovery/procurement 入口，travel 仍为预留。
 
 ## 技术组成
 
@@ -97,7 +97,7 @@ cd mcp-services
 
 | 路径 | 用途 |
 | --- | --- |
-| `backend/src/life_agent/agents/` | 现有购物主从图；协调、发现、采买职责的包结构整理见 022 |
+| `backend/src/life_agent/agents/` | coordinator/discovery/procurement 职责入口、兼容购物图和 travel 预留；022 真实组合回归受阻 |
 | `backend/src/life_agent/modules/` | 认证、对话、任务、能力、表单、Run、方案等业务模块 |
 | `backend/src/life_agent/tools/` | 通用 MCP 客户端、地点适配器和预留工具目录 |
 | `backend/src/life_agent/worker/` | 独立数据库 Worker 与 Run 执行 |
@@ -111,4 +111,4 @@ cd mcp-services
 
 ## 后续方向
 
-先完成 [022 Agent 职责与包结构整理](docs/vibe%20coding/022-agent-responsibility-structure.md)，再按独立任务扩展搜索、天气及更多采买场景；投稿、文档解析与 RAG 检索属于 P5，出行规划属于 P6，全应用部署与论文演示属于 P7。交易、预订和支付是后续扩展，不属于当前查询规划闭环。
+先补齐 [022 Agent 职责与包结构整理](docs/vibe%20coding/022-agent-responsibility-structure.md) 的 shopping-mcp 真实组合回归，再按独立任务扩展搜索、天气及更多采买场景；投稿、文档解析与 RAG 检索属于 P5，出行规划属于 P6，全应用部署与论文演示属于 P7。交易、预订和支付是后续扩展，不属于当前查询规划闭环。
