@@ -12,7 +12,7 @@ from life_agent.modules.tasks.consistency import (
     check_goal_consistency,
     resolve_goal,
 )
-from life_agent.modules.tasks.schemas import Conditions
+from life_agent.modules.tasks.schemas import Conditions, validate_conditions
 
 
 class TaskNotFoundError(LookupError):
@@ -198,6 +198,7 @@ def create_revision(
     commit: bool = True,
 ) -> TaskRevision:
     task = _get_owned_task(db, owner_id, task_id)
+    conditions = validate_conditions(task.domain, conditions)
     current_snapshot = _get_revision(db, task.id, expected_revision)
     effective_goal = (goal or current_snapshot.goal).strip()
     consistency = check_goal_consistency(effective_goal, conditions)

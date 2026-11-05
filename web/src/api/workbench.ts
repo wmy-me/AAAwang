@@ -44,6 +44,12 @@ export interface Conditions {
   people?: number
   quantity?: number
   item?: string
+  color?: string
+  use_case?: string
+  destination?: string
+  start_date?: string
+  end_date?: string
+  activity_types?: string[]
 }
 
 export interface FormField {

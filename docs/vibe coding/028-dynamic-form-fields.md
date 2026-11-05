@@ -1,6 +1,6 @@
 # 028：扩展动态表单的场景字段
 
-- 状态：待执行
+- 状态：已实现；真实场景验收待补
 - 阶段：P4 自然语言任务与多场景交互
 - 基线：`1ce0deb2fe6b62d03eb2abd41148928a9d152093`；执行时核对最新 HEAD。
 - 前置：[021 报告](../reports/021-dynamic-task-forms-report.md)、[027 报告](../reports/027-web-search-mcp-report.md)。

@@ -1144,10 +1144,10 @@ function DynamicFormPanel({
 }) {
   const [values, setValues] = useState<Record<string, unknown>>({});
 
-  function updateValue(field: DynamicFormProposal["schema"][number], value: string) {
+  function updateValue(field: DynamicFormProposal["schema"][number], value: string | string[]) {
     setValues((current) => {
       const next = { ...current };
-      if (value === "") {
+      if (value === "" || (Array.isArray(value) && value.length === 0)) {
         delete next[field.id];
       } else {
         next[field.id] = field.control === "number" || field.control === "money"
@@ -1178,17 +1178,34 @@ function DynamicFormPanel({
         {proposal.schema.map((field) => (
           <label key={field.id}>
             <span>{field.label}{field.required ? " *" : ""}</span>
-            <input
-              type={field.control === "number" || field.control === "money" ? "number" : "text"}
-              min={field.min_value ?? undefined}
-              max={field.max_value ?? undefined}
-              step={field.control === "money" ? "0.01" : field.control === "number" ? "1" : undefined}
-              placeholder={field.unit ? `单位：${field.unit}` : "可选"}
-              value={String(values[field.id] ?? "")}
-              onChange={(event) => updateValue(field, event.target.value)}
-              required={field.required}
-              disabled={busy}
-            />
+            {field.control === "single_select" ? (
+              <select value={String(values[field.id] ?? "")} onChange={(event) => updateValue(field, event.target.value)} required={field.required} disabled={busy}>
+                <option value="">请选择</option>
+                {(field.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            ) : field.control === "multi_select" ? (
+              <span className="dynamic-form-options">
+                {(field.options ?? []).map((option) => {
+                  const current = Array.isArray(values[field.id]) ? values[field.id] as string[] : []
+                  const selected = current.includes(option)
+                  return <label key={option}><input type="checkbox" checked={selected} disabled={busy} onChange={(event) => {
+                    updateValue(field, event.target.checked ? [...current, option] : current.filter((item) => item !== option))
+                  }} />{option}</label>
+                })}
+              </span>
+            ) : (
+              <input
+                type={field.control === "number" || field.control === "money" ? "number" : field.control === "date" ? "date" : "text"}
+                min={field.min_value ?? undefined}
+                max={field.max_value ?? undefined}
+                step={field.control === "money" ? "0.01" : field.control === "number" ? "1" : undefined}
+                placeholder={field.unit ? `单位：${field.unit}` : "可选"}
+                value={String(values[field.id] ?? "")}
+                onChange={(event) => updateValue(field, event.target.value)}
+                required={field.required}
+                disabled={busy}
+              />
+            )}
             <small>{field.reason}</small>
           </label>
         ))}

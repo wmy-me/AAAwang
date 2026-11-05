@@ -4,6 +4,12 @@
 - 已覆盖服务缺失、schema 不兼容、非法/内网 URL、空结果、鉴权、超时和密钥不泄露等替身路径；后端全量 `164 passed`，Ruff、compileall、迁移升级/Alembic check 和前端 lint/build 通过。
 - 已使用进程环境提供的本地 key 启动 API/Worker，真实 Tavily 握手、工具发现和搜索、DeepSeek 结构化决策、PostgreSQL 快照、Chrome 刷新重读及双用户 404 隔离均通过；`backend/.env` 不会被当前 Settings 自动读取，复现应在仓库根目录 `.env` 或进程环境配置。key 未写入仓库、报告或日志。详见[027报告](reports/027-web-search-mcp-report.md)。
 
+## 028 扩展动态表单的场景字段（已实现；真实场景验收待补）
+
+- 保留 shopping 旧默认四字段和历史读取，同时为模型 schema 增加受控颜色/用途单选；travel 默认表单支持地点、开始/结束日期和活动类型多选。服务端固定字段 ID、控件、选项、长度、值类型、日期顺序和标记字符边界，未确认 schema 不进入任务条件。
+- 确认仍通过既有 owner、revision、原子写入和幂等路径；扩展条件复用 JSON revision，不需要迁移，Run 读取确认后的 revision 快照。前端按 schema 安全渲染 date、select、checkbox 和 location 输入。
+- 新增场景 schema/恶意文本回归 `9 passed`，任务/run 动态表单回归 `19 passed`，后端全量 `164 passed`，Ruff 与前端 build 通过；前端 lint 仍有既有 3 条 Hook warning。真实 DeepSeek/Worker/PostgreSQL/Chrome 新场景验收未在本轮执行，见[028报告](reports/028-dynamic-form-fields-report.md)。
+
 ## 025 后端 Agent、Skill 与 Tools 结构整理（已完成）
 
 - 已将短的 discovery 状态契约和委派工具定义合并到唯一 `agents/discovery/graph.py`，避免只有一个短函数的薄模块；`shopping.py` 仍仅为兼容导出。

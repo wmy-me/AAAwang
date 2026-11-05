@@ -3,7 +3,7 @@
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -34,6 +34,7 @@ class FormFieldSpec:
     required: bool = False
     min_value: int | float | None = None
     max_value: int | float | None = None
+    options: tuple[str, ...] = ()
 
 
 _REGISTERED_FORM_FIELDS = {
@@ -41,6 +42,18 @@ _REGISTERED_FORM_FIELDS = {
     "people": FormFieldSpec("people", "number", "覆盖人数", "只有需要覆盖人数时才作为方案约束", "人", False, 1, 100000),
     "quantity": FormFieldSpec("quantity", "number", "数量", "便于估算需要购买的件数", "件", False, 1, 100000),
     "budget": FormFieldSpec("budget", "money", "目标预算", "用于预算复算；不填写时不假设默认金额", "元", False, 0.01, 100000000),
+}
+_REGISTERED_FORM_FIELDS_BY_DOMAIN = {
+    "shopping": _REGISTERED_FORM_FIELDS | {
+        "color": FormFieldSpec("color", "single_select", "偏好颜色", "帮助筛选更符合需求的商品", options=("黑色", "蓝色", "黄色", "红色", "其他")),
+        "use_case": FormFieldSpec("use_case", "single_select", "主要用途", "区分通勤、户外和日常使用场景", options=("通勤", "户外", "日常", "运动")),
+    },
+    "travel": {
+        "destination": FormFieldSpec("destination", "location", "城市或地点", "确定活动地点范围"),
+        "start_date": FormFieldSpec("start_date", "date", "开始日期", "限定活动开始时间"),
+        "end_date": FormFieldSpec("end_date", "date", "结束日期", "限定活动结束时间"),
+        "activity_types": FormFieldSpec("activity_types", "multi_select", "活动偏好", "帮助筛选周末活动类型", options=("美食", "展览", "户外", "亲子", "文化")),
+    },
 }
 
 
@@ -55,19 +68,22 @@ def _owned_task(db: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> Task:
     return task
 
 
-def _shopping_specs(snapshot: TaskRevision) -> list[FormFieldSpec]:
+def _shopping_specs(snapshot: TaskRevision, domain: str = "shopping") -> list[FormFieldSpec]:
     current = dict(snapshot.conditions)
-    specs = list(_REGISTERED_FORM_FIELDS.values())
+    specs = list(
+        (_REGISTERED_FORM_FIELDS if domain == "shopping" else _REGISTERED_FORM_FIELDS_BY_DOMAIN.get(domain, {})).values()
+    )
     return [spec for spec in specs if spec.id not in current]
 
 
 def validate_model_schema(
-    raw_schema: object, current_conditions: Conditions
+    raw_schema: object, current_conditions: Conditions, domain: str = "shopping"
 ) -> list[dict[str, object]]:
     """Validate model suggestions against registered controls and known values."""
     if raw_schema is None:
         return []
-    if not isinstance(raw_schema, list) or len(raw_schema) > len(_REGISTERED_FORM_FIELDS):
+    registered_fields = _REGISTERED_FORM_FIELDS_BY_DOMAIN.get(domain, _REGISTERED_FORM_FIELDS)
+    if not isinstance(raw_schema, list) or len(raw_schema) > len(registered_fields):
         raise FormValidationError("模型表单 schema 必须是有限字段列表。")
     fields: list[dict[str, object]] = []
     seen: set[str] = set()
@@ -76,17 +92,29 @@ def validate_model_schema(
             field = FormField.model_validate(raw_field)
         except ValueError as exc:
             raise FormValidationError("模型表单字段格式不合法。") from exc
-        if field.id in seen or field.id not in _REGISTERED_FORM_FIELDS:
+        if field.id in seen or field.id not in registered_fields:
             raise FormValidationError("模型表单包含未注册或重复字段。")
         if field.id in current_conditions:
             raise FormValidationError("模型表单不能重复要求已确认条件。")
-        registered = _REGISTERED_FORM_FIELDS[field.id]
+        registered = registered_fields[field.id]
         if field.control != registered.control:
             raise FormValidationError("模型表单控件类型不匹配注册能力。")
         unit = field.unit.strip() if isinstance(field.unit, str) else field.unit
         unit = unit or None
         if unit != registered.unit:
             raise FormValidationError("模型表单单位不匹配注册能力。")
+        if any(character in field.label or character in field.reason for character in "<>"):
+            raise FormValidationError("模型表单文本不能包含脚本标记。")
+        options = tuple(field.options or ())
+        if len(set(options)) != len(options) or any(
+            not option.strip() or len(option) > 80 or any(character in option for character in "<>")
+            for option in options
+        ):
+            raise FormValidationError("模型表单选项不合法。")
+        if registered.options and options != registered.options:
+            raise FormValidationError("模型表单选项不匹配注册能力。")
+        if not registered.options and options:
+            raise FormValidationError("该控件不允许自定义选项。")
         if field.min_value is not None and (
             registered.min_value is None or field.min_value < registered.min_value
         ):
@@ -117,8 +145,11 @@ def persist_model_proposal(
     )
     if snapshot is None:
         raise FormNotFoundError
+    task = db.get(Task, task_id)
+    if task is None:
+        raise FormNotFoundError
     try:
-        schema = validate_model_schema(raw_schema, dict(snapshot.conditions))
+        schema = validate_model_schema(raw_schema, dict(snapshot.conditions), task.domain)
     except FormValidationError:
         logger.warning(
             "discarding invalid model form schema: task=%s revision=%s",
@@ -162,6 +193,7 @@ def _schema(specs: list[FormFieldSpec]) -> list[dict[str, object]]:
             **({"unit": spec.unit} if spec.unit else {}),
             **({"min_value": spec.min_value} if spec.min_value is not None else {}),
             **({"max_value": spec.max_value} if spec.max_value is not None else {}),
+            **({"options": list(spec.options)} if spec.options else {}),
         }
         for spec in specs
     ]
@@ -191,7 +223,7 @@ def get_or_create_proposal(
         task_id=task.id,
         task_revision_id=snapshot.id,
         revision=snapshot.revision,
-        schema=_schema(_shopping_specs(snapshot)),
+        schema=_schema(_shopping_specs(snapshot, task.domain)),
         client_request_id=f"proposal:{snapshot.id}",
         created_at=datetime.now(UTC),
     )
@@ -221,6 +253,7 @@ def _validate_values(
     proposal: DynamicFormProposal,
     values: dict[str, object],
     base_conditions: Conditions,
+    domain: str,
 ) -> Conditions:
     fields = {field["id"]: field for field in proposal.schema}
     unknown = set(values) - fields.keys()
@@ -237,8 +270,29 @@ def _validate_values(
     for field_id, value in values.items():
         field = fields[field_id]
         control = field["control"]
-        if control == "short_text" and (not isinstance(value, str) or not value.strip()):
+        if isinstance(value, str) and any(character in value for character in "<>"):
+            raise FormValidationError(f"{field_id} 包含不允许的标记字符。")
+        if control in {"short_text", "location", "date", "single_select"} and (
+            not isinstance(value, str) or not value.strip()
+        ):
             raise FormValidationError(f"{field_id} 必须是非空文本。")
+        if control == "date":
+            try:
+                date.fromisoformat(value)
+            except ValueError as exc:
+                raise FormValidationError(f"{field_id} 必须是 YYYY-MM-DD 日期。") from exc
+        if control == "single_select" and value not in field.get("options", []):
+            raise FormValidationError(f"{field_id} 不是允许的选项。")
+        if control == "multi_select":
+            options = field.get("options", [])
+            if (
+                not isinstance(value, list)
+                or not value
+                or len(value) > len(options)
+                or len(set(value)) != len(value)
+                or any(item not in options for item in value)
+            ):
+                raise FormValidationError(f"{field_id} 不是允许的多选值。")
         if control in {"number", "money"}:
             if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
                 raise FormValidationError(f"{field_id} 必须是正数。")
@@ -250,7 +304,7 @@ def _validate_values(
                 raise FormValidationError(f"{field_id} 超出允许范围。")
         conditions[field_id] = value
     try:
-        return validate_conditions("shopping", conditions)
+        return validate_conditions(domain, conditions)
     except ValueError as exc:
         raise FormValidationError(str(exc)) from exc
 
@@ -296,7 +350,7 @@ def confirm_proposal(
     )
     if snapshot is None:
         raise FormNotFoundError
-    conditions = _validate_values(proposal, values, dict(snapshot.conditions))
+    conditions = _validate_values(proposal, values, dict(snapshot.conditions), task.domain)
     revision = create_revision(
         db,
         owner_id,

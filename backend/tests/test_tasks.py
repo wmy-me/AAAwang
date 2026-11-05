@@ -50,6 +50,35 @@ def test_model_form_schema_normalizes_empty_item_unit() -> None:
         )
 
 
+def test_model_form_schema_supports_registered_scene_controls() -> None:
+    fields = validate_model_schema(
+        [
+            {
+                "id": "color",
+                "control": "single_select",
+                "label": "颜色",
+                "reason": "筛选偏好",
+                "options": ["黑色", "蓝色", "黄色", "红色", "其他"],
+            },
+        ],
+        {},
+        "shopping",
+    )
+    assert fields[0]["control"] == "single_select"
+    travel_fields = validate_model_schema(
+        [{"id": "activity_types", "control": "multi_select", "label": "活动类型", "reason": "筛选活动", "options": ["美食", "展览", "户外", "亲子", "文化"]}],
+        {},
+        "travel",
+    )
+    assert travel_fields[0]["control"] == "multi_select"
+    with pytest.raises(FormValidationError, match="标记"):
+        validate_model_schema(
+            [{"id": "color", "control": "single_select", "label": "<script>", "reason": "x", "options": ["黑色", "蓝色", "黄色", "红色", "其他"]}],
+            {},
+            "shopping",
+        )
+
+
 @pytest.fixture
 def task_context() -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
     engine = create_engine(

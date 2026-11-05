@@ -16,7 +16,7 @@ from pydantic import (
 )
 
 TaskDomain = Literal["shopping", "travel"]
-ConditionValue = StrictStr | StrictInt | StrictFloat
+ConditionValue = StrictStr | StrictInt | StrictFloat | list[StrictStr]
 Conditions = dict[str, ConditionValue]
 
 ALLOWED_CONDITIONS: dict[str, dict[str, type[object]]] = {
@@ -25,6 +25,8 @@ ALLOWED_CONDITIONS: dict[str, dict[str, type[object]]] = {
         "people": int,
         "item": str,
         "quantity": int,
+        "color": str,
+        "use_case": str,
     },
     "travel": {
         "budget": float,
@@ -32,6 +34,7 @@ ALLOWED_CONDITIONS: dict[str, dict[str, type[object]]] = {
         "destination": str,
         "start_date": str,
         "end_date": str,
+        "activity_types": list,
     },
 }
 MAX_CONDITIONS_BYTES = 16 * 1024
@@ -57,6 +60,16 @@ def validate_conditions(domain: str, conditions: Conditions) -> Conditions:
         elif expected is int:
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f"{name} 必须是正整数。")
+        elif expected is list:
+            if (
+                not isinstance(value, list)
+                or not value
+                or len(value) > 10
+                or any(not isinstance(item, str) or not item.strip() for item in value)
+            ):
+                raise ValueError(f"{name} 必须是 1–10 项非空文本。")
+            if len(set(value)) != len(value):
+                raise ValueError(f"{name} 不能包含重复选项。")
         elif not isinstance(value, str) or not value.strip() or len(value) > 200:
             raise ValueError(f"{name} 必须是 1–200 字符的非空字符串。")
     if domain == "travel":

@@ -65,11 +65,14 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
         "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。\n"
         "form_schema 只能提出当前缺失且本轮确实有帮助的字段；没有必要时返回空数组。"
         "每项必须严格使用以下结构，且 id/control/unit 只能取注册值：\n"
-        '{"id":"item|people|quantity|budget","control":"short_text|number|money",'
+        '"id":"item|people|quantity|budget|color|use_case|destination|start_date|end_date|activity_types",'
+        '"control":"short_text|number|money|date|single_select|multi_select|location",'
         '"label":"简短标签","reason":"为什么需要","required":false,'
-        '"unit":"人|件|元（与 id 对应）"}\n'
+        '"unit":null,"options":[]}\n'
         "item 使用 short_text；people/quantity 使用 number 和单位 人/件；"
         "budget 使用 money 和单位 元。已确认条件不得重复提出。"
+        "color/use_case 只能分别使用注册的单选选项；destination 使用 location；"
+        "start_date/end_date 使用 date；activity_types 使用注册的多选选项。"
         "当用户明确要求补充条件或整理采购方案且关键信息缺失时，可以提出对应字段；"
         "普通只读探索不要为了补字段而阻断。"
         "budget、people、quantity 不是固定必填项。"
