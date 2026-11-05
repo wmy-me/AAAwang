@@ -10,6 +10,7 @@ import json
 import logging
 from typing import Any
 
+from life_agent.agents.shared.prompt_loader import load_prompt
 from life_agent.core.budget import RunBudget
 from life_agent.core.llm import ToolLoopError
 from life_agent.core.llm.deepseek import call_deepseek
@@ -76,7 +77,13 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
         "天气查询必须有明确城市，不能根据用户位置或任务历史猜测。"
     )
     response = asyncio.run(
-        call_deepseek(settings, prompt, budget=budget, max_tokens=512)
+        call_deepseek(
+            settings,
+            prompt,
+            budget=budget,
+            max_tokens=512,
+            system_prompt=load_prompt("../coordinator/prompts/system.md"),
+        )
     )
     value = _decision_json(response.text)
     if value is None:
@@ -102,7 +109,13 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
             "否则保持 direct/clarification 并说明理由。"
         )
         response = asyncio.run(
-            call_deepseek(settings, correction, budget=budget, max_tokens=512)
+            call_deepseek(
+                settings,
+                correction,
+                budget=budget,
+                max_tokens=512,
+                system_prompt=load_prompt("../coordinator/prompts/system.md"),
+            )
         )
         value = _decision_json(response.text)
         if value is None:

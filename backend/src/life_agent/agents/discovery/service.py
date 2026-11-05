@@ -6,7 +6,8 @@ it does not own Run leases or persistence.
 
 from typing import Any
 
-from life_agent.agents.shopping import ShoppingAgentResult, run_shopping_agent
+from life_agent.agents.discovery.graph import ShoppingAgentResult, run_shopping_agent
+from life_agent.agents.shared.skill_loader import skill_context
 
 __all__ = [
     "ShoppingAgentResult",
@@ -21,6 +22,7 @@ def build_shopping_prompt(goal: str, conditions: dict[str, object]) -> str:
     known = ", ".join(f"{key}={value}" for key, value in conditions.items()) or "无"
     return (
         f"购物目标：{goal}\n已知条件：{known}\n"
+        f"{skill_context(f'{goal} {known}')}\n"
         "只查询并回答模拟商品候选。未提供的预算、物品、数量必须明确写为未知，不能猜测。"
     )
 

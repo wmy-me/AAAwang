@@ -1,1 +1,1 @@
-"""Reserved package for the agent layer (not implemented yet)."""
+"""Bounded agent roles and their trusted prompt/Skill assets."""

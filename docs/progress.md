@@ -1,3 +1,10 @@
+## 024 Agent 结构、系统提示词与 Skill 分层（已完成）
+
+- 已将唯一商品发现 LangGraph 迁移至 `agents/discovery/graph.py`，拆出 `state.py`、`nodes.py`、可信角色提示、共享来源规则和受限 Skill loader；`shopping.py` 仅保留兼容导出，生产入口通过 discovery service 使用新图。coordinator 角色提示也已迁出，Worker 仍只负责 Run 生命周期和执行分派。
+- `teacher_rewards` v1.0 仅在教师/学生/奖品等唯一匹配场景注入；普通商品、天气和闲聊不加载。Skill 不能修改工具白名单、预算、用户身份或系统规则，缺失提示资产会诊断失败。
+- 真实 DeepSeek、独立 Worker、PostgreSQL 和 Java `shopping-mcp` 完成教师奖品 Run `86af3d2f-4952-45f4-98ef-388948aaf6f9` 与普通商品 Run `3aefc72c-8d67-480a-ab7e-cb53dc978c81`；两者均完成 1 次委派和 1 次 MCP 调用，来源明确为模拟商品。Chrome 商品任务 `agent024_browser_1793849970275` 完成运行、结果查看和刷新重读。
+- 024 专项及相关回归 `33 passed`，后端全量 `152 passed`，Ruff、compileall、前端 build 通过；前端 lint 保留 3 条既有 Hook warning。详见[024报告](reports/024-agent-prompt-skill-structure-report.md)。
+
 ## 023 高德 MCP 天气能力（已完成）
 
 - 已接入真实高德 `maps_weather`：initialize、list_tools、上海 call_tool 均成功；新增天气能力路由、无城市澄清、共享预算 Worker 分支、天气快照迁移、私有读取 API 和网页展示。

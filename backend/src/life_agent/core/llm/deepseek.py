@@ -116,13 +116,17 @@ async def call_deepseek(
     client: AsyncOpenAI | None = None,
     budget: RunBudget | None = None,
     max_tokens: int = 128,
+    system_prompt: str | None = None,
 ) -> LLMResult:
     """Send one non-streaming text request with retries disabled."""
     async with open_deepseek_client(settings, client) as active_client:
         response = await create_deepseek_completion(
             settings,
             active_client,
-            messages=[{"role": "user", "content": prompt}],
+            messages=(
+                ([{"role": "system", "content": system_prompt}] if system_prompt else [])
+                + [{"role": "user", "content": prompt}]
+            ),
             max_tokens=max_tokens,
             budget=budget,
         )

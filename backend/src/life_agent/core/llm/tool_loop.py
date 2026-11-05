@@ -122,6 +122,7 @@ async def run_tool_loop(
     total_timeout_seconds: float = 90.0,
     force_tool_call: bool = False,
     budget: RunBudget | None = None,
+    system_prompt: str | None = None,
 ) -> ToolLoopResult:
     """Run one discovery, up to two model requests, and at most one MCP call."""
     if not prompt.strip():
@@ -137,7 +138,8 @@ async def run_tool_loop(
             messages: list[dict[str, Any]] = [
                 {
                     "role": "system",
-                    "content": (
+                    "content": system_prompt
+                    or (
                         "仅依据工具结果回答商品问题。工具数据均为模拟数据，"
                         "回答必须明确说明商品和价格是模拟信息，不得补充工具未返回的候选。"
                     ),
