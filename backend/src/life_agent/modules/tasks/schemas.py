@@ -1,6 +1,7 @@
 """Request and response schemas for private versioned tasks."""
 
 import json
+import re
 import uuid
 from datetime import date, datetime
 from typing import Literal
@@ -38,6 +39,26 @@ ALLOWED_CONDITIONS: dict[str, dict[str, type[object]]] = {
     },
 }
 MAX_CONDITIONS_BYTES = 16 * 1024
+_DYNAMIC_CONDITION_NAME = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+_RESERVED_CONDITION_NAMES = frozenset(
+    {
+        "owner_id",
+        "task_id",
+        "revision",
+        "run_id",
+        "service_url",
+        "tool_name",
+        "api_key",
+        "secret",
+        "password",
+        "token",
+        "payment",
+    }
+)
+_CORE_FIELDS_BY_DOMAIN = {
+    "shopping": frozenset({"budget", "people", "item", "quantity", "color", "use_case"}),
+    "travel": frozenset({"budget", "people", "destination", "start_date", "end_date", "activity_types"}),
+}
 
 
 class StrictRequest(BaseModel):
@@ -49,11 +70,43 @@ def validate_conditions(domain: str, conditions: Conditions) -> Conditions:
     if len(encoded.encode("utf-8")) > MAX_CONDITIONS_BYTES:
         raise ValueError("条件快照不能超过 16 KiB。")
     allowed = ALLOWED_CONDITIONS[domain]
-    unknown = conditions.keys() - allowed.keys()
-    if unknown:
-        raise ValueError(f"条件包含未知字段: {', '.join(sorted(unknown))}。")
+    other_core_fields = set().union(*(_CORE_FIELDS_BY_DOMAIN[other] for other in _CORE_FIELDS_BY_DOMAIN if other != domain))
     for name, value in conditions.items():
-        expected = allowed[name]
+        if name in allowed:
+            expected = allowed[name]
+        elif name in other_core_fields:
+            raise ValueError(f"条件字段不适用于 {domain} 任务: {name}。")
+        elif (
+            not _DYNAMIC_CONDITION_NAME.fullmatch(name)
+            or name in _RESERVED_CONDITION_NAMES
+        ):
+            raise ValueError(f"条件包含未知或保留字段: {name}。")
+        else:
+            expected = None
+        if expected is None:
+            if isinstance(value, str):
+                if not value.strip() or len(value) > 200 or any(char in value for char in "<>\x00\n\r"):
+                    raise ValueError(f"{name} 必须是安全的 1–200 字符文本。")
+            elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                if value <= 0 or value > 100000000:
+                    raise ValueError(f"{name} 必须是范围内的正数。")
+            elif isinstance(value, list):
+                if (
+                    not value
+                    or len(value) > 10
+                    or any(
+                        not isinstance(item, str)
+                        or not item.strip()
+                        or len(item) > 80
+                        or any(char in item for char in "<>\x00\n\r")
+                        for item in value
+                    )
+                    or len(set(value)) != len(value)
+                ):
+                    raise ValueError(f"{name} 必须是 1–10 项不重复安全文本。")
+            else:
+                raise ValueError(f"{name} 的条件值类型不受支持。")
+            continue
         if expected is float:
             if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
                 raise ValueError(f"{name} 必须是正数。")
@@ -70,7 +123,12 @@ def validate_conditions(domain: str, conditions: Conditions) -> Conditions:
                 raise ValueError(f"{name} 必须是 1–10 项非空文本。")
             if len(set(value)) != len(value):
                 raise ValueError(f"{name} 不能包含重复选项。")
-        elif not isinstance(value, str) or not value.strip() or len(value) > 200:
+        elif (
+            not isinstance(value, str)
+            or not value.strip()
+            or len(value) > 200
+            or any(char in value for char in "<>\x00\n\r")
+        ):
             raise ValueError(f"{name} 必须是 1–200 字符的非空字符串。")
     if domain == "travel":
         parsed_dates: dict[str, date] = {}

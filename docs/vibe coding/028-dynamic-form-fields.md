@@ -1,6 +1,6 @@
 # 028：扩展动态表单的场景字段
 
-- 状态：已实现；真实场景验收待补
+- 状态：已完成
 - 阶段：P4 自然语言任务与多场景交互
 - 基线：`1ce0deb2fe6b62d03eb2abd41148928a9d152093`；执行时核对最新 HEAD。
 - 前置：[021 报告](../reports/021-dynamic-task-forms-report.md)、[027 报告](../reports/027-web-search-mcp-report.md)。
@@ -39,7 +39,7 @@
 
 ## 本轮收口：修复字段仍固定的问题
 
-截至提交 `8bebb53320ac2f9cfac44536a545a24a3e2420f1`，代码将 color/use_case 和 travel 的 destination/start_date/end_date/activity_types 加入固定注册表，选项也固定；`validate_conditions` 仍拒绝未注册 ID。因此目前只能从预设字段中选择，尚未满足本任务“字段名称和标签不限于购物四项、模型提出场景字段”的目标，也未完成真实验收。不要只增加几个固定字段或仅补跑测试。
+截至提交 `8bebb53320ac2f9cfac44536a545a24a3e2420f1`，代码将 color/use_case 和 travel 的 destination/start_date/end_date/activity_types 加入固定注册表，选项也固定；`validate_conditions` 仍拒绝未注册 ID。后续提交已移除固定字段白名单，改为受控模型生成业务字段，并完成真实模型/Worker/PostgreSQL/浏览器验收；具体证据见[028 报告](../reports/028-dynamic-form-fields-report.md)。
 
 1. 保持控件类型和安全边界受控，允许模型在规范内提出新的非保留业务字段 ID、标签、原因及安全的有限选项；服务端校验 ID、类型、选项数量/长度、数值、日期、总数据大小和冲突。身份、权限、密钥、服务地址、支付等保留字段不能由模型写入。未知字段的 schema 与用户确认值应绑定到具体 proposal/task/revision，不以仅有的用户输入绕开验证。
 2. 设计扩展字段与购物硬约束的隔离：已有 budget/people/quantity/item 继续使用确定性校验与复算；扩展值不得覆盖或伪造核心字段。确认使用 021 的所有权、幂等和并发机制；旧 revision、旧 proposal、旧 Run 与新条件均可重读。数据结构若需迁移，按实际兼容设计处理，不强制每字段建数据库列。

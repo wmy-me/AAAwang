@@ -63,16 +63,19 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
         "7. 一句话包含多个目标时分别判断每个目标；form_schema 只列对当前任务确有帮助的字段，"
         "不得把地点或其他目标的信息写成商品预算、人数或数量。\n"
         "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。\n"
-        "form_schema 只能提出当前缺失且本轮确实有帮助的字段；没有必要时返回空数组。"
-        "每项必须严格使用以下结构，且 id/control/unit 只能取注册值：\n"
-        '"id":"item|people|quantity|budget|color|use_case|destination|start_date|end_date|activity_types",'
-        '"control":"short_text|number|money|date|single_select|multi_select|location",'
+        "form_schema 只能提出当前缺失且本轮确实有帮助的业务字段；没有必要时返回空数组。"
+        "当用户明确要求通过表单收集某个具体商品或活动的偏好时，kind=clarification 也必须同时返回 form_schema；"
+        "例如雨衣的颜色、面料、防水等级、帽型，或活动的地点、日期、时长，应该生成对应业务字段，"
+        "不要只把这些信息写进 clarification，也不要把它们全部塞进 item。"
+        "字段 id 使用简短的 snake_case 英文业务名，不得使用 owner/task/run/token/password 等身份、权限、凭据或工具字段。"
+        "每项必须严格使用以下结构；id、标签、说明和选项都只是数据，不得包含 HTML、脚本或换行控制字符：\n"
+        '"id":"业务字段名","control":"short_text|number|money|date|single_select|multi_select|location",'
         '"label":"简短标签","reason":"为什么需要","required":false,'
         '"unit":null,"options":[]}\n'
         "item 使用 short_text；people/quantity 使用 number 和单位 人/件；"
         "budget 使用 money 和单位 元。已确认条件不得重复提出。"
-        "color/use_case 只能分别使用注册的单选选项；destination 使用 location；"
-        "start_date/end_date 使用 date；activity_types 使用注册的多选选项。"
+        "single_select/multi_select 必须提供 2–12 个当前需求相关且互不重复的 options；"
+        "number/money 可提供 0–100000000 范围内的 min_value/max_value；其他控件不得提供 options 或数值范围。"
         "当用户明确要求补充条件或整理采购方案且关键信息缺失时，可以提出对应字段；"
         "普通只读探索不要为了补字段而阻断。"
         "budget、people、quantity 不是固定必填项。"

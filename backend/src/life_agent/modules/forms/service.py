@@ -1,6 +1,7 @@
 """Owner-scoped proposal generation and atomic form confirmation."""
 
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -55,6 +56,25 @@ _REGISTERED_FORM_FIELDS_BY_DOMAIN = {
         "activity_types": FormFieldSpec("activity_types", "multi_select", "活动偏好", "帮助筛选周末活动类型", options=("美食", "展览", "户外", "亲子", "文化")),
     },
 }
+_CORE_FORM_FIELD_IDS = frozenset(_REGISTERED_FORM_FIELDS)
+_RESERVED_DYNAMIC_FIELD_IDS = frozenset(
+    {
+        "owner_id",
+        "task_id",
+        "revision",
+        "run_id",
+        "service_url",
+        "tool_name",
+        "api_key",
+        "secret",
+        "password",
+        "token",
+        "payment",
+    }
+)
+_DYNAMIC_FIELD_ID = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+_MAX_DYNAMIC_FIELDS = 8
+_MAX_OPTION_COUNT = 12
 
 
 def _owned_task(db: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> Task:
@@ -79,11 +99,11 @@ def _shopping_specs(snapshot: TaskRevision, domain: str = "shopping") -> list[Fo
 def validate_model_schema(
     raw_schema: object, current_conditions: Conditions, domain: str = "shopping"
 ) -> list[dict[str, object]]:
-    """Validate model suggestions against registered controls and known values."""
+    """Validate model suggestions against the bounded form contract."""
     if raw_schema is None:
         return []
     registered_fields = _REGISTERED_FORM_FIELDS_BY_DOMAIN.get(domain, _REGISTERED_FORM_FIELDS)
-    if not isinstance(raw_schema, list) or len(raw_schema) > len(registered_fields):
+    if not isinstance(raw_schema, list) or len(raw_schema) > _MAX_DYNAMIC_FIELDS:
         raise FormValidationError("模型表单 schema 必须是有限字段列表。")
     fields: list[dict[str, object]] = []
     seen: set[str] = set()
@@ -92,37 +112,50 @@ def validate_model_schema(
             field = FormField.model_validate(raw_field)
         except ValueError as exc:
             raise FormValidationError("模型表单字段格式不合法。") from exc
-        if field.id in seen or field.id not in registered_fields:
-            raise FormValidationError("模型表单包含未注册或重复字段。")
+        if (
+            field.id in seen
+            or field.id in _RESERVED_DYNAMIC_FIELD_IDS
+            or not _DYNAMIC_FIELD_ID.fullmatch(field.id)
+        ):
+            raise FormValidationError("模型表单包含非法、保留或重复字段。")
         if field.id in current_conditions:
             raise FormValidationError("模型表单不能重复要求已确认条件。")
-        registered = registered_fields[field.id]
-        if field.control != registered.control:
-            raise FormValidationError("模型表单控件类型不匹配注册能力。")
+        registered = registered_fields.get(field.id)
+        if registered is not None and field.control != registered.control:
+            raise FormValidationError("核心字段控件类型不匹配注册能力。")
         unit = field.unit.strip() if isinstance(field.unit, str) else field.unit
         unit = unit or None
-        if unit != registered.unit:
+        if registered is not None and unit != registered.unit:
             raise FormValidationError("模型表单单位不匹配注册能力。")
-        if any(character in field.label or character in field.reason for character in "<>"):
+        if any(
+            character in field.label or character in field.reason
+            for character in "<>\x00\n\r"
+        ):
             raise FormValidationError("模型表单文本不能包含脚本标记。")
         options = tuple(field.options or ())
-        if len(set(options)) != len(options) or any(
+        if len(options) > _MAX_OPTION_COUNT or len(set(options)) != len(options) or any(
             not option.strip() or len(option) > 80 or any(character in option for character in "<>")
             for option in options
         ):
             raise FormValidationError("模型表单选项不合法。")
-        if registered.options and options != registered.options:
-            raise FormValidationError("模型表单选项不匹配注册能力。")
-        if not registered.options and options:
-            raise FormValidationError("该控件不允许自定义选项。")
-        if field.min_value is not None and (
-            registered.min_value is None or field.min_value < registered.min_value
-        ):
-            raise FormValidationError("模型表单最小值超出注册范围。")
-        if field.max_value is not None and (
-            registered.max_value is None or field.max_value > registered.max_value
-        ):
-            raise FormValidationError("模型表单最大值超出注册范围。")
+        if field.control in {"single_select", "multi_select"}:
+            if not 2 <= len(options) <= _MAX_OPTION_COUNT:
+                raise FormValidationError("选择控件必须提供 2–12 个选项。")
+        elif options:
+            raise FormValidationError("非选择控件不能提供选项。")
+        if field.control in {"number", "money"}:
+            if field.min_value is not None and field.min_value < 0:
+                raise FormValidationError("数字字段最小值不能为负数。")
+            if field.max_value is not None and field.max_value > 100000000:
+                raise FormValidationError("数字字段最大值超出范围。")
+            if (
+                field.min_value is not None
+                and field.max_value is not None
+                and field.min_value > field.max_value
+            ):
+                raise FormValidationError("数字字段范围无效。")
+        elif field.min_value is not None or field.max_value is not None:
+            raise FormValidationError("非数字控件不能提供数值范围。")
         seen.add(field.id)
         normalized = field.model_dump(exclude_none=True)
         normalized["unit"] = unit

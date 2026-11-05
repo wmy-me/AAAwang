@@ -79,6 +79,44 @@ def test_model_form_schema_supports_registered_scene_controls() -> None:
         )
 
 
+def test_model_form_schema_accepts_unregistered_business_fields_with_bounds() -> None:
+    fields = validate_model_schema(
+        [
+            {
+                "id": "fabric_type",
+                "control": "single_select",
+                "label": "面料偏好",
+                "reason": "帮助筛选适合通勤的雨衣",
+                "options": ["轻薄", "防水", "透气"],
+            },
+            {
+                "id": "activity_duration",
+                "control": "number",
+                "label": "活动时长",
+                "reason": "用于安排周末活动",
+                "unit": "小时",
+                "min_value": 1,
+                "max_value": 24,
+            },
+        ],
+        {},
+        "shopping",
+    )
+    assert {field["id"] for field in fields} == {"fabric_type", "activity_duration"}
+    with pytest.raises(FormValidationError, match="选项"):
+        validate_model_schema(
+            [{"id": "fabric_type", "control": "single_select", "label": "面料", "reason": "筛选", "options": ["防水"]}],
+            {},
+            "shopping",
+        )
+    with pytest.raises(FormValidationError, match="保留"):
+        validate_model_schema(
+            [{"id": "api_key", "control": "short_text", "label": "密钥", "reason": "x"}],
+            {},
+            "shopping",
+        )
+
+
 @pytest.fixture
 def task_context() -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
     engine = create_engine(
