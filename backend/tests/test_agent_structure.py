@@ -1,21 +1,37 @@
 import asyncio
 from decimal import Decimal
+from types import SimpleNamespace
 
+from life_agent.agents.coordinator import service as coordinator
 from life_agent.agents.coordinator.service import decide_capabilities
 from life_agent.agents.discovery import service as discovery_service
 from life_agent.agents.procurement.service import build_validated_plan
+from life_agent.core.llm.deepseek import LLMResult
+from life_agent.worker import runner
 
 
-def test_coordinator_entrypoint_keeps_worker_implementation_behind_boundary(monkeypatch) -> None:
-    expected = {"kind": "direct", "capability_ids": []}
+def test_coordinator_owns_decision_prompt_and_parser(monkeypatch) -> None:
+    assert not hasattr(runner, "_run_capability_decision_impl")
+    captured: dict[str, str] = {}
 
-    def fake_decision(settings, claim, budget):
-        return expected
+    async def fake_call(_settings, prompt, **_kwargs):
+        captured["prompt"] = prompt
+        return LLMResult('{"kind":"direct","capability_ids":[],"reason":"问候"}')
 
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
     monkeypatch.setattr(
-        "life_agent.worker.runner._run_capability_decision_impl", fake_decision
+        coordinator,
+        "discover_capability_tools",
+        lambda settings, _budget=None: (set(), {}),
     )
-    assert decide_capabilities(object(), object(), object()) is expected
+    decision = decide_capabilities(
+        object(),
+        SimpleNamespace(goal="给同学买毕业礼物", input_message="你好", conditions={}),
+        runner.RunBudget(),
+    )
+
+    assert "任务目标：给同学买毕业礼物" in captured["prompt"]
+    assert decision["kind"] == "direct"
 
 
 def test_discovery_entrypoint_delegates_without_creating_a_second_graph(monkeypatch) -> None:

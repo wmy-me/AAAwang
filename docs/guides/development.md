@@ -73,13 +73,18 @@ Worker 通过 PostgreSQL 行锁和 `SKIP LOCKED` 领取 run，使用租约、后
 购物Run本地联调需要同时启动 PostgreSQL、shopping-mcp、API和Worker：
 
 ```bash
-cd mcp-services && ./mvnw -pl shopping-mcp spring-boot:run
+# shopping-mcp 使用 detached 方式启动，避免调试终端关闭时收到 SIGHUP 后优雅退出
+cd mcp-services
+setsid nohup ./mvnw -B -ntp -pl shopping-mcp spring-boot:run \
+  > /tmp/shopping-mcp.log 2>&1 < /dev/null &
+curl http://127.0.0.1:8101/actuator/health
+
 cd backend && uv run alembic upgrade head
 cd backend && uv run uvicorn life_agent.main:app --host 127.0.0.1 --port 8000
 cd backend && uv run python -m life_agent.worker.runner
 ```
 
-并在仅存在于本机的根目录 `.env` 中配置 `LLM_API_KEY`、`DATABASE_URL` 和 `MCP_SERVICES`。缺少Key、MCP不可用或外部调用失败会使购物Run进入安全失败状态，不应把历史003脚本成功当作010真实闭环证据。
+并在仅存在于本机的根目录 `.env` 中配置 `LLM_API_KEY`、`DATABASE_URL` 和 `MCP_SERVICES`。shopping-mcp 实际监听 `127.0.0.1:8101`；前台运行存活不代表服务异常，若启动它的终端/调试会话结束，进程会随父会话收到终止信号而优雅退出，长驻联调应使用上面的 `setsid nohup`。缺少Key、MCP不可用或外部调用失败会使购物Run进入安全失败状态，不应把历史003脚本成功当作010真实闭环证据。
 
 ### 3.3 DeepSeek 连通检查
 

@@ -8,7 +8,21 @@ from typing import Any
 
 from life_agent.agents.shopping import ShoppingAgentResult, run_shopping_agent
 
-__all__ = ["ShoppingAgentResult", "run_product_discovery", "run_shopping_agent"]
+__all__ = [
+    "ShoppingAgentResult",
+    "build_shopping_prompt",
+    "run_product_discovery",
+    "run_shopping_agent",
+]
+
+
+def build_shopping_prompt(goal: str, conditions: dict[str, object]) -> str:
+    """Build the bounded product-discovery prompt without platform details."""
+    known = ", ".join(f"{key}={value}" for key, value in conditions.items()) or "无"
+    return (
+        f"购物目标：{goal}\n已知条件：{known}\n"
+        "只查询并回答模拟商品候选。未提供的预算、物品、数量必须明确写为未知，不能猜测。"
+    )
 
 
 async def run_product_discovery(

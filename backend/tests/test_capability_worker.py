@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from life_agent.agents.coordinator import service as coordinator
 from life_agent.core.llm import ToolLoopError
 from life_agent.core.llm.deepseek import LLMResult
 from life_agent.modules.runs.service import _map_source
@@ -85,10 +86,10 @@ def test_capability_decision_accepts_only_visible_registered_capabilities(monkey
             '{"kind":"capabilities","capability_ids":["map_place_search"],"reason":"需要地点"}'
         )
 
-    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
     monkeypatch.setattr(
-        runner,
-        "_discover_capability_tools",
+        coordinator,
+        "discover_capability_tools",
         lambda settings, _budget=None: (
             {"map", "shopping"},
             {
@@ -108,7 +109,7 @@ def test_capability_decision_accepts_only_visible_registered_capabilities(monkey
         ),
     )
 
-    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+    decision = coordinator.decide_capabilities(settings, run_claim, runner.RunBudget())
 
     assert decision["capability_ids"] == ["map_place_search"]
 
@@ -122,10 +123,10 @@ def test_capability_decision_rejects_unregistered_capability(monkeypatch) -> Non
     async def fake_call(*args, **kwargs):
         return LLMResult('{"kind":"capabilities","capability_ids":["arbitrary_url_tool"]}')
 
-    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
     monkeypatch.setattr(
-        runner,
-        "_discover_capability_tools",
+        coordinator,
+        "discover_capability_tools",
         lambda settings, _budget=None: (
             {"shopping"},
             {"shopping": {
@@ -138,7 +139,7 @@ def test_capability_decision_rejects_unregistered_capability(monkeypatch) -> Non
     )
 
     with pytest.raises(ToolLoopError, match="不可见或重复"):
-        runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+        coordinator.decide_capabilities(settings, run_claim, runner.RunBudget())
 
 
 def test_capability_decision_treats_valid_ids_as_capabilities(monkeypatch) -> None:
@@ -154,10 +155,10 @@ def test_capability_decision_treats_valid_ids_as_capabilities(monkeypatch) -> No
             '{"kind":"direct","capability_ids":["shopping_product_discovery"]}'
         )
 
-    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
     monkeypatch.setattr(
-        runner,
-        "_discover_capability_tools",
+        coordinator,
+        "discover_capability_tools",
         lambda settings, _budget=None: (
             {"shopping"},
             {"shopping": {
@@ -169,7 +170,7 @@ def test_capability_decision_treats_valid_ids_as_capabilities(monkeypatch) -> No
         ),
     )
 
-    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+    decision = coordinator.decide_capabilities(settings, run_claim, runner.RunBudget())
 
     assert decision["kind"] == "capabilities"
     assert decision["capability_ids"] == ["shopping_product_discovery"]
@@ -186,9 +187,9 @@ def test_capability_decision_parses_fenced_json(monkeypatch) -> None:
             '```json\n{"kind":"direct","capability_ids":[],"reason":"问候"}\n```'
         )
 
-    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
 
-    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+    decision = coordinator.decide_capabilities(settings, run_claim, runner.RunBudget())
 
     assert decision["kind"] == "direct"
 
@@ -202,10 +203,10 @@ def test_capability_decision_downgrades_map_without_location(monkeypatch) -> Non
     async def fake_call(*args, **kwargs):
         return LLMResult('{"kind":"capabilities","capability_ids":["map_place_search"]}')
 
-    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
     monkeypatch.setattr(
-        runner,
-        "_discover_capability_tools",
+        coordinator,
+        "discover_capability_tools",
         lambda settings, _budget=None: (
             {"map"},
             {"map": {
@@ -217,7 +218,7 @@ def test_capability_decision_downgrades_map_without_location(monkeypatch) -> Non
         ),
     )
 
-    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+    decision = coordinator.decide_capabilities(settings, run_claim, runner.RunBudget())
 
     assert decision["kind"] == "clarification"
     assert decision["capability_ids"] == []
@@ -236,8 +237,8 @@ def test_capability_decision_prompt_preserves_goal_and_form_message(monkeypatch)
         captured["prompt"] = prompt
         return LLMResult('{"kind":"direct","capability_ids":[]}')
 
-    monkeypatch.setattr(runner, "call_deepseek", fake_call)
-    runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
+    coordinator.decide_capabilities(settings, run_claim, runner.RunBudget())
 
     assert "任务目标：给25人买彩色铅笔作为奖品" in captured["prompt"]
     assert "本轮用户消息：通过动态表单确认" in captured["prompt"]
@@ -266,10 +267,10 @@ def test_capability_decision_retries_self_contradictory_direct(monkeypatch) -> N
             '{"kind":"capabilities","capability_ids":["shopping_product_discovery"]}'
         )
 
-    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
     monkeypatch.setattr(
-        runner,
-        "_discover_capability_tools",
+        coordinator,
+        "discover_capability_tools",
         lambda settings, _budget=None: (
             {"shopping"},
             {"shopping": {
@@ -281,7 +282,7 @@ def test_capability_decision_retries_self_contradictory_direct(monkeypatch) -> N
         ),
     )
 
-    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+    decision = coordinator.decide_capabilities(settings, run_claim, runner.RunBudget())
 
     assert len(calls) == 2
     assert "请重新输出严格 JSON" in calls[1]
@@ -305,10 +306,10 @@ def test_capability_decision_uses_goal_location_for_form_confirmation(
     async def fake_call(*_args, **_kwargs):
         return LLMResult('{"kind":"capabilities","capability_ids":["map_place_search"]}')
 
-    monkeypatch.setattr(runner, "call_deepseek", fake_call)
+    monkeypatch.setattr(coordinator, "call_deepseek", fake_call)
     monkeypatch.setattr(
-        runner,
-        "_discover_capability_tools",
+        coordinator,
+        "discover_capability_tools",
         lambda settings, _budget=None: (
             {"map"},
             {"map": {
@@ -320,7 +321,7 @@ def test_capability_decision_uses_goal_location_for_form_confirmation(
         ),
     )
 
-    decision = runner._run_capability_decision(settings, run_claim, runner.RunBudget())
+    decision = coordinator.decide_capabilities(settings, run_claim, runner.RunBudget())
 
     assert decision["kind"] == "capabilities"
     assert decision["capability_ids"] == ["map_place_search"]
@@ -329,13 +330,13 @@ def test_capability_decision_uses_goal_location_for_form_confirmation(
 def test_execution_rejects_changed_mcp_discovery(monkeypatch) -> None:
     claim_value = claim("map_places", ("map_place_search",))
     monkeypatch.setattr(
-        runner,
-        "_discover_capability_tools",
+        coordinator,
+        "discover_capability_tools",
         lambda settings, _budget=None: ({"map"}, {"map": {"other_tool": {"type": "object"}}}),
     )
 
     with pytest.raises(ToolLoopError, match="工具发现结果已变化"):
-        runner._validate_discovered_capabilities(SimpleNamespace(), claim_value)
+        coordinator.validate_discovered_capabilities(SimpleNamespace(), claim_value)
 
 
 def test_termination_reasons_are_bounded() -> None:

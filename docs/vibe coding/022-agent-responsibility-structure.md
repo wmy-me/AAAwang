@@ -1,8 +1,8 @@
 # 022：Agent 职责与包结构整理
 
-- 状态：部分完成；代码入口和职责文档已整理，真实 shopping-mcp 组合回归受阻，不能据此宣称 022 已完成
+- 状态：已完成；coordinator/discovery/procurement 职责入口已接入生产路径，shopping-mcp 退出根因已定位并采用 detached 启动修复，真实商品/地图组合、动态表单、浏览器、权限、幂等和预算回归均通过
 - 所属阶段：P4 真实信息与更多采买场景（现有 Agent 架构收敛）
-- 起始分支与代码提交：`main` / `0f8d10b5e4513414573a7f86405b0ff63814e634`；执行前重新核对 HEAD
+- 起始分支与代码提交：`main` / `7083eaa`；前一轮从 `0f8d10b` 起完成职责入口初版
 - 前置证据：[020 报告](../reports/020-model-capability-budget-report.md)、[021 报告](../reports/021-dynamic-task-forms-report.md)
 - 对应报告：`docs/reports/022-agent-responsibility-structure-report.md`
 

@@ -1,9 +1,9 @@
-## 022 Agent 职责与包结构整理（部分完成，真实组合受阻）
+## 022 Agent 职责与包结构整理（已完成）
 
-- 已新增并接入生产路径的职责入口：`agents/coordinator/` 负责受限结构化能力决策，`agents/discovery/` 负责有界商品发现适配，`agents/procurement/` 负责确定性候选/方案边界；`worker/runner.py` 继续只负责 Run 生命周期、租约、取消、fencing、终态事务和分派。
+- 已新增并接入生产路径的职责入口：`agents/coordinator/` 持有领域提示词、模型 JSON 解析、纠正重试和可见集校验，`agents/discovery/` 负责有界商品发现与提示词，`agents/procurement/` 负责确定性候选/方案边界；`worker/runner.py` 只负责 Run 生命周期、租约、取消、fencing、终态事务和分派。
 - 保留唯一的 `agents/shopping.py` 图实现和 `modules/shopping_plans/service.py` 计算实现，未新增第二套购物图、能力注册表或预算实例；travel 仍为预留。
-- 结构入口/Worker/购物图/方案专项 `35 passed`，后端全量 `136 passed`，Ruff、compileall、Alembic check、前端 lint/build 通过；前端保留 3 条 Hook warning。
-- 本轮真实 PostgreSQL + DeepSeek + API + 独立 Worker 已完成 coordinator 直答 Run，`direct_answer`、`model_requests=2`、`remote_calls=2`；shopping-mcp 调试会话退出且 8101 不可访问，商品/地图组合和浏览器回归未验收。详见[022报告](reports/022-agent-responsibility-structure-report.md)。
+- 结构入口/Worker/购物图/方案专项 `45 passed`，后端全量 `136 passed`，Ruff、compileall、Alembic check、前端 lint/build 通过；前端保留 3 条 Hook warning。
+- shopping-mcp 前台运行验证稳定，退出原因是临时调试终端结束后进程收到终止信号；使用 `setsid nohup` detached 启动后 8101 健康、MCP `2025-11-25` 初始化、`list_tools` 与 `search_products` 可调用。真实商品（`1461a434...`）、商品+地图（`cc4d61f1...`）、表单方案（`6410c52f...`）、地点、直答、追问、无预算探索和双账号隔离均通过，浏览器刷新已验收。详见[022报告](reports/022-agent-responsibility-structure-report.md)。
 
 ## 020 模型能力决策与跨 Agent 共享预算（已完成）
 
