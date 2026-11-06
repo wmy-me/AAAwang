@@ -8,7 +8,13 @@
 
 - 已拉取并核对远端最新 `origin/main`：`10cb67a docs: align memory design with Mem0 plan`；任务已明确要求 Mem0 OSS，不能以自建偏好表替代。
 - 现有项目实例为 `life-buy-agent-postgres`（`pgvector/pgvector:pg17`），在不清库、不删卷、不启动备用 Compose 的前提下，已对 `life_buy_agent` 执行 `CREATE EXTENSION IF NOT EXISTS vector`，得到 `vector:0.8.5`；数据库角色具备创建扩展权限。
-- 当前仓库原本没有 `mem0ai`、`sentence-transformers` 或本地 Embedding 模型。已将 `mem0ai==2.2.1` 和 `sentence-transformers>=5.2.0,<6` 写入 `backend/pyproject.toml` 与 `uv.lock`，但安装过程需下载大型 PyTorch/CUDA 依赖，尚未完成可导入验证，更未下载/验证任何中文 Embedding 模型。
+- 当前仓库原本没有 `mem0ai`、`sentence-transformers` 或本地 Embedding 模型。已将 `mem0ai==2.2.1` 和 `sentence-transformers>=5.2.0,<6` 写入项目依赖；CPU 锁定使用 PyTorch 官方 `pytorch-cpu` 索引、`torch>=2.10.0,<2.11`，锁定解析已移除 CUDA/NVIDIA 包并选择 `2.10.0+cpu`。
+
+## 有时限运行时诊断（2026-11-06）
+
+- 直接以项目 `.venv/bin/python`、每项 20 秒上限测试：`torch` 在上限内成功导入，输出为旧环境的 `2.15.0+cu132`、`cuda.is_available()=False`，退出码 `0`；`mem0` 成功导入，退出码 `0`。这说明此前不是 Mem0 导入失败。
+- 结论是锁文件与既有虚拟环境不一致：CPU 锁已生成，但 `.venv` 尚未完成同步替换旧 CUDA torch。随后运行 `timeout 120 uv sync --locked --no-dev` 未在当前执行窗口得到可验证的完成输出，不能写为成功。未取得可显示的 Python 异常；需继续检查同步进程/缓存，而不是声称模型下载失败。
+- `sentence_transformers` 的独立导入和 BAAI/bge-m3 下载/编码尚未完成；未发现已有本地模型或 Embedding 服务。
 
 ## 不能作为完成证据的内容
 
