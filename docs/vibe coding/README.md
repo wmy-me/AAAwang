@@ -61,7 +61,7 @@
 | 027 | [公开网页搜索 MCP 与来源引用](027-web-search-mcp.md) | 已完成；真实 Tavily、DeepSeek、独立 Worker、PostgreSQL、Chrome 刷新和双用户隔离通过，见[报告](../reports/027-web-search-mcp-report.md) |
 | 028 | [扩展动态表单的场景字段](028-dynamic-form-fields.md) | 已完成；两个真实 DeepSeek 场景、独立 Worker/PostgreSQL、浏览器生成/填写/提交/后续 Run/刷新，以及 proposal/revision 校验边界均已验证，见[报告](../reports/028-dynamic-form-fields-report.md) |
 | 029 | [纯对话入口与 Agent 自主执行](029-conversation-first-agent.md) | 已完成；模型级对话路由、taskless Worker、采买/多轮 revision、商品与来源卡历史/刷新/隔离、多任务澄清和 HTTP 400 根因修复均已验收，见[报告](../reports/029-conversation-first-agent-report.md) |
-| 030 | [对话短期上下文与统一执行预算](030-conversation-context.md) | 执行中；用户已精简验收，以主流程和已有验证收口；待核对并提交本地结果，浏览器聊天/SSE 未验证不作为完成门槛，见[报告](../reports/030-conversation-context-report.md) |
+| 030 | [对话短期上下文与统一执行预算](030-conversation-context.md) | 已完成（浏览器交互未验证）；已验证持久化 Worker 路由、短期上下文和统一预算的真实主流程及自动化检查。Chrome 仅注册/登录/创建会话，未实际发送消息，聊天/SSE 等未验证但不阻止本任务收口，见[报告](../reports/030-conversation-context-report.md) |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 

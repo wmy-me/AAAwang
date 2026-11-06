@@ -108,7 +108,7 @@
 	exactly-once。
 # 当前进度
 
-核对日期：2026-11-03。以下按 001–017 的对应执行报告和最新源码归档；013 的规划基线为 `main` 提交 `ba69c6e7180c700333d9fd6ea15d1a614796f8b3`，014、015、016 在其后的工作区变更上完成并已在真实 PostgreSQL、真实 Worker/DeepSeek/MCP 和浏览器中重新验收，017 于提交 `3f61900` 后完成真实新 Run 补验。
+核对日期：2026-11-06。以下按对应执行报告和最新源码归档；013 的规划基线为 `main` 提交 `ba69c6e7180c700333d9fd6ea15d1a614796f8b3`，014、015、016 在其后的工作区变更上完成并已在真实 PostgreSQL、真实 Worker/DeepSeek/MCP 和浏览器中重新验收，017 于提交 `3f61900` 后完成真实新 Run 补验。
 
 ## 代码现状
 
@@ -121,9 +121,10 @@
 - 真实 DeepSeek、独立 Worker、PostgreSQL、shopping-mcp 和 Chromium 已验证聊天、采买、预算 revision、多任务澄清、商品卡和受控来源卡；后端全量 `175 passed`，会话专项 `11 passed`，Ruff、compileall、Alembic check、前端 build 通过（2 条既有 lint warning）。详见[029报告](reports/029-conversation-first-agent-report.md)。
 - 边界：公开搜索来源卡使用受控快照验证（027 已有真实 Tavily 证据）；API 内对话分类调用未计入 RunBudget；已用 Playwright 中止首个 SSE 请求验证重连/补读，未模拟长时间断网。
 
-## 030 对话短期上下文与统一执行预算（执行中）
+## 030 对话短期上下文与统一执行预算（已完成；浏览器交互未验证）
 
-- 已接入 owner-scoped 近期 `ContextBuilder`，路由、Worker 直答和能力决策可读取同一受限历史视图；路由模型调用迁入 Worker/持久预算及真实交互验收仍待完成，详见[030阶段报告](reports/030-conversation-context-report.md)。
+- owner-scoped `ContextBuilder` 已按输入游标、会话和 owner 过滤历史，并按完整轮次裁剪；路由、Worker 直答和能力决策读取各自所需的同一受限上下文。路由已迁入持久化 Worker Run；模型、委派、发现与 MCP 的预算预占均经带 fencing 的 Run 快照保存，旧 Run 仍兼容。
+- 已有真实 DeepSeek→API→独立 Worker→PostgreSQL 两轮上下文闭环；后端全量 `181 passed`、Ruff、compileall、Alembic check 通过，前端 lint/build 通过（3 条既有 lint 警告）。Chrome 仅完成注册、登录和创建会话，未实际发送消息，故聊天/刷新/卡片/SSE 未验证；按用户确认的 030 修订范围不阻止完成。详见[030报告](reports/030-conversation-context-report.md)。
 
 | 能力 | 事实与证据 |
 | --- | --- |
