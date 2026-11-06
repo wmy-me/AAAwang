@@ -65,7 +65,7 @@
 | 031 | [基于 Mem0 的用户长期偏好记忆](031-user-preference-memory.md) | 代码完成、真实验收待定；Mem0 OSS 适配、Worker/预算与替身边界已实现，真实 BGE-M3、Mem0+pgvector+DeepSeek 闭环尚未运行，见[报告](../reports/031-user-preference-memory-report.md) |
 | 032 | [独立意图识别与主 Agent 入口](032-intent-routing.md) | 已完成；单一意图层已接入 Worker，复合意图安全澄清并修复 forget 无新值，031 真实记忆联调仍暂缓，见[报告](../reports/032-intent-routing-report.md) |
 | 033 | [高德 MCP 周边地点搜索](033-amap-nearby-search.md) | 已完成；真实 maps_geo→maps_around_search 返回来源地点，城市文本搜索保留，见[报告](../reports/033-amap-nearby-search-report.md) |
-| 033 | [高德 MCP 周边地点搜索](033-amap-nearby-search.md) | 待执行；复用已有高德 MCP 和对话链路 |
+| 034 | [通用采购指导与场景解耦](034-general-shopping-guidance.md) | 待执行；教师奖品仅为示例，保留通用采购能力 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
