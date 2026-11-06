@@ -33,6 +33,13 @@ def test_map_request_without_city_asks_before_calling() -> None:
     assert decision.capability_ids == ()
 
 
+def test_nearby_landmark_request_uses_map_without_forcing_product_search() -> None:
+    decision = route_task_turn("天安门附近找餐厅")
+    assert (decision.kind, decision.capability_ids) == (
+        RouteKind.CAPABILITIES, ("map_place_search",)
+    )
+
+
 def test_weather_request_without_city_asks_before_calling() -> None:
     decision = route_task_turn("天气怎么样")
     assert decision.kind is RouteKind.CLARIFICATION
@@ -46,7 +53,9 @@ def test_unregistered_capability_is_rejected() -> None:
 
 def test_registered_capabilities_are_read_only_and_allowlisted() -> None:
     assert get_capability("map_place_search").read_only is True
-    assert get_capability("map_place_search").allowed_tool_names == ("maps_text_search",)
+    assert get_capability("map_place_search").allowed_tool_names == (
+        "maps_text_search", "maps_around_search", "maps_geo"
+    )
     assert get_capability("map_place_search").timeout_seconds > 0
     assert get_capability("web_search").read_only is True
     assert get_capability("web_search").allowed_tool_names == ("tavily_search",)

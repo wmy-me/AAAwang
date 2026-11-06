@@ -504,6 +504,7 @@ _MAP_CITY_PATTERNS = (
 
 _CLAUSE_SPLIT = re.compile(r"[，。；;,]|(?:并|同时|以及|然后|再)")
 _MAP_CLAUSE_HINT = re.compile(r"(附近|周边|地点|位置|地图|礼品店|哪里买)")
+_COORDINATE_PATTERN = re.compile(r"(?<![\d.])(-?\d{2,3}\.\d+)\s*,\s*(-?\d{1,2}\.\d+)(?![\d.])")
 
 
 def _clauses(text: str) -> list[str]:
@@ -543,8 +544,51 @@ def _map_request(
     return query or text[:120], city
 
 
+def _nearby_request(goal: str, input_message: str | None) -> tuple[str, str | None, str | None]:
+    """Extract a nearby category plus either direct coordinates or an address."""
+    text = (input_message or goal).strip()
+    coordinate = _COORDINATE_PATTERN.search(text)
+    if coordinate:
+        location = f"{coordinate.group(1)},{coordinate.group(2)}"
+        query = _COORDINATE_PATTERN.sub(" ", text)
+        query = re.sub(r"(?:帮我|请|麻烦|查询|查找|搜索|搜一下|找一下|看看|看一下|找|在|附近的|附近|周边的|周边|有哪些|有什么|的)", " ", query)
+        return " ".join(query.split())[:120] or "地点", location, None
+    marker = next((item for item in ("附近", "周边") if item in text), None)
+    if marker is None:
+        return "", None, None
+    before, after = text.split(marker, 1)
+    address = re.sub(r"^(?:帮我|请|麻烦|查询|查找|搜索|搜一下|找一下|看看|看一下|找|在)\s*", "", before).strip()
+    query = re.sub(r"(?:有哪些|有什么|的|店铺|商铺)?\s*$", "", after).strip()
+    query = re.sub(r"^(?:有哪些|有什么|找|查|搜|的)\s*", "", query)
+    return query[:120], None, address[:120] or None
+
+
 def _run_map_places_with_lease(settings, claim, budget=None):
-    from life_agent.tools.maps import search_places
+    from life_agent.tools.maps import geocode_address, search_nearby_places, search_places
+
+    nearby_query, location, address = _nearby_request(claim.goal, claim.input_message)
+    if location or address:
+        if not nearby_query:
+            return {
+                "answer": "请说明要在该位置附近查询哪类地点。",
+                "source": {"service_id": "map", "tool": None, "simulated": False},
+                "execution_version": "033-v1", "decision_type": "clarification", "delegated": False,
+                "mcp_call_count": 0, "places": [], "query": "", "city": "",
+            }
+        if address:
+            if budget is not None:
+                budget.reserve("mcp")
+            location = asyncio.run(asyncio.wait_for(geocode_address(settings, address), timeout=settings.map_mcp_timeout_seconds))
+        if budget is not None:
+            budget.reserve("mcp")
+        result = asyncio.run(asyncio.wait_for(search_nearby_places(settings, nearby_query, location=location), timeout=settings.map_mcp_timeout_seconds))
+        location_label = address or "提供的坐标"
+        return {
+            "answer": f"已以{location_label}为中心查询“{nearby_query}”，找到 {len(result['places'])} 个地点。",
+            "source": result["source"], "execution_version": "033-v1", "decision_type": "direct_answer",
+            "delegated": False, "mcp_call_count": 2 if address else 1, "places": result["places"],
+            "query": nearby_query, "city": "", "observed_at": result["observed_at"],
+        }
 
     query, city = _map_request(claim.goal, claim.input_message, claim.conversation_context)
     if not city:

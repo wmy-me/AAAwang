@@ -281,6 +281,11 @@
 
 PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–008 均已提交，验收边界见各报告。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。
 
+## 033 高德 MCP 周边地点搜索（已完成）
+
+- 已在既有地图能力中接入 `maps_geo` 地址转坐标和 `maps_around_search` 周边 POI；城市 `maps_text_search` 保持可用。Worker 对地址路径分别计入地理编码和周边调用预算，结果继续走已有 owner 隔离、地点持久化、SSE 与卡片路径。
+- 真实高德已完成“天安门 → 坐标 → 附近餐厅”并返回 5 个来源地点；替身验证地址/周边参数隔离、缺位置澄清、城市文本搜索和不强制商品能力，compileall/diff check 通过。031 真实记忆联调仍暂缓，详见[033报告](reports/033-amap-nearby-search-report.md)。
+
 ## 032 独立意图识别与主 Agent 入口（已完成）
 
 - 已建立并接入唯一的 `modules/intent` 结构化意图入口；Worker 实际使用它，coordinator 只保留兼容转发，能力选择仍在既有 coordinator/白名单链路。普通聊天、任务新建/延续/修改、记忆操作、歧义和复合意图均有受控结果，模型输出不授予任务、用户或工具权限。

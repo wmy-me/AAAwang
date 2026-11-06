@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     map_mcp_timeout_seconds: float = Field(default=20.0, gt=0)
     map_mcp_enabled: bool = False
     map_mcp_tool_name: str = "maps_text_search"
+    map_mcp_nearby_tool_name: str = "maps_around_search"
+    map_mcp_geocode_tool_name: str = "maps_geo"
+    map_mcp_nearby_radius_meters: int = Field(default=1000, ge=100, le=50000)
     map_mcp_weather_tool_name: str = "maps_weather"
     tavily_mcp_url: str = "https://mcp.tavily.com/mcp/"
     tavily_mcp_key: SecretStr | None = None
@@ -99,6 +102,8 @@ class Settings(BaseSettings):
                 raise ValueError("MAP_MCP_ENABLED=true 时必须配置 MAP_MCP_KEY。")
             if not self.map_mcp_tool_name.strip():
                 raise ValueError("MAP_MCP_TOOL_NAME 不能为空。")
+            if not self.map_mcp_nearby_tool_name.strip() or not self.map_mcp_geocode_tool_name.strip():
+                raise ValueError("MAP_MCP_NEARBY_TOOL_NAME 和 MAP_MCP_GEOCODE_TOOL_NAME 不能为空。")
             if not self.map_mcp_weather_tool_name.strip():
                 raise ValueError("MAP_MCP_WEATHER_TOOL_NAME 不能为空。")
             self.mcp_services["map"] = McpServiceConfig(
@@ -111,6 +116,8 @@ class Settings(BaseSettings):
                     dict.fromkeys(
                         (
                             self.map_mcp_tool_name.strip(),
+                            self.map_mcp_nearby_tool_name.strip(),
+                            self.map_mcp_geocode_tool_name.strip(),
                             self.map_mcp_weather_tool_name.strip(),
                         )
                     )

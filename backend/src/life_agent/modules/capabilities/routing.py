@@ -52,7 +52,7 @@ _CAPABILITIES = {
         agent_id="discovery",
         task_domain="shopping",
         service_id="map",
-        allowed_tool_names=("maps_text_search",),
+        allowed_tool_names=("maps_text_search", "maps_around_search", "maps_geo"),
         read_only=True,
         result_type="map_places",
         input_schema={"type": "object", "required": ["keywords"]},
@@ -164,7 +164,9 @@ def _has_city(text: str) -> bool:
 
 def has_location_scope(text: str) -> bool:
     """Return whether the trusted location parser found a search scope."""
-    return _has_city(text)
+    return _has_city(text) or bool(re.search(r"\d{2,3}\.\d+\s*,\s*\d{1,2}\.\d+", text)) or bool(
+        re.search(r"[^，。；;,\s]{2,80}(?:附近|周边)", text)
+    )
 
 
 def has_weather_city(text: str) -> bool:

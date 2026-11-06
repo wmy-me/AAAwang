@@ -1,6 +1,6 @@
 # 033：高德 MCP 周边地点搜索
 
-- 状态：待执行；核对最新 HEAD 和本地工作区，保留未提交改动。
+- 状态：已完成；真实高德主流程和聚焦检查见报告。核对最新 HEAD 和本地工作区，保留未提交改动。
 - 基线：032 已接入独立意图层；031 Mem0 真实联调暂缓，不是前置条件。
 - 参考：[018 地点搜索报告](../reports/018-map-mcp-place-search-report.md)、[032 报告](../reports/032-intent-routing-report.md)、[工具规则](../design/tools-and-mcp.md)。
 - 交付：[033 报告](../reports/033-amap-nearby-search-report.md)。

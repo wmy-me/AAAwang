@@ -2,7 +2,9 @@
 
 from life_agent.tools.maps.places import (
 	MapPlaceSearchError,
+	geocode_address,
 	normalize_places,
+	search_nearby_places,
 	search_places,
 )
 from life_agent.tools.maps.weather import (
@@ -14,8 +16,10 @@ from life_agent.tools.maps.weather import (
 __all__ = [
 	"MapPlaceSearchError",
 	"WeatherQueryError",
+	"geocode_address",
 	"normalize_forecasts",
 	"normalize_places",
 	"query_weather",
+	"search_nearby_places",
 	"search_places",
 ]

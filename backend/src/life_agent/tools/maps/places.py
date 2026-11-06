@@ -20,6 +20,7 @@ from life_agent.tools.mcp import (
 MAX_QUERY_LENGTH = 120
 MAX_TEXT_LENGTH = 240
 MAX_RESULTS = 20
+DEFAULT_NEARBY_RADIUS_METERS = 1000
 
 
 class MapPlaceSearchError(RuntimeError):
@@ -55,7 +56,7 @@ def _text(value: Any) -> str | None:
 
 def _items(payload: Any) -> list[Mapping[str, Any]]:
     if isinstance(payload, Mapping):
-        payload = payload.get("pois", payload.get("places", payload.get("results", [])))
+        payload = payload.get("pois", payload.get("geocodes", payload.get("places", payload.get("results", []))))
     if not isinstance(payload, list):
         return []
     return [item for item in payload if isinstance(item, Mapping)][:MAX_RESULTS]
@@ -146,3 +147,94 @@ async def search_places(
         "source": {"service_id": service_id, "tool": tool_name, "simulated": False},
         "observed_at": datetime.now(UTC).isoformat(),
     }
+
+
+def _allowed_tool(settings: Settings, service_id: str, configured_name: str) -> str:
+    config = settings.mcp_services.get(service_id)
+    if config is None or not config.enabled:
+        raise _error("not_configured")
+    tool_name = configured_name.strip()
+    if not tool_name or tool_name not in config.allowed_tool_names:
+        raise _error("protocol_error")
+    return tool_name
+
+
+async def geocode_address(settings: Settings, address: str, *, service_id: str = "map", mcp_client: McpClient | None = None) -> str:
+    """Resolve one unambiguous user-supplied address to a coordinate string."""
+    address = address.strip()
+    if not address or len(address) > MAX_QUERY_LENGTH:
+        raise _error("invalid_request")
+    tool_name = _allowed_tool(settings, service_id, settings.map_mcp_geocode_tool_name)
+    client = mcp_client or McpClient(settings)
+    try:
+        async with client.connect(service_id) as connection:
+            if tool_name not in {tool.name for tool in await connection.list_tools()}:
+                raise _error("protocol_error")
+            result = await connection.call_tool(tool_name, {"address": address})
+    except MapPlaceSearchError:
+        raise
+    except McpAuthenticationError as exc:
+        raise _error("authentication_failed") from exc
+    except McpRateLimitError as exc:
+        raise _error("rate_limited") from exc
+    except McpTimeoutError as exc:
+        raise _error("timeout") from exc
+    except (McpProtocolError, McpToolNotFoundError) as exc:
+        raise _error("protocol_error") from exc
+    except (McpConnectionError, McpToolExecutionError) as exc:
+        raise _error("external_failure") from exc
+    except Exception as exc:
+        raise _error("external_failure") from exc
+    candidates = _items(_content_payload(result.result))
+    locations = {_text(item.get("location") or item.get("coordinate")) for item in candidates}
+    locations.discard(None)
+    if len(locations) != 1:
+        raise _error("invalid_request", "地址无法唯一定位，请补充更具体的位置或直接提供坐标。")
+    return next(iter(locations))
+
+
+async def search_nearby_places(
+    settings: Settings, query: str, *, location: str, radius_meters: int | None = None,
+    service_id: str = "map", mcp_client: McpClient | None = None,
+) -> dict[str, Any]:
+    """Search POIs around a server-validated coordinate, not a city query."""
+    query, location = query.strip(), location.strip()
+    if not query or len(query) > MAX_QUERY_LENGTH or not _coordinate(location):
+        raise _error("invalid_request")
+    radius = radius_meters if radius_meters is not None else settings.map_mcp_nearby_radius_meters
+    if not isinstance(radius, int) or not 100 <= radius <= 50000:
+        raise _error("invalid_request")
+    tool_name = _allowed_tool(settings, service_id, settings.map_mcp_nearby_tool_name)
+    client = mcp_client or McpClient(settings)
+    try:
+        async with client.connect(service_id) as connection:
+            if tool_name not in {tool.name for tool in await connection.list_tools()}:
+                raise _error("protocol_error")
+            result = await connection.call_tool(tool_name, {"keywords": query, "location": location, "radius": str(radius), "strategy": 0})
+    except MapPlaceSearchError:
+        raise
+    except McpAuthenticationError as exc:
+        raise _error("authentication_failed") from exc
+    except McpRateLimitError as exc:
+        raise _error("rate_limited") from exc
+    except McpTimeoutError as exc:
+        raise _error("timeout") from exc
+    except (McpProtocolError, McpToolNotFoundError) as exc:
+        raise _error("protocol_error") from exc
+    except (McpConnectionError, McpToolExecutionError) as exc:
+        raise _error("external_failure") from exc
+    except Exception as exc:
+        raise _error("external_failure") from exc
+    return {
+        "places": normalize_places(_content_payload(result.result), service_id=service_id, tool_name=tool_name),
+        "source": {"service_id": service_id, "tool": tool_name, "simulated": False},
+        "observed_at": datetime.now(UTC).isoformat(), "location": location, "radius_meters": radius,
+    }
+
+
+def _coordinate(value: str) -> bool:
+    try:
+        longitude, latitude = (float(part.strip()) for part in value.split(",", 1))
+    except (TypeError, ValueError):
+        return False
+    return -180 <= longitude <= 180 and -90 <= latitude <= 90

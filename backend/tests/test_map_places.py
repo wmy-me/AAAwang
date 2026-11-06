@@ -8,7 +8,13 @@ from mcp.types import CallToolResult, Tool
 from pydantic import SecretStr
 
 from life_agent.core.config import McpServiceConfig, Settings
-from life_agent.tools.maps import MapPlaceSearchError, normalize_places, search_places
+from life_agent.tools.maps import (
+    MapPlaceSearchError,
+    geocode_address,
+    normalize_places,
+    search_nearby_places,
+    search_places,
+)
 from life_agent.tools.mcp import (
     McpAuthenticationError,
     McpClient,
@@ -85,6 +91,42 @@ def configured_settings() -> Settings:
             )
         }
     )
+
+
+def nearby_settings() -> Settings:
+    return Settings(
+        _env_file=None,
+        mcp_services={"map": McpServiceConfig(url="https://mcp.example/mcp", allowed_tool_names=("maps_geo", "maps_around_search", "maps_text_search"))},
+    )
+
+
+class NearbyConnection:
+    async def list_tools(self) -> list[Any]:
+        return [Tool(name="maps_geo", inputSchema={"type": "object"}), Tool(name="maps_around_search", inputSchema={"type": "object"})]
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        if name == "maps_geo":
+            assert arguments == {"address": "天安门"}
+            payload = '{"geocodes":[{"location":"116.397499,39.908722"}]}'
+        else:
+            assert arguments == {"keywords": "餐厅", "location": "116.397499,39.908722", "radius": "1000", "strategy": 0}
+            payload = '{"pois":[{"name":"示例餐厅","address":"示例地址","location":"116.4,39.9"}]}'
+        return SimpleNamespace(result=CallToolResult(content=[{"type": "text", "text": payload}], isError=False))
+
+
+class NearbyClient:
+    @asynccontextmanager
+    async def connect(self, _service_id: str) -> Any:
+        yield NearbyConnection()
+
+
+def test_geocode_then_nearby_uses_distinct_server_generated_parameters() -> None:
+    settings = nearby_settings()
+    location = asyncio.run(geocode_address(settings, "天安门", mcp_client=NearbyClient()))
+    assert location == "116.397499,39.908722"
+    result = asyncio.run(search_nearby_places(settings, "餐厅", location=location, mcp_client=NearbyClient()))
+    assert result["source"]["tool"] == "maps_around_search"
+    assert result["places"][0]["name"] == "示例餐厅"
 
 
 def test_missing_city_is_rejected_before_mcp_call() -> None:
