@@ -72,6 +72,7 @@ class RunClaim:
     input_message_id: uuid.UUID | None
     budget: dict[str, object] | None
     conversation_context: str = ""
+    preference_context: str = ""
 
 
 def _owned_task(db: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> Task:

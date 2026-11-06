@@ -29,6 +29,7 @@ from life_agent.modules.chat.service import (
     conversation_route_inputs,
 )
 from life_agent.modules.forms.service import persist_model_proposal
+from life_agent.modules.memory import apply_memory_action, relevant_preferences
 from life_agent.modules.runs.service import (
     cancel_claim,
     claim_run,
@@ -95,6 +96,19 @@ def run_once(worker_id: str) -> bool:
                         budget.stop("cancelled")
                         return cancel_claim(route_db, claim, budget.snapshot())
                     claim = apply_conversation_route(route_db, claim, classification, budget.snapshot())
+            if claim.execution_type == "direct_answer" and (claim.decision or {}).get("kind") == "memory":
+                with get_session_factory()() as memory_db:
+                    result = apply_memory_action(memory_db, claim.owner_id, claim.input_message_id, claim.decision or {})
+                    return complete_claim(
+                        memory_db, claim,
+                        shopping_result={"answer": result, "source": {"service_id": None, "tool": "user_preference_memory", "simulated": False}, "execution_version": "031-v1", "decision_type": "memory", "delegated": False, "mcp_call_count": 0},
+                        budget=budget.snapshot(), decision=claim.decision,
+                        execution_type=claim.execution_type, capability_ids=claim.capability_ids,
+                    )
+            if claim.execution_type == "direct_answer":
+                preferences = relevant_preferences(db, claim.owner_id, claim.input_message or claim.goal)
+                if preferences:
+                    claim = replace(claim, preference_context="；".join(f"{item.preference_key}：{item.content}" for item in preferences))
             _validate_claim_capabilities(claim)
             if claim.execution_type == "capability_decision":
                 decision = decide_capabilities(settings, claim, budget)
@@ -393,6 +407,7 @@ def _run_direct_answer_with_lease(settings, claim, budget) -> str:
         f"用户请求：{claim.input_message or claim.goal}\n"
         f"已确认条件：{_bounded_json(claim.conditions)}\n"
         f"近期对话（可能已裁剪）：{claim.conversation_context or '（无）'}\n"
+        f"与本轮相关的用户明确长期偏好（仅供参考，当前用户要求优先）：{claim.preference_context or '（无）'}\n"
         "请直接回答，不要调用任何工具；未知信息要明确说明。"
     )
     stop = threading.Event()

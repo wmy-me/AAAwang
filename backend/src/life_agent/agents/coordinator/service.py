@@ -41,8 +41,9 @@ def classify_conversation_turn(
     ) or "（无任务）"
     prompt = (
         "你是对话入口的受限路由器。只输出一个 JSON 对象，不要 Markdown。\n"
-        '{"intent":"chat|task|update_task|ambiguous","task_id":null,'
-        '"clarification":null,"reason":"简短原因"}\n'
+        '{"intent":"chat|task|update_task|ambiguous|memory","task_id":null,'
+        '"clarification":null,"memory_action":null,"memory_category":null,'
+        '"memory_key":null,"memory_value":null,"reason":"简短原因"}\n'
         "intent 规则：\n"
         "- chat：问候、闲聊、能力介绍、普通知识问答，不需要购物任务或工具。\n"
         "- task：用户要求购买/查询商品、地点、天气、公开网页资料，或需要调用业务能力；"
@@ -52,6 +53,10 @@ def classify_conversation_turn(
         "任务名称、目标或 ID 才能选择；仅说新条件而没有指代对象时用 ambiguous。\n"
         "- ambiguous：多个任务都可能相关、指代不清或无法安全关联；"
         "填写一句自然语言 clarification，不猜任务。\n"
+        "- memory：仅当用户明确要求记住、查看、修改或忘记自己的长期普通偏好时使用；"
+        "memory_action 必须为 remember|list|update|forget。remember/update/forget 要提供简短英文 snake_case memory_category、"
+        "中文 memory_key 和普通偏好 memory_value。不得保存或处理密码、token、密钥、证件、银行卡、支付信息、用户 ID、任务预算或一次性数量。"
+        "一般聊天中的推断绝不能选择 memory。\n"
         "任务列表：\n"
         f"{task_lines}\n"
         "最近对话：\n"
@@ -72,7 +77,7 @@ def classify_conversation_turn(
     if value is None:
         return _fallback_conversation_classification(content, tasks)
     intent = value.get("intent")
-    if intent not in {"chat", "task", "update_task", "ambiguous"}:
+    if intent not in {"chat", "task", "update_task", "ambiguous", "memory"}:
         return _fallback_conversation_classification(content, tasks)
     task_id = value.get("task_id")
     if not isinstance(task_id, str) or not task_id:
@@ -103,6 +108,10 @@ def classify_conversation_turn(
             if intent == "ambiguous"
             else None
         ),
+        "memory_action": value.get("memory_action"),
+        "memory_category": value.get("memory_category"),
+        "memory_key": value.get("memory_key"),
+        "memory_value": value.get("memory_value"),
         "reason": str(value.get("reason"))[:500] if value.get("reason") else None,
     }
 

@@ -126,6 +126,10 @@
 - owner-scoped `ContextBuilder` 已按输入游标、会话和 owner 过滤历史，并按完整轮次裁剪；路由、Worker 直答和能力决策读取各自所需的同一受限上下文。路由已迁入持久化 Worker Run；模型、委派、发现与 MCP 的预算预占均经带 fencing 的 Run 快照保存，旧 Run 仍兼容。
 - 已有真实 DeepSeek→API→独立 Worker→PostgreSQL 两轮上下文闭环；后端全量 `181 passed`、Ruff、compileall、Alembic check 通过，前端 lint/build 通过（3 条既有 lint 警告）。Chrome 仅完成注册、登录和创建会话，未实际发送消息，故聊天/刷新/卡片/SSE 未验证；按用户确认的 030 修订范围不阻止完成。详见[030报告](reports/030-conversation-context-report.md)。
 
+## 031 基于 Mem0 的用户长期偏好记忆（受阻）
+
+- 已拉取 Mem0 修订任务并确认现有 PostgreSQL 可启用 pgvector（`vector 0.8.5`）；未完成 Mem0 与本地 Embedding 安装/模型下载，故未实现或验收长期偏好主流程。中断前的未提交自建偏好实验不作为 031 结果。需完成本地 Embedding 运行时后继续，详见[031报告](reports/031-user-preference-memory-report.md)。
+
 | 能力 | 事实与证据 |
 | --- | --- |
 | 工程骨架 | `backend/`、`web/`、`mcp-services/` 及锁文件已存在 |

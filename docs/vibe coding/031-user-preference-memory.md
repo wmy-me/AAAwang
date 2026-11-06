@@ -1,6 +1,6 @@
 # 031：基于 Mem0 的用户长期偏好记忆
 
-- 状态：待执行；本文为方案修订，不代表功能已实现。
+- 状态：受阻；Mem0 本地 Embedding 运行时尚未完成，见报告。本文为方案修订，不代表功能已实现。
 - 阶段：P4 对话与 Agent 能力
 - 基线：执行前读取最新 HEAD、本地工作区及已有实现；保留已有用户改动。
 - 前置：[030 报告](../reports/030-conversation-context-report.md)、[上下文与长期记忆方案](../design/context-and-memory.md)

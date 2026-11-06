@@ -373,6 +373,20 @@ def apply_conversation_route(db: Session, claim, classification: dict[str, objec
         return _bind_routed_direct(db, claim, run, _clarification_decision(str(classification.get("clarification") or "请说明你想继续哪个任务或补充目标。")))
     if intent == "chat":
         return _bind_routed_direct(db, claim, run, {"kind": "direct", "capability_ids": []})
+    if intent == "memory":
+        action = classification.get("memory_action")
+        if action not in {"remember", "list", "update", "forget"}:
+            return _bind_routed_direct(db, claim, run, _clarification_decision("请明确说明要记住、查看、修改或忘记哪项普通偏好。"))
+        decision = {
+            "kind": "memory",
+            "capability_ids": [],
+            "memory_action": action,
+            "memory_category": classification.get("memory_category"),
+            "memory_key": classification.get("memory_key"),
+            "memory_value": classification.get("memory_value"),
+            "decision_source": "deepseek_structured_worker",
+        }
+        return _bind_routed_direct(db, claim, run, decision)
     if intent == "update_task":
         selected = [
             task
