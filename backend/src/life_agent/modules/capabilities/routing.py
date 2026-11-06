@@ -86,7 +86,7 @@ _MAP_PATTERN = re.compile(
     r"(地点|附近|周边|位置|地图|哪里买|礼品店)"
     r"|(?:(?:在|到|位于)\s*[^，。；;,\s]{2,20}?\s*(?:找|查|搜|看))"
 )
-_PRODUCT_PATTERN = re.compile(r"(买|购买|商品|奖品|彩色铅笔|预算|数量|人数|候选|采购)")
+_PRODUCT_PATTERN = re.compile(r"(买|购买|商品|预算|数量|人数|候选|采购)")
 _WEATHER_PATTERN = re.compile(r"(天气|气温|温度|下雨|降雨|晴阴|预报)")
 _CITY_PATTERN = re.compile(
     r"(?:在|到|位于)\s*([^，。；;,\s]{2,20}?)(?=\s*(?:找|查|搜|看|的|附近|周边|有|$))"

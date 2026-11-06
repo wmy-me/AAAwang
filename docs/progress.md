@@ -291,6 +291,8 @@ PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点�
 - 已建立并接入唯一的 `modules/intent` 结构化意图入口；Worker 实际使用它，coordinator 只保留兼容转发，能力选择仍在既有 coordinator/白名单链路。普通聊天、任务新建/延续/修改、记忆操作、歧义和复合意图均有受控结果，模型输出不授予任务、用户或工具权限。
 - 已修复 forget 无需新值，并以替身验证普通聊天、任务延续、复合意图澄清、删除标识、跨 owner 删除隔离及记忆删除后不召回；compileall/diff check 通过。未运行真实 DeepSeek、Mem0/pgvector、BGE-M3、浏览器或全量回归；031 真实联调仍暂缓，详见[032报告](reports/032-intent-routing-report.md)。
 
-## 034 通用采购指导与场景解耦（待执行）
+## 034 通用采购指导与场景解耦（已完成）
 
-- 去除对教师奖品专用关键词指导的运行时依赖，保留通用 Agent 采购能力；详见 [034 执行文档](vibe%20coding/034-general-shopping-guidance.md)。031 真实联调继续暂缓。
+- 已用 `shopping_guidance` 替换 discovery 图和商品回答提示中按教师、学生、奖品关键词选择的 `teacher_rewards`；教师奖品和通勤水杯等请求现在得到同一份通用采购/比较边界。预算、人数和品类均非必填，Agent 可按当前对话选择探索、追问、查询或直接回答。
+- 沿用既有单一 discovery 图、Worker、能力白名单和共享预算；没有新增 Agent、持久化字段、外部服务或固定“商品→地图→方案”链。地点和商品结果仍分别来源，普通聊天不选择采购工具。
+- 替身提示词检查覆盖有预算的教师奖品、无预算的通勤水杯和普通聊天；商品 Agent 的既有 FakeModel/MCP 委派检查通过。compileall、diff check 通过；本轮未运行真实 DeepSeek、MCP、浏览器、pytest 全套或 031 的 Embedding/Mem0 联调，详见[034报告](reports/034-general-shopping-guidance-report.md)。

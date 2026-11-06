@@ -113,7 +113,7 @@ def _conversation_turn_existing(
 def _looks_like_shopping(content: str) -> bool:
     return bool(
         re.search(
-            r"买|购买|采购|采买|商品|礼物|奖品|预算|推荐.+(?:买|商品)|找.+(?:店|地点)",
+            r"买|购买|采购|采买|商品|礼物|预算|推荐.+(?:买|商品)|找.+(?:店|地点)",
             content,
         )
     )

@@ -303,7 +303,8 @@ def test_delegation_uses_only_discovery_tool_and_persists_source_facts() -> None
     assert connection.calls == [("search_products", {"keyword": "彩色铅笔", "limit": 2})]
     assert result.source["simulated"] is True
     assert result.source["tool"] == "shopping:search_products"
-    assert "teacher_rewards" in supervisor.completions.requests[0]["messages"][0]["content"]
+    assert "shopping_guidance" in supervisor.completions.requests[0]["messages"][0]["content"]
+    assert "teacher_rewards" not in supervisor.completions.requests[0]["messages"][0]["content"]
 
 
 def test_forced_discovery_skips_supervisor_and_requires_tool_call() -> None:

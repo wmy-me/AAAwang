@@ -1,4 +1,4 @@
-"""Bounded, trusted scene-skill registry for Agent guidance."""
+"""Bounded, trusted guidance-asset registry for Agent roles."""
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -67,6 +67,13 @@ def available_skills() -> tuple[SkillDefinition, ...]:
         if path.stem not in _REGISTERED:
             _parse_skill(path)
     return tuple(_REGISTERED.values())
+
+
+def shopping_guidance() -> str:
+    """Load the single reusable procurement guide without keyword selection."""
+    path = _SKILL_ROOT / "shopping_guidance.md"
+    skill = _REGISTERED.get("shopping_guidance") or _parse_skill(path)
+    return f"通用采购指导：{skill.name} v{skill.version}\n{skill.guidance}"
 
 
 def select_skill(

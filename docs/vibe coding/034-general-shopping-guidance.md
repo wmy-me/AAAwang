@@ -1,6 +1,6 @@
 # 034：通用采购指导与场景解耦
 
-- 状态：待执行。开始前核对最新 HEAD 与本地工作区，保留已有改动。
+- 状态：已完成。实现与精简替身检查见 `docs/reports/034-general-shopping-guidance-report.md`；未运行真实 DeepSeek/MCP 冒烟。
 - 前置：[032 意图层](032-intent-routing.md)、[033 周边搜索](033-amap-nearby-search.md)；031 的真实 Mem0 联调暂缓，不是前置条件。
 - 报告：`docs/reports/034-general-shopping-guidance-report.md`。
 

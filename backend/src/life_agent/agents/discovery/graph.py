@@ -17,7 +17,7 @@ from life_agent.core.llm.deepseek import (
     open_deepseek_client,
 )
 from life_agent.core.llm.tool_loop import ToolLoopResult, run_tool_loop
-from life_agent.skills import skill_context
+from life_agent.skills import shopping_guidance
 from life_agent.tools.mcp import McpClient
 
 DECISIONS = {"direct_answer", "clarification", "delegated_discovery"}
@@ -132,7 +132,7 @@ def _supervisor_messages(goal: str, conditions: Mapping[str, object]) -> list[di
         (
             load_prompt("../discovery/prompts/system.md"),
             load_prompt("../shared/prompts/source_rules.md"),
-            skill_context(f"{goal} {json.dumps(dict(conditions), ensure_ascii=False)}"),
+            shopping_guidance(),
         )
     )
     return [
@@ -315,7 +315,7 @@ def _build_graph(
             if keyword
             else (
                 "请从购物目标中提取一个简短商品关键词后调用工具；"
-                "关键词只写商品名称（2–10 个汉字，例如“奖品”“文具”“水杯”），"
+                "关键词只写商品名称（2–10 个汉字，例如“水杯”“耳机”“收纳盒”），"
                 "不要包含城市、地点、预算、人数或整句。\n"
             )
         )
@@ -338,7 +338,7 @@ def _build_graph(
                 (
                     load_prompt("../discovery/prompts/system.md"),
                     load_prompt("../shared/prompts/source_rules.md"),
-                    skill_context(f"{state['goal']} {json.dumps(state['conditions'], ensure_ascii=False)}"),
+                    shopping_guidance(),
                 )
             ),
         )
