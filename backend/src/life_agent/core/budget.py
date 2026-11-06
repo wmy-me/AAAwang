@@ -1,5 +1,6 @@
 """Shared, pre-reserved execution budget for one durable Run."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from threading import Lock
@@ -29,13 +30,20 @@ class RunBudget:
     mcp_attempts: int = 0
     remote_calls: int = 0
     termination_reason: str | None = None
+    on_reserve: Callable[[dict[str, object]], None] | None = field(
+        default=None, repr=False, compare=False
+    )
     _lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     @classmethod
     def from_snapshot(cls, snapshot: dict[str, object] | None) -> "RunBudget":
         """Restore server-persisted counters when a claimed Run is retried."""
-        if not isinstance(snapshot, dict) or not isinstance(snapshot.get("limits"), dict):
+        if snapshot is None:
             return cls()
+        if not isinstance(snapshot, dict) or not isinstance(snapshot.get("limits"), dict):
+            budget = cls()
+            budget.termination_reason = "budget_snapshot_invalid"
+            return budget
         try:
             raw = snapshot["limits"]
             limits = BudgetLimits(**{field: raw[field] for field in BudgetLimits.__dataclass_fields__})
@@ -50,7 +58,9 @@ class RunBudget:
                 remote_calls=max(0, int(snapshot.get("remote_calls", 0))),
             )
         except (KeyError, TypeError, ValueError):
-            return cls()
+            budget = cls()
+            budget.termination_reason = "budget_snapshot_invalid"
+            return budget
 
     def reserve(self, kind: str) -> None:
         """Atomically reserve one attempt before starting external work."""
@@ -86,6 +96,26 @@ class RunBudget:
                 self.remote_calls += 1
             else:
                 raise ValueError(f"unsupported budget reservation: {kind}")
+            snapshot = self._snapshot_unlocked()
+        if self.on_reserve is not None:
+            self.on_reserve(snapshot)
+
+    def _snapshot_unlocked(self) -> dict[str, object]:
+        return {
+            "limits": {
+                "model_requests": self.limits.model_requests,
+                "delegations": self.limits.delegations,
+                "mcp_attempts": self.limits.mcp_attempts,
+                "remote_calls": self.limits.remote_calls,
+                "wall_clock_seconds": self.limits.wall_clock_seconds,
+            },
+            "model_requests": self.model_requests,
+            "delegations": self.delegations,
+            "mcp_attempts": self.mcp_attempts,
+            "remote_calls": self.remote_calls,
+            "termination_reason": self.termination_reason,
+            "started_at": self.started_at.isoformat(),
+        }
 
     def stop(self, reason: str) -> None:
         with self._lock:
@@ -95,21 +125,7 @@ class RunBudget:
 
     def snapshot(self) -> dict[str, object]:
         with self._lock:
-            return {
-                "limits": {
-                    "model_requests": self.limits.model_requests,
-                    "delegations": self.limits.delegations,
-                    "mcp_attempts": self.limits.mcp_attempts,
-                    "remote_calls": self.limits.remote_calls,
-                    "wall_clock_seconds": self.limits.wall_clock_seconds,
-                },
-                "model_requests": self.model_requests,
-                "delegations": self.delegations,
-                "mcp_attempts": self.mcp_attempts,
-                "remote_calls": self.remote_calls,
-                "termination_reason": self.termination_reason,
-                "started_at": self.started_at.isoformat(),
-            }
+            return self._snapshot_unlocked()
 
     def _expired(self) -> bool:
         return datetime.now(UTC) >= self.started_at + timedelta(

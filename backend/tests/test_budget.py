@@ -84,3 +84,14 @@ def test_budget_restores_persisted_route_reservation() -> None:
     restored.reserve("model")
     with pytest.raises(BudgetExceededError, match="model_budget_exhausted"):
         restored.reserve("model")
+
+
+def test_every_external_reservation_is_persisted_before_the_attempt() -> None:
+    snapshots: list[dict[str, object]] = []
+    budget = RunBudget(on_reserve=lambda snapshot: snapshots.append(snapshot))
+    for kind in ("model", "discovery", "delegation", "mcp"):
+        budget.reserve(kind)
+    assert [snapshot["model_requests"] for snapshot in snapshots] == [1, 1, 1, 1]
+    assert snapshots[-1]["delegations"] == 1
+    assert snapshots[-1]["mcp_attempts"] == 1
+    assert snapshots[-1]["remote_calls"] == 2

@@ -8,7 +8,7 @@ source of truth and are never rewritten or summarized here.
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from life_agent.db.models import Conversation, Message, Run, Task, TaskRevision
@@ -33,13 +33,7 @@ class ConversationContext:
 
 
 class ContextBuilder:
-    """Build recent complete conversational turns after owner verification.
-
-    A character estimate is intentionally conservative (four characters per token
-    is not assumed); long messages consume their complete turn or are omitted.
-    Tool protocol messages are not persisted by this application today.  Should
-    they be added, their run group must be retained or removed as a whole.
-    """
+    """Build a continuous suffix of complete prior turns after owner verification."""
 
     def __init__(self, *, max_messages: int, max_characters: int) -> None:
         self.max_messages = max_messages
@@ -53,34 +47,62 @@ class ContextBuilder:
         *,
         before_message_id: uuid.UUID | None = None,
     ) -> ConversationContext:
-        owned = db.scalar(select(Conversation.id).where(Conversation.id == conversation_id, Conversation.owner_id == owner_id))
-        if owned is None:
+        if db.scalar(select(Conversation.id).where(Conversation.id == conversation_id, Conversation.owner_id == owner_id)) is None:
             raise LookupError("conversation is not owned")
-        rows = list(db.scalars(
+        cursor: Message | None = None
+        if before_message_id is not None:
+            cursor = db.scalar(select(Message).where(
+                Message.id == before_message_id,
+                Message.conversation_id == conversation_id,
+            ))
+            if cursor is None:
+                # Fail closed: a delayed Worker must not read later messages.
+                return ConversationContext((), True, 0)
+        query = (
             select(Message)
             .outerjoin(Run, Message.run_id == Run.id)
             .where(Message.conversation_id == conversation_id)
-            # Assistant output from a failed/cancelled run is never context.
             .where((Message.role != "assistant") | (Run.status == "completed"))
-            .order_by(Message.created_at.desc(), Message.id.desc())
-            .limit(self.max_messages * 4 + 8)
-        ))
-        if before_message_id is not None:
-            index = next((i for i, row in enumerate(rows) if row.id == before_message_id), None)
-            if index is not None:
-                rows = rows[index + 1 :]
-        rows.reverse()
-        selected: list[ContextMessage] = []
-        chars = 0
-        for row in reversed(rows):
-            size = len(row.content)
-            if len(selected) >= self.max_messages or chars + size > self.max_characters:
-                continue
-            selected.append(ContextMessage(row.role, row.content))
-            chars += size
-        selected.reverse()
-        truncated = len(selected) < len(rows)
-        return ConversationContext(tuple(selected), truncated, chars)
+        )
+        if cursor is not None:
+            query = query.where(or_(
+                Message.created_at < cursor.created_at,
+                and_(Message.created_at == cursor.created_at, Message.id < cursor.id),
+            ))
+        rows = list(db.scalars(query.order_by(Message.created_at, Message.id)))
+        turns = self._turns(rows)
+        chosen: list[list[Message]] = []
+        count = chars = 0
+        truncated = False
+        for turn in reversed(turns):
+            turn_count = len(turn)
+            turn_chars = sum(len(row.content) for row in turn)
+            if count + turn_count > self.max_messages or chars + turn_chars > self.max_characters:
+                # Keep a continuous suffix; never skip an overlong recent turn
+                # just to introduce older, unrelated context.
+                truncated = True
+                break
+            chosen.append(turn)
+            count += turn_count
+            chars += turn_chars
+        chosen.reverse()
+        selected = tuple(ContextMessage(row.role, row.content) for turn in chosen for row in turn)
+        return ConversationContext(selected, truncated or len(selected) < len(rows), chars)
+
+    @staticmethod
+    def _turns(rows: list[Message]) -> list[list[Message]]:
+        turns: list[list[Message]] = []
+        by_run: dict[uuid.UUID, list[Message]] = {}
+        for row in rows:
+            if row.run_id is not None and row.run_id in by_run:
+                by_run[row.run_id].append(row)
+            elif row.run_id is not None:
+                group = [row]
+                by_run[row.run_id] = group
+                turns.append(group)
+            else:
+                turns.append([row])
+        return turns
 
     def task_snapshot(self, db: Session, task: Task) -> dict[str, object]:
         revision = db.scalar(select(TaskRevision).where(TaskRevision.task_id == task.id, TaskRevision.revision == task.current_revision))

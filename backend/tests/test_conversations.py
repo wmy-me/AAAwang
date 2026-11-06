@@ -268,6 +268,50 @@ def test_context_builder_is_ordered_bounded_and_owner_scoped(
             )
 
 
+def test_context_cursor_never_reads_messages_after_an_old_turn(
+    conversation_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = conversation_context
+    register_and_login(client, "context-cursor")
+    conversation_id = create_conversation(client, "Cursor")['id']
+    for index in range(20):
+        assert client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            json={"client_message_id": f"cursor-{index}", "content": f"turn-{index}"},
+        ).status_code == 201
+    with factory() as db:
+        rows = list(db.scalars(select(Message).order_by(Message.created_at, Message.id)))
+        owner_id = db.scalar(select(Conversation.owner_id).where(Conversation.id == uuid.UUID(conversation_id)))
+        assert owner_id is not None
+        context = ContextBuilder(max_messages=50, max_characters=1000).build(
+            db, owner_id, uuid.UUID(conversation_id), before_message_id=rows[4].id
+        )
+        assert [item.content for item in context.messages] == [f"turn-{index}" for index in range(4)]
+        assert "turn-19" not in context.as_prompt()
+
+
+def test_context_does_not_split_or_skip_an_overlong_recent_turn(
+    conversation_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = conversation_context
+    register_and_login(client, "context-long")
+    conversation_id = create_conversation(client, "Long")['id']
+    for index, content in enumerate(("older fact", "x" * 80, "current")):
+        assert client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            json={"client_message_id": f"long-{index}", "content": content},
+        ).status_code == 201
+    with factory() as db:
+        rows = list(db.scalars(select(Message).order_by(Message.created_at, Message.id)))
+        owner_id = db.scalar(select(Conversation.owner_id).where(Conversation.id == uuid.UUID(conversation_id)))
+        assert owner_id is not None
+        context = ContextBuilder(max_messages=10, max_characters=40).build(
+            db, owner_id, uuid.UUID(conversation_id), before_message_id=rows[-1].id
+        )
+        assert context.messages == ()
+        assert context.truncated is True
+
+
 def test_claimed_route_binds_a_task_only_after_worker_classification(
     conversation_context: tuple[TestClient, sessionmaker[Session]],
 ) -> None:

@@ -609,10 +609,10 @@ def is_cancel_requested(db: Session, claim: RunClaim) -> bool:
     return run is None or run.cancel_requested
 
 
-def persist_route_budget(
+def persist_budget_reservation(
     db: Session, claim: RunClaim, budget: dict[str, object]
 ) -> bool:
-    """Persist a pre-reserved route budget without holding a lock across the call."""
+    """Fenced pre-reservation write before every model or remote attempt."""
     now = datetime.now(UTC)
     run = db.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
     if (
@@ -627,6 +627,11 @@ def persist_route_budget(
     run.budget = dict(budget)
     db.commit()
     return True
+
+
+# Kept for callers from the first 030 increment; all new calls use the generic
+# name because model, discovery, delegation and MCP reservations share this path.
+persist_route_budget = persist_budget_reservation
 
 
 def renew_claim(db: Session, claim: RunClaim, lease_seconds: int) -> bool:

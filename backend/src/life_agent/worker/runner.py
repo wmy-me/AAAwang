@@ -36,7 +36,7 @@ from life_agent.modules.runs.service import (
     fail_claim,
     fail_exhausted_runs,
     is_cancel_requested,
-    persist_route_budget,
+    persist_budget_reservation,
     renew_claim,
 )
 
@@ -61,6 +61,13 @@ def run_once(worker_id: str) -> bool:
             return False
         try:
             budget = RunBudget.from_snapshot(claim.budget)
+
+            def persist_reservation(snapshot: dict[str, object]) -> None:
+                with get_session_factory()() as reservation_db:
+                    if not persist_budget_reservation(reservation_db, claim, snapshot):
+                        raise BudgetExceededError("lease_lost")
+
+            budget.on_reserve = persist_reservation
             context = ContextBuilder(
                 max_messages=settings.conversation_context_max_messages,
                 max_characters=settings.conversation_context_max_characters,
@@ -75,25 +82,13 @@ def run_once(worker_id: str) -> bool:
                 budget.stop("cancelled")
                 return cancel_claim(db, claim, budget.snapshot())
             if claim.execution_type == "conversation_route":
-                budget.reserve("model")
-                with get_session_factory()() as budget_db:
-                    if not persist_route_budget(
-                        budget_db, claim, budget.snapshot()
-                    ):
-                        budget.stop("lease_lost")
-                        return fail_claim(
-                            budget_db,
-                            claim,
-                            "route budget ownership lost",
-                            budget.snapshot(),
-                        )
                 tasks = conversation_route_inputs(db, claim.owner_id, claim.conversation_id)
                 classification = classify_conversation_turn(
                     settings,
                     claim.input_message or claim.goal,
                     [{"role": item.role, "content": item.content} for item in context.messages],
                     tasks,
-                    None,
+                    budget,
                 )
                 with get_session_factory()() as route_db:
                     if is_cancel_requested(route_db, claim):
