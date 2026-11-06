@@ -297,6 +297,12 @@ PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点�
 - 沿用既有单一 discovery 图、Worker、能力白名单和共享预算；没有新增 Agent、持久化字段、外部服务或固定“商品→地图→方案”链。地点和商品结果仍分别来源，普通聊天不选择采购工具。
 - 替身提示词检查覆盖有预算的教师奖品、无预算的通勤水杯和普通聊天；商品 Agent 的既有 FakeModel/MCP 委派检查通过。compileall、diff check 通过；本轮未运行真实 DeepSeek、MCP、浏览器、pytest 全套或 031 的 Embedding/Mem0 联调，详见[034报告](reports/034-general-shopping-guidance-report.md)。
 
+## 035 简洁对话主界面与结果卡片（已完成）
+
+- 网页主视图改为左侧私有会话列表、中间消息流和底部输入；自然语言入口直接调用既有会话 turn API，不要求先创建任务或填写采购表单。登录、退出、会话历史、消息持久化和 SSE Run 补读链路保留。
+- 商品候选、地点、已验证方案和网页来源只按各自 assistant `run_id` 跟随消息展示；无结构化结果时只显示文本。旧 task/run/地图/方案工作台不再默认铺在聊天页，未删除历史数据或接口。
+- 前端 `npm run lint` 完成（1 条 React 既有风格警告），`npm run build` 通过。未启动真实后端/浏览器，故登录、发送、刷新和真实卡片联动未本轮验收，详见[035报告](reports/035-conversation-ui-report.md)。
+
 ## 035 简洁对话主界面与结果卡片（待执行）
 
 - 按用户确定的 GoGo/Codex 式简洁对话方向整理主界面；详见 [035 执行文档](vibe%20coding/035-conversation-ui.md)。031 真实记忆联调继续暂缓。

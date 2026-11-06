@@ -1,6 +1,6 @@
 # 035：简洁对话主界面与结果卡片
 
-- 状态：待执行；执行前确认最新 HEAD 和本地工作区，保留用户未提交改动。
+- 状态：已完成；实现和精简验证见 `docs/reports/035-conversation-ui-report.md`。
 - 范围：P4 网页体验。前置参考 [029 报告](../reports/029-conversation-first-agent-report.md)、[034 报告](../reports/034-general-shopping-guidance-report.md)。
 - 报告：`docs/reports/035-conversation-ui-report.md`。
 
