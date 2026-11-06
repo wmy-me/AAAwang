@@ -303,6 +303,6 @@ PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点�
 - 商品候选、地点、已验证方案和网页来源只按各自 assistant `run_id` 跟随消息展示；无结构化结果时只显示文本。旧 task/run/地图/方案工作台不再默认铺在聊天页，未删除历史数据或接口。
 - 前端 `npm run lint` 完成（1 条 React 既有风格警告），`npm run build` 通过。未启动真实后端/浏览器，故登录、发送、刷新和真实卡片联动未本轮验收，详见[035报告](reports/035-conversation-ui-report.md)。
 
-## 035 简洁对话主界面与结果卡片（待执行）
+## 036 LLM Wiki 私有知识库最小闭环（待执行）
 
-- 按用户确定的 GoGo/Codex 式简洁对话方向整理主界面；详见 [035 执行文档](vibe%20coding/035-conversation-ui.md)。031 真实记忆联调继续暂缓。
+- 基于现有 DeepSeek 与 PostgreSQL，先支持 Markdown/文本资料整理、来源与对话查询；不以 Embedding 或 031 真实记忆联调为前置。见 [036 执行文档](vibe%20coding/036-llm-wiki.md)。
