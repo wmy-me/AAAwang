@@ -308,3 +308,7 @@ PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点�
 - 已实现 Markdown/文本上传、200 KB/UTF-8 校验、owner 去重与隔离、`wiki_documents`/`wiki_pages` 持久化、taskless `wiki_index` Worker Run、DeepSeek JSON 页面整理、失败状态、来源文件名展示和关键词检索片段。
 - 网页输入区增加上传入口、知识库资料/Wiki 页面/来源展示和删除；上传后的 Run 沿用现有状态与消息。
 - 仅执行本次涉及的 Ruff、compileall、前端 lint/build；未执行迁移、真实 DeepSeek、独立 Worker、PostgreSQL 或浏览器闭环，不能视为真实通过。详见[036报告](reports/036-llm-wiki-report.md)。
+
+## 037 Wiki 接入稳定性与对话不中断（待执行）
+
+- 修复 036 在 Wiki 不可用时的普通对话降级、失租前提交风险，按需调用知识能力；不以真实服务联调或用户手测为前置。见 [037 执行文档](vibe%20coding/037-wiki-reliability.md)。
