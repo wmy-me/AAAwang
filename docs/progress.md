@@ -280,3 +280,7 @@
 在仓库 `8459e40` 基础上记录 Agent 分类、协作、Tools 与 MCP、RAG、意图识别讨论，入口见 [设计索引](design/README.md)。此段是当时设计归档；目前 P1 的 001–003 与 P2 的 004–008 已提交，私有对话、任务和条件版本隔离已验证；完整 Agent、自动意图路由和 RAG 尚未实现。
 
 PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–008 均已提交，验收边界见各报告。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。
+
+## 032 独立意图识别与主 Agent 入口（待执行）
+
+- 031 已接入 Mem0 代码，真实 Embedding/pgvector 联调暂缓；当前仅有 DeepSeek 模型 API，没有其他已配置模型或 Embedding 服务。用户下次询问缺少的服务或配置时再说明，不以此阻塞后续。见 [032 执行文档](vibe%20coding/032-intent-routing.md)。
