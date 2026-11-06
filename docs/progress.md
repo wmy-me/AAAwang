@@ -285,3 +285,7 @@ PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点�
 
 - 已建立并接入唯一的 `modules/intent` 结构化意图入口；Worker 实际使用它，coordinator 只保留兼容转发，能力选择仍在既有 coordinator/白名单链路。普通聊天、任务新建/延续/修改、记忆操作、歧义和复合意图均有受控结果，模型输出不授予任务、用户或工具权限。
 - 已修复 forget 无需新值，并以替身验证普通聊天、任务延续、复合意图澄清、删除标识、跨 owner 删除隔离及记忆删除后不召回；compileall/diff check 通过。未运行真实 DeepSeek、Mem0/pgvector、BGE-M3、浏览器或全量回归；031 真实联调仍暂缓，详见[032报告](reports/032-intent-routing-report.md)。
+
+## 033 高德 MCP 周边地点搜索（待执行）
+
+- 在现有城市关键词搜索基础上，按实际 MCP schema 增加坐标周边搜索；详见 [033 执行文档](vibe%20coding/033-amap-nearby-search.md)。031 真实记忆联调继续暂缓。
