@@ -1,6 +1,6 @@
 # 032：独立意图识别与主 Agent 入口
 
-- 状态：待执行；执行前核对最新 HEAD 和本地工作区，保护已有改动。
+- 状态：已完成；031 真实 Embedding/Mem0 联调仍暂缓，见报告。执行前核对最新 HEAD 和本地工作区，保护已有改动。
 - 阶段：P4 对话与 Agent 能力。
 - 参考：[意图识别设计](../design/intent-routing.md)、[Agent 架构](../design/agent-architecture.md)、[031 报告](../reports/031-user-preference-memory-report.md)。
 - 报告：`docs/reports/032-intent-routing-report.md`。

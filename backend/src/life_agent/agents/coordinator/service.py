@@ -14,6 +14,7 @@ from life_agent.agents.shared.prompt_loader import load_prompt
 from life_agent.core.budget import RunBudget
 from life_agent.core.llm import LLMConfigurationError, LLMRequestError, ToolLoopError
 from life_agent.core.llm.deepseek import call_deepseek
+from life_agent.modules.intent import classify_conversation_turn as _classify_intent
 from life_agent.modules.capabilities import (
     has_location_scope,
     has_weather_city,
@@ -31,7 +32,11 @@ def classify_conversation_turn(
     tasks: list[dict[str, object]],
     budget: RunBudget | None = None,
 ) -> dict[str, object]:
-    """Classify one conversation turn without creating a task for casual chat."""
+    """Compatibility forwarding; production routing lives in ``modules.intent``."""
+    return _classify_intent(settings, content, history, tasks, budget)
+
+    # Kept below temporarily for source-compatible history; unreachable after
+    # the forwarding return and no longer used by the Worker.
     recent = "\n".join(
         f"{item['role']}: {item['content'][:400]}" for item in history[-8:]
     ) or "（无历史）"

@@ -91,7 +91,13 @@ class Mem0PreferenceService:
             items = self._all_for_owner(owner_id)
             text = "；".join(f"{item.metadata.get('memory_key', '偏好')}：{item.content}" for item in items[:12])
             return "我目前记住的偏好：" + (text or "（暂无）")
-        safe = _safe(action.get("memory_category"), action.get("memory_key"), action.get("memory_value"))
+        # Forget identifies an existing memory; it must not require a new value.
+        if operation == "forget":
+            category = _clean(action.get("memory_category"), 32).lower()
+            key = _clean(action.get("memory_key"), 120)
+            safe = (category, key, "") if category and re.fullmatch(r"[a-z_]{1,32}", category) and key and not _SENSITIVE.search(key) else None
+        else:
+            safe = _safe(action.get("memory_category"), action.get("memory_key"), action.get("memory_value"))
         if safe is None:
             return "我不能保存或修改这条信息；请只提供普通偏好，不要包含密码、令牌、证件或支付信息。"
         category, key, value = safe

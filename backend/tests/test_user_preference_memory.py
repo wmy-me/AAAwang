@@ -53,7 +53,7 @@ def test_explicit_preference_round_trip_is_owner_scoped_and_retry_safe() -> None
     assert "已记住" in service.apply(alice, message_id, _action("remember"), budget)
     assert client.add_calls == 1
     assert "已更新" in service.apply(alice, uuid.uuid4(), _action("update", "微辣"), budget)
-    assert "已忘记" in service.apply(alice, uuid.uuid4(), _action("forget", "微辣"), budget)
+    assert "已忘记" in service.apply(alice, uuid.uuid4(), {**_action("forget", "微辣"), "memory_value": None}, budget)
     assert service.relevant(alice, "推荐餐厅") == []
 
 

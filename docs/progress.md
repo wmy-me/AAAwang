@@ -281,6 +281,7 @@
 
 PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点，Embedding 和重排型号及分类阈值仍需评估。当时的讨论只更新设计与导航；之后 002–008 均已提交，验收边界见各报告。仓库自带 PostgreSQL 17 Compose 未配置 pgvector；用户其他实例的扩展状态尚未核对。
 
-## 032 独立意图识别与主 Agent 入口（待执行）
+## 032 独立意图识别与主 Agent 入口（已完成）
 
-- 031 已接入 Mem0 代码，真实 Embedding/pgvector 联调暂缓；当前仅有 DeepSeek 模型 API，没有其他已配置模型或 Embedding 服务。用户下次询问缺少的服务或配置时再说明，不以此阻塞后续。见 [032 执行文档](vibe%20coding/032-intent-routing.md)。
+- 已建立并接入唯一的 `modules/intent` 结构化意图入口；Worker 实际使用它，coordinator 只保留兼容转发，能力选择仍在既有 coordinator/白名单链路。普通聊天、任务新建/延续/修改、记忆操作、歧义和复合意图均有受控结果，模型输出不授予任务、用户或工具权限。
+- 已修复 forget 无需新值，并以替身验证普通聊天、任务延续、复合意图澄清、删除标识、跨 owner 删除隔离及记忆删除后不召回；compileall/diff check 通过。未运行真实 DeepSeek、Mem0/pgvector、BGE-M3、浏览器或全量回归；031 真实联调仍暂缓，详见[032报告](reports/032-intent-routing-report.md)。

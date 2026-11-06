@@ -15,7 +15,7 @@ from life_agent.agents.coordinator import (
     decide_capabilities,
     validate_discovered_capabilities,
 )
-from life_agent.agents.coordinator.service import classify_conversation_turn
+from life_agent.modules.intent import classify_conversation_turn
 from life_agent.agents.discovery import build_shopping_prompt
 from life_agent.core.budget import BudgetExceededError, RunBudget
 from life_agent.core.config import get_settings
