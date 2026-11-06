@@ -119,7 +119,11 @@
 - 每条 assistant 消息按自身 `run_id` 加载商品/来源卡，历史消息卡片不被新 Run 覆盖；刷新后消息与卡片恢复，第二账号浏览器无会话/卡片，API 读取 404。
 - 已定位 HTTP 400 根因：纠正重试回放带 `tool_calls` 的 assistant 消息但缺少对应 tool 消息；discovery 与 tool loop 已改为回放纯文本纠正消息，真实采买复跑完成。
 - 真实 DeepSeek、独立 Worker、PostgreSQL、shopping-mcp 和 Chromium 已验证聊天、采买、预算 revision、多任务澄清、商品卡和受控来源卡；后端全量 `175 passed`，会话专项 `11 passed`，Ruff、compileall、Alembic check、前端 build 通过（2 条既有 lint warning）。详见[029报告](reports/029-conversation-first-agent-report.md)。
-- 边界：公开搜索来源卡使用受控快照验证（027 已有真实 Tavily 证据）；API 内对话分类调用未计入 RunBudget；已用 Playwright 中止首个 SSE 请求验证重连/补读，未模拟长时间断网。当前不启动 030。
+- 边界：公开搜索来源卡使用受控快照验证（027 已有真实 Tavily 证据）；API 内对话分类调用未计入 RunBudget；已用 Playwright 中止首个 SSE 请求验证重连/补读，未模拟长时间断网。
+
+## 030 对话短期上下文与统一执行预算（执行中）
+
+- 已接入 owner-scoped 近期 `ContextBuilder`，路由、Worker 直答和能力决策可读取同一受限历史视图；路由模型调用迁入 Worker/持久预算及真实交互验收仍待完成，详见[030阶段报告](reports/030-conversation-context-report.md)。
 
 | 能力 | 事实与证据 |
 | --- | --- |

@@ -29,6 +29,7 @@ def classify_conversation_turn(
     content: str,
     history: list[dict[str, str]],
     tasks: list[dict[str, object]],
+    budget: RunBudget | None = None,
 ) -> dict[str, object]:
     """Classify one conversation turn without creating a task for casual chat."""
     recent = "\n".join(
@@ -56,11 +57,13 @@ def classify_conversation_turn(
         "最近对话：\n"
         f"{recent}\n"
         f"本轮用户消息：{content}\n"
+        "结合最近对话判断代词和省略：如果本轮用“那/它/那里/附近”等指代前文的地点或目标，"
+        "并提出了查询/购买请求，应判定为 task；只有确实无法安全关联时才 ambiguous。"
         "只分类，不执行工具，不创建任务，不修改条件。"
     )
     try:
         response = asyncio.run(
-            call_deepseek(settings, prompt, max_tokens=256)
+            call_deepseek(settings, prompt, max_tokens=256, budget=budget)
         )
         value = _decision_json(response.text)
     except (LLMConfigurationError, LLMRequestError):
@@ -153,6 +156,7 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
         f"任务目标：{claim.goal}\n"
         f"本轮用户消息：{claim.input_message or '（无）'}\n"
         f"当前任务条件：{_bounded_json(claim.conditions)}\n"
+        f"本会话近期上下文（可能已裁剪）：{getattr(claim, 'conversation_context', '') or '（无）'}\n"
         "判断规则：\n"
         "1. 问候、询问你能做什么、闲聊或解释概念：kind=direct，capability_ids=[]，不要调用工具。\n"
         "2. 用户本轮明确要查找地点/店铺/附近/路线，但没有城市或位置范围：kind=clarification。\n"
@@ -169,7 +173,9 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
         "或条件不足时，才可以 direct 或 clarification。\n"
         "7. 一句话包含多个目标时分别判断每个目标；form_schema 只列对当前任务确有帮助的字段，"
         "不得把地点或其他目标的信息写成商品预算、人数或数量。\n"
-        "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。\n"
+        "只读查询不因缺预算而阻断；无法判断时选择 direct 或 clarification，不要猜测能力。"
+        "如果本轮省略城市但本会话近期上下文明确同一目标的城市/地点，可据此选择地点能力；"
+        "不能凭空推测用户位置。\n"
         "form_schema 只能提出当前缺失且本轮确实有帮助的业务字段；没有必要时返回空数组。"
         "当用户明确要求通过表单收集某个具体商品或活动的偏好时，kind=clarification 也必须同时返回 form_schema；"
         "例如雨衣的颜色、面料、防水等级、帽型，或活动的地点、日期、时长，应该生成对应业务字段，"
@@ -250,8 +256,9 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
         # Models sometimes label a tool-using reply "direct"; capability_ids are
         # validated against the visible set, so treat them as authoritative.
         kind = "capabilities"
+    context_text = getattr(claim, "conversation_context", "") or ""
     if "map_place_search" in selected and not has_location_scope(
-        f"{claim.goal} {claim.input_message or ''}"
+        f"{claim.goal} {claim.input_message or ''} {context_text}"
     ):
         return {
             "kind": "clarification",
@@ -261,7 +268,7 @@ def decide_capabilities(settings, claim, budget) -> dict[str, object]:
             "decision_source": "deepseek_structured_worker",
         }
     if "weather_forecast" in selected and not has_weather_city(
-        f"{claim.goal} {claim.input_message or ''}"
+        f"{claim.goal} {claim.input_message or ''} {context_text}"
     ):
         return {
             "kind": "clarification",

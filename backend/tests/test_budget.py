@@ -75,3 +75,12 @@ def test_budget_records_wall_clock_timeout_before_new_call() -> None:
         budget.reserve("mcp")
 
     assert budget.snapshot()["termination_reason"] == "timeout"
+
+
+def test_budget_restores_persisted_route_reservation() -> None:
+    budget = RunBudget(BudgetLimits(model_requests=2))
+    budget.reserve("model")
+    restored = RunBudget.from_snapshot(budget.snapshot())
+    restored.reserve("model")
+    with pytest.raises(BudgetExceededError, match="model_budget_exhausted"):
+        restored.reserve("model")

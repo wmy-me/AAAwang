@@ -68,6 +68,10 @@ class RunClaim:
     decision: dict[str, object] | None
     worker_id: str
     fencing_token: int
+    owner_id: uuid.UUID
+    input_message_id: uuid.UUID | None
+    budget: dict[str, object] | None
+    conversation_context: str = ""
 
 
 def _owned_task(db: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> Task:
@@ -114,8 +118,8 @@ def create_run(
     commit: bool = True,
 ) -> Run:
     if task_id is None:
-        if execution_type != "direct_answer" or input_message_id is None:
-            raise ValueError("taskless runs only support direct answers with an input message")
+        if execution_type not in {"direct_answer", "conversation_route"} or input_message_id is None:
+            raise ValueError("taskless runs require an input message")
         input_message = db.scalar(select(Message).where(Message.id == input_message_id))
         if input_message is None or input_message.conversation_id is None:
             raise RunNotFoundError
@@ -334,6 +338,9 @@ def claim_run(
         decision=dict(run.decision) if run.decision is not None else None,
         worker_id=worker_id,
         fencing_token=run.fencing_token,
+        owner_id=run.owner_id,
+        input_message_id=run.input_message_id,
+        budget=dict(run.budget) if run.budget is not None else None,
     )
 
 
@@ -600,6 +607,26 @@ def cancel_claim(
 def is_cancel_requested(db: Session, claim: RunClaim) -> bool:
     run = db.scalar(select(Run).where(Run.id == claim.run_id))
     return run is None or run.cancel_requested
+
+
+def persist_route_budget(
+    db: Session, claim: RunClaim, budget: dict[str, object]
+) -> bool:
+    """Persist a pre-reserved route budget without holding a lock across the call."""
+    now = datetime.now(UTC)
+    run = db.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
+    if (
+        run is None
+        or run.status != "running"
+        or run.worker_id != claim.worker_id
+        or run.fencing_token != claim.fencing_token
+        or _lease_expired(run.lease_until, now)
+    ):
+        db.rollback()
+        return False
+    run.budget = dict(budget)
+    db.commit()
+    return True
 
 
 def renew_claim(db: Session, claim: RunClaim, lease_seconds: int) -> bool:

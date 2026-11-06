@@ -15,6 +15,7 @@ from life_agent.agents.coordinator import (
     decide_capabilities,
     validate_discovered_capabilities,
 )
+from life_agent.agents.coordinator.service import classify_conversation_turn
 from life_agent.agents.discovery import build_shopping_prompt
 from life_agent.core.budget import BudgetExceededError, RunBudget
 from life_agent.core.config import get_settings
@@ -22,6 +23,11 @@ from life_agent.core.llm import LLMRequestError, ToolLoopError, run_tool_loop
 from life_agent.core.llm.deepseek import call_deepseek
 from life_agent.db.session import get_session_factory
 from life_agent.modules.capabilities import get_capability
+from life_agent.modules.chat.context import ContextBuilder
+from life_agent.modules.chat.service import (
+    apply_conversation_route,
+    conversation_route_inputs,
+)
 from life_agent.modules.forms.service import persist_model_proposal
 from life_agent.modules.runs.service import (
     cancel_claim,
@@ -30,6 +36,7 @@ from life_agent.modules.runs.service import (
     fail_claim,
     fail_exhausted_runs,
     is_cancel_requested,
+    persist_route_budget,
     renew_claim,
 )
 
@@ -53,10 +60,46 @@ def run_once(worker_id: str) -> bool:
         if claim is None:
             return False
         try:
-            budget = RunBudget()
+            budget = RunBudget.from_snapshot(claim.budget)
+            context = ContextBuilder(
+                max_messages=settings.conversation_context_max_messages,
+                max_characters=settings.conversation_context_max_characters,
+            ).build(
+                db, claim.owner_id, claim.conversation_id,
+                before_message_id=claim.input_message_id,
+            )
+            # The current user message is supplied separately to each consumer,
+            # so it must not be duplicated in the historical view.
+            claim = replace(claim, conversation_context=context.as_prompt())
             if is_cancel_requested(db, claim):
                 budget.stop("cancelled")
                 return cancel_claim(db, claim, budget.snapshot())
+            if claim.execution_type == "conversation_route":
+                budget.reserve("model")
+                with get_session_factory()() as budget_db:
+                    if not persist_route_budget(
+                        budget_db, claim, budget.snapshot()
+                    ):
+                        budget.stop("lease_lost")
+                        return fail_claim(
+                            budget_db,
+                            claim,
+                            "route budget ownership lost",
+                            budget.snapshot(),
+                        )
+                tasks = conversation_route_inputs(db, claim.owner_id, claim.conversation_id)
+                classification = classify_conversation_turn(
+                    settings,
+                    claim.input_message or claim.goal,
+                    [{"role": item.role, "content": item.content} for item in context.messages],
+                    tasks,
+                    None,
+                )
+                with get_session_factory()() as route_db:
+                    if is_cancel_requested(route_db, claim):
+                        budget.stop("cancelled")
+                        return cancel_claim(route_db, claim, budget.snapshot())
+                    claim = apply_conversation_route(route_db, claim, classification, budget.snapshot())
             _validate_claim_capabilities(claim)
             if claim.execution_type == "capability_decision":
                 decision = decide_capabilities(settings, claim, budget)
@@ -354,6 +397,7 @@ def _run_direct_answer_with_lease(settings, claim, budget) -> str:
     prompt = (
         f"用户请求：{claim.input_message or claim.goal}\n"
         f"已确认条件：{_bounded_json(claim.conditions)}\n"
+        f"近期对话（可能已裁剪）：{claim.conversation_context or '（无）'}\n"
         "请直接回答，不要调用任何工具；未知信息要明确说明。"
     )
     stop = threading.Event()
@@ -412,8 +456,10 @@ def _clauses(text: str) -> list[str]:
     return [clause.strip() for clause in _CLAUSE_SPLIT.split(text) if clause.strip()]
 
 
-def _map_request(goal: str, input_message: str | None) -> tuple[str, str | None]:
-    text = (input_message or goal).strip()
+def _map_request(
+    goal: str, input_message: str | None, context: str = ""
+) -> tuple[str, str | None]:
+    text = f"{input_message or goal} {context}".strip()
     city = next(
         (match.group(1) for pattern in _MAP_CITY_PATTERNS if (match := pattern.search(text))),
         None,
@@ -446,7 +492,7 @@ def _map_request(goal: str, input_message: str | None) -> tuple[str, str | None]
 def _run_map_places_with_lease(settings, claim, budget=None):
     from life_agent.tools.maps import search_places
 
-    query, city = _map_request(claim.goal, claim.input_message)
+    query, city = _map_request(claim.goal, claim.input_message, claim.conversation_context)
     if not city:
         return {
             "answer": "请先告诉我需要查询的城市或位置范围。",

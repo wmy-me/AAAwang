@@ -11,6 +11,7 @@ RunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 RunExecutionType = Literal[
     "diagnostic",
     "capability_decision",
+    "conversation_route",
     "direct_answer",
     "shopping_research",
     "shopping_agent",

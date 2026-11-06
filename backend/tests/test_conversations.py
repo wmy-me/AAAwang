@@ -12,9 +12,12 @@ from sqlalchemy.pool import StaticPool
 
 from life_agent.core.config import Settings, get_settings
 from life_agent.db.base import Base
-from life_agent.db.models import Message, Run, Task, TaskRevision
+from life_agent.db.models import Conversation, Message, Run, Task, TaskRevision
 from life_agent.db.session import get_db
 from life_agent.main import app
+from life_agent.modules.chat.context import ContextBuilder
+from life_agent.modules.chat.service import apply_conversation_route
+from life_agent.modules.runs.service import claim_run
 
 PASSWORD = f"test-only-{secrets.token_urlsafe(18)}"
 
@@ -227,7 +230,7 @@ def test_conversation_turn_answers_without_creating_a_task_and_is_idempotent(
     assert created.status_code == 201
     assert created.json()["task"] is None
     assert created.json()["run"]["task_id"] is None
-    assert created.json()["run"]["execution_type"] == "direct_answer"
+    assert created.json()["run"]["execution_type"] == "conversation_route"
     assert created.json()["assistant_message"] is None
     assert retried.status_code == 200
     assert retried.json() == created.json()
@@ -235,6 +238,59 @@ def test_conversation_turn_answers_without_creating_a_task_and_is_idempotent(
         assert db.scalar(select(func.count()).select_from(Task)) == 0
         assert db.scalar(select(func.count()).select_from(Run)) == 1
         assert db.scalar(select(func.count()).select_from(Message)) == 1
+
+
+def test_context_builder_is_ordered_bounded_and_owner_scoped(
+    conversation_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = conversation_context
+    register_and_login(client, "context-alice")
+    conversation_id = create_conversation(client, "Context")['id']
+    for index, text in enumerate(("first preference", "second detail", "current turn")):
+        assert client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            json={"client_message_id": f"context-{index}", "content": text},
+        ).status_code == 201
+    with factory() as db:
+        messages = list(db.scalars(select(Message).order_by(Message.created_at, Message.id)))
+        owner_id = db.scalar(
+            select(Conversation.owner_id).where(Conversation.id == uuid.UUID(conversation_id))
+        )
+        assert owner_id is not None
+        context = ContextBuilder(max_messages=2, max_characters=100).build(
+            db, owner_id, uuid.UUID(conversation_id), before_message_id=messages[-1].id
+        )
+        assert [item.content for item in context.messages] == ["first preference", "second detail"]
+        assert context.truncated is False
+        with pytest.raises(LookupError):
+            ContextBuilder(max_messages=2, max_characters=100).build(
+                db, uuid.uuid4(), uuid.UUID(conversation_id)
+            )
+
+
+def test_claimed_route_binds_a_task_only_after_worker_classification(
+    conversation_context: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = conversation_context
+    register_and_login(client, "route-worker")
+    conversation_id = create_conversation(client, "Route")['id']
+    response = client.post(
+        f"/api/conversations/{conversation_id}/turns",
+        json={"client_turn_id": "route-task", "content": "给学生买奖品，预算 200 元"},
+    )
+    assert response.status_code == 201
+    run_id = uuid.UUID(response.json()["run"]["id"])
+    with factory() as db:
+        claim = claim_run(db, "test-worker", 30, 3)
+        assert claim is not None
+        routed = apply_conversation_route(
+            db, claim, {"intent": "task", "task_id": None, "reason": "test"}, {"model_requests": 1}
+        )
+        run = db.get(Run, run_id)
+        assert run is not None
+        assert routed.execution_type == "capability_decision"
+        assert run.task_id is not None
+        assert run.conditions["budget"] == 200.0
 
 
 def test_conversation_turn_creates_one_shopping_task_and_run(
@@ -253,18 +309,12 @@ def test_conversation_turn_creates_one_shopping_task_and_run(
     assert created.status_code == 201, created.text
     body = created.json()
     assert body["assistant_message"] is None
-    assert body["task"]["domain"] == "shopping"
-    assert body["task"]["conditions"] == {
-        "people": 25,
-        "quantity": 25,
-        "item": "奖品",
-        "budget": 200.0,
-    }
-    assert body["run"]["execution_type"] == "capability_decision"
+    assert body["task"] is None
+    assert body["run"]["execution_type"] == "conversation_route"
     assert retried.status_code == 200
     assert retried.json() == body
     with factory() as db:
-        assert db.scalar(select(func.count()).select_from(Task)) == 1
+        assert db.scalar(select(func.count()).select_from(Task)) == 0
         assert db.scalar(select(func.count()).select_from(Run)) == 1
 
 
@@ -293,26 +343,14 @@ def test_conversation_turn_updates_budget_and_creates_new_revision(
 
     assert second.status_code == 201, second.text
     body = second.json()
-    assert body["task"]["current_revision"] == 2
-    assert body["task"]["conditions"]["budget"] == 180.0
-    assert body["run"]["revision"] == 2
+    assert body["task"] is None
+    assert body["run"]["execution_type"] == "conversation_route"
     with factory() as db:
-        revisions = list(
-            db.scalars(
-                select(TaskRevision)
-                .join(Task)
-                .where(TaskRevision.task_id == uuid.UUID(body["task"]["id"]))
-                .order_by(TaskRevision.revision)
-            )
-        )
-        assert revisions[1].goal == "给学生买彩色铅笔，预算 180 元"
+        assert db.scalar(select(func.count()).select_from(TaskRevision)) == 0
 
 def test_conversation_uses_model_classification_not_keyword_prefilter(
     conversation_context: tuple[TestClient, sessionmaker[Session]],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from life_agent.modules.chat import service as chat_service
-
     client, factory = conversation_context
     register_and_login(client, "alice")
     conversation_id = create_conversation(client, "Chat")['id']
@@ -324,7 +362,6 @@ def test_conversation_uses_model_classification_not_keyword_prefilter(
         )
         return {"intent": "chat", "task_id": None, "reason": "闲聊"}
 
-    monkeypatch.setattr(chat_service, "classify_conversation_turn", fake_classifier)
     response = client.post(
         f"/api/conversations/{conversation_id}/turns",
         json={"client_turn_id": "model-chat", "content": "给学生买奖品"},
@@ -332,17 +369,14 @@ def test_conversation_uses_model_classification_not_keyword_prefilter(
     assert response.status_code == 201, response.text
     assert response.json()["task"] is None
     assert response.json()["run"]["task_id"] is None
-    assert captured["content"] == "给学生买奖品"
+    assert captured == {}
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(Task)) == 0
 
 
 def test_conversation_asks_when_model_reports_ambiguous_task(
     conversation_context: tuple[TestClient, sessionmaker[Session]],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from life_agent.modules.chat import service as chat_service
-
     client, factory = conversation_context
     register_and_login(client, "alice")
     conversation_id = create_conversation(client, "Shopping")['id']
@@ -364,7 +398,6 @@ def test_conversation_asks_when_model_reports_ambiguous_task(
             "clarification": "请说明要修改哪个任务。",
         }
 
-    monkeypatch.setattr(chat_service, "classify_conversation_turn", fake_classifier)
     response = client.post(
         f"/api/conversations/{conversation_id}/turns",
         json={"client_turn_id": "ambiguous-budget", "content": "预算改为 180 元"},
@@ -372,9 +405,9 @@ def test_conversation_asks_when_model_reports_ambiguous_task(
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["task"] is None
-    assert body["run"]["execution_type"] == "direct_answer"
+    assert body["run"]["execution_type"] == "conversation_route"
     assert body["run"]["task_id"] is None
-    assert body["run"]["decision"]["kind"] == "clarification"
+    assert body["run"]["decision"]["kind"] == "pending"
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(Task)) == 2
         assert db.scalar(select(func.count()).select_from(Run)) == 1
@@ -382,10 +415,7 @@ def test_conversation_asks_when_model_reports_ambiguous_task(
 
 def test_conversation_attaches_model_selected_existing_task(
     conversation_context: tuple[TestClient, sessionmaker[Session]],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from life_agent.modules.chat import service as chat_service
-
     client, factory = conversation_context
     register_and_login(client, "alice")
     conversation_id = create_conversation(client, "Shopping")['id']
@@ -398,25 +428,21 @@ def test_conversation_attaches_model_selected_existing_task(
     def fake_classifier(settings, content, history, tasks):
         return {"intent": "task", "task_id": task_id, "reason": "延续任务"}
 
-    monkeypatch.setattr(chat_service, "classify_conversation_turn", fake_classifier)
     response = client.post(
         f"/api/conversations/{conversation_id}/turns",
         json={"client_turn_id": "existing-task", "content": "继续看彩色铅笔"},
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    assert body["task"]["id"] == task_id
-    assert body["run"]["task_id"] == task_id
+    assert body["task"] is None
+    assert body["run"]["task_id"] is None
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(Task)) == 1
 
 
 def test_conversation_rejects_guessed_task_when_multiple_tasks_exist(
     conversation_context: tuple[TestClient, sessionmaker[Session]],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from life_agent.modules.chat import service as chat_service
-
     client, factory = conversation_context
     register_and_login(client, "alice")
     conversation_id = create_conversation(client, "Shopping")['id']
@@ -435,7 +461,6 @@ def test_conversation_rejects_guessed_task_when_multiple_tasks_exist(
             "reason": "模型猜测了第一个任务",
         }
 
-    monkeypatch.setattr(chat_service, "classify_conversation_turn", fake_classifier)
     response = client.post(
         f"/api/conversations/{conversation_id}/turns",
         json={"client_turn_id": "guessed-task", "content": "预算改为 150 元"},
@@ -444,6 +469,6 @@ def test_conversation_rejects_guessed_task_when_multiple_tasks_exist(
     body = response.json()
     assert body["task"] is None
     assert body["run"]["task_id"] is None
-    assert body["run"]["decision"]["kind"] == "clarification"
+    assert body["run"]["execution_type"] == "conversation_route"
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(TaskRevision)) == 2

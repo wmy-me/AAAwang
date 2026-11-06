@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     run_worker_poll_seconds: float = Field(default=1.0, gt=0)
     run_worker_max_attempts: int = Field(default=3, ge=1, le=20)
     shopping_agent_total_timeout_seconds: float = Field(default=180.0, gt=0, le=180.0)
+    conversation_context_max_messages: int = Field(default=12, ge=1, le=100)
+    conversation_context_max_characters: int = Field(default=12000, ge=500, le=100000)
     run_events_poll_seconds: float = Field(default=1.0, gt=0)
     run_events_heartbeat_seconds: float = Field(default=15.0, gt=0)
     run_events_batch_size: int = Field(default=100, ge=1, le=500)

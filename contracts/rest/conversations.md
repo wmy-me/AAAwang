@@ -19,6 +19,7 @@
 | `GET /api/conversations/{id}` | 无 | `200` 与对话 |
 | `PATCH /api/conversations/{id}` | `{"title": "新标题"}` | `200` 与更新后的对话 |
 | `POST /api/conversations/{id}/messages` | `{"client_message_id": "...", "content": "..."}` | 首次 `201`；同文重试 `200` 与原消息 |
+| `POST /api/conversations/{id}/turns` | `{"client_turn_id": "...", "content": "..."}` | 首次 `201`；立即返回可取消的 `conversation_route` Run，同键同文重试 `200` |
 | `POST /api/conversations/{id}/tasks/{task_id}/turns` | `{"client_turn_id": "...", "content": "...", "task_id": "...", "expected_revision": 1}` | 首次 `201`；同键同请求重试 `200` 与原消息/Run/assistant |
 | `GET /api/conversations/{id}/messages?offset=0&limit=100` | 无 | `200` 与分页列表 |
 
@@ -34,6 +35,7 @@
 - 回合使用 `client_turn_id` 作为幂等键：同一对话、同一用户、同一内容、同一 task 和预期版本的重试返回原消息与原 Run；同键不同请求返回 `409`。`expected_revision` 与当前版本不符返回 `409`。
 - 回合在同一事务内按需创建新的 TaskRevision、写入用户消息并创建 `shopping_agent` Run；用户消息与 Run 互相绑定。条件只根据用户明确补充的 `budget`/`people`/`quantity`/`item` 合并，未提及字段沿用原快照。
 - completed Run 至多写入一条绑定该 Run 的 assistant 消息，正文与 Run 结果一致；failed/cancelled Run 不写 assistant 消息。
+- 会话级回合先在事务中持久化用户消息及 taskless `conversation_route` Run；Worker 在同一 Run 的预算内执行模型路由，随后只可绑定当前 owner/conversation 内的 task/revision，或转为 `direct_answer`。API 线程不执行模型调用，网络调用期间不持有数据库行锁。多个任务而用户未明确指代时，Worker 写入澄清结果，不猜测或修改任务。
 
 ## 错误状态
 

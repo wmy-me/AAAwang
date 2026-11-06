@@ -1,12 +1,12 @@
 # 对话上下文与长期记忆方案
 
-- 状态：设计提案，未实现；代码基线 `6470091729601e0c5dd8214d8c62adbde1bdaa2e`。
+- 状态：设计提案；030 已开始实现近期上下文，长期记忆仍未实现。
 - 029 正在进行，后续各项按独立编号任务拆分，本文不授权全部实现。
 - 参考 [GoGo MasterAgent](https://github.com/wmy-me/gogo-agent/blob/d7823df02887b01e31ffa094d06ab22653876098/src/main/java/com/gogo/travel/agent/MasterAgent.java)、[AgentMemoryFactory](https://github.com/wmy-me/gogo-agent/blob/d7823df02887b01e31ffa094d06ab22653876098/src/main/java/com/gogo/travel/agent/memory/AgentMemoryFactory.java)、[长期偏好工厂](https://github.com/wmy-me/gogo-agent/blob/d7823df02887b01e31ffa094d06ab22653876098/src/main/java/com/gogo/travel/agent/memory/TravelPreferenceLongTermMemoryFactory.java)、[LangGraph 持久化](https://docs.langchain.com/oss/python/langgraph/persistence)。
 
 ## 当前事实
 
-会话消息、任务 revision、Run/事件和结果持久化于 PostgreSQL；存在任务条件与当轮工具循环上下文，不等于完整历史管理。当前会话级普通问答把当前消息传入模型，购物决策主要传 goal/当前消息/条件；会话级任务关联和多轮条件更新仍为 029 未完成项。当前未见跨会话长期偏好存储/召回或图 checkpoint 恢复的生产实现。数据存储不等于所有历史都会送入模型。
+会话消息、任务 revision、Run/事件和结果持久化于 PostgreSQL；存在任务条件与当轮工具循环上下文，不等于完整历史管理。030 已加入 owner-scoped `ContextBuilder`：路由、Worker 直答和能力决策读取同一会话的有限近期文本视图，默认最多 12 条消息和 12,000 字符，assistant 仅在关联 Run 已完成时进入视图。路由模型仍在 API 线程，尚未纳入 durable Worker/RunBudget 生命周期，故 030 尚未验收完成。当前未见跨会话长期偏好存储/召回或图 checkpoint 恢复的生产实现。数据存储不等于所有历史都会送入模型。
 
 ## 四层职责
 

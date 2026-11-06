@@ -31,6 +31,27 @@ class RunBudget:
     termination_reason: str | None = None
     _lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
+    @classmethod
+    def from_snapshot(cls, snapshot: dict[str, object] | None) -> "RunBudget":
+        """Restore server-persisted counters when a claimed Run is retried."""
+        if not isinstance(snapshot, dict) or not isinstance(snapshot.get("limits"), dict):
+            return cls()
+        try:
+            raw = snapshot["limits"]
+            limits = BudgetLimits(**{field: raw[field] for field in BudgetLimits.__dataclass_fields__})
+            started = datetime.fromisoformat(str(snapshot["started_at"]))
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=UTC)
+            return cls(
+                limits=limits, started_at=started,
+                model_requests=max(0, int(snapshot.get("model_requests", 0))),
+                delegations=max(0, int(snapshot.get("delegations", 0))),
+                mcp_attempts=max(0, int(snapshot.get("mcp_attempts", 0))),
+                remote_calls=max(0, int(snapshot.get("remote_calls", 0))),
+            )
+        except (KeyError, TypeError, ValueError):
+            return cls()
+
     def reserve(self, kind: str) -> None:
         """Atomically reserve one attempt before starting external work."""
         with self._lock:
