@@ -67,6 +67,7 @@
 | 033 | [高德 MCP 周边地点搜索](033-amap-nearby-search.md) | 已完成；真实 maps_geo→maps_around_search 返回来源地点，城市文本搜索保留，见[报告](../reports/033-amap-nearby-search-report.md) |
 | 034 | [通用采购指导与场景解耦](034-general-shopping-guidance.md) | 已完成；通用采购指导取代教师场景关键词选择，精简替身检查通过，见[报告](../reports/034-general-shopping-guidance-report.md) |
 | 035 | [简洁对话主界面与结果卡片](035-conversation-ui.md) | 已完成；对话主界面与消息关联结果卡片已实现，见[报告](../reports/035-conversation-ui-report.md) |
+| 036 | [LLM Wiki 私有知识库最小闭环](036-llm-wiki.md) | 待执行；Markdown/文本、来源与对话查询，不依赖 Embedding |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
