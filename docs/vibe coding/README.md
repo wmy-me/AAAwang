@@ -68,6 +68,7 @@
 | 034 | [通用采购指导与场景解耦](034-general-shopping-guidance.md) | 已完成；通用采购指导取代教师场景关键词选择，精简替身检查通过，见[报告](../reports/034-general-shopping-guidance-report.md) |
 | 035 | [简洁对话主界面与结果卡片](035-conversation-ui.md) | 已完成；对话主界面与消息关联结果卡片已实现，见[报告](../reports/035-conversation-ui-report.md) |
 | 036 | [LLM Wiki 私有知识库最小闭环](036-llm-wiki.md) | 代码已实现，真实联调待补；Markdown/文本上传、Worker 整理、来源展示和对话检索已接入，见[报告](../reports/036-llm-wiki-report.md) |
+| 037 | [Wiki 接入稳定性与对话不中断](037-wiki-reliability.md) | 待执行；修复 036 的降级、租约提交及按需检索问题 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
