@@ -296,3 +296,7 @@ PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点�
 - 已用 `shopping_guidance` 替换 discovery 图和商品回答提示中按教师、学生、奖品关键词选择的 `teacher_rewards`；教师奖品和通勤水杯等请求现在得到同一份通用采购/比较边界。预算、人数和品类均非必填，Agent 可按当前对话选择探索、追问、查询或直接回答。
 - 沿用既有单一 discovery 图、Worker、能力白名单和共享预算；没有新增 Agent、持久化字段、外部服务或固定“商品→地图→方案”链。地点和商品结果仍分别来源，普通聊天不选择采购工具。
 - 替身提示词检查覆盖有预算的教师奖品、无预算的通勤水杯和普通聊天；商品 Agent 的既有 FakeModel/MCP 委派检查通过。compileall、diff check 通过；本轮未运行真实 DeepSeek、MCP、浏览器、pytest 全套或 031 的 Embedding/Mem0 联调，详见[034报告](reports/034-general-shopping-guidance-report.md)。
+
+## 035 简洁对话主界面与结果卡片（待执行）
+
+- 按用户确定的 GoGo/Codex 式简洁对话方向整理主界面；详见 [035 执行文档](vibe%20coding/035-conversation-ui.md)。031 真实记忆联调继续暂缓。
