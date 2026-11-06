@@ -61,6 +61,32 @@ class LoginSession(Base):
     user: Mapped[User] = relationship(back_populates="sessions")
 
 
+class WikiDocument(Base):
+    __tablename__ = "wiki_documents"
+    __table_args__ = (UniqueConstraint("owner_id", "content_hash", name="uq_wiki_document_owner_hash"),)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    content: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="queued")
+    error_summary: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class WikiPage(Base):
+    __tablename__ = "wiki_pages"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("wiki_documents.id", ondelete="CASCADE"), unique=True, index=True)
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    content: Mapped[str] = mapped_column(Text)
+    source_excerpt: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="ready")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (
