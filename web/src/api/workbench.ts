@@ -84,7 +84,7 @@ export interface Run {
   task_revision_id: string | null
   revision: number
   conditions: Conditions
-  execution_type: 'diagnostic' | 'capability_decision' | 'direct_answer' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'weather' | 'web_search' | 'capability_router'
+  execution_type: 'diagnostic' | 'capability_decision' | 'conversation_route' | 'wiki_index' | 'direct_answer' | 'shopping_research' | 'shopping_agent' | 'map_places' | 'weather' | 'web_search' | 'capability_router'
   capability_ids: string[] | null
   decision: Record<string, unknown> | null
   budget: Record<string, unknown> | null
@@ -260,6 +260,23 @@ export interface ConversationTurnResponse {
   task: Task | null
 }
 
+
+export interface WikiDocument {
+  id: string
+  filename: string
+  status: string
+  created_at: string
+}
+
+export interface WikiPage {
+  id: string
+  title: string
+  content: string
+  source_filename: string
+  status: string
+  created_at: string
+}
+
 export interface FormSubmitResponse {
   message: Message
   run: Run
@@ -276,7 +293,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
   })
@@ -394,6 +411,19 @@ export const api = {
       `/conversations/${conversationId}/tasks/${taskId}/turns`,
       json({ client_turn_id: clientTurnId, content, task_id: taskId, expected_revision: expectedRevision }),
     ),
+  wikiDocuments: () => request<WikiDocument[]>('/wiki/documents'),
+  wikiPages: () => request<WikiPage[]>('/wiki/pages'),
+  uploadWikiDocument: (conversationId: string, file: File) => {
+    const body = new FormData()
+    body.append('conversation_id', conversationId)
+    body.append('file', file)
+    return request<{ id: string; filename: string; status: string; run: { id: string; status: string } | null }>(
+      '/wiki/documents',
+      { method: 'POST', body },
+    )
+  },
+  deleteWikiDocument: (documentId: string) =>
+    request<void>(`/wiki/documents/${documentId}`, { method: 'DELETE' }),
   submitConversationTurn: (
     conversationId: string,
     clientTurnId: string,

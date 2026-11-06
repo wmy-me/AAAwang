@@ -119,7 +119,7 @@ def create_run(
     commit: bool = True,
 ) -> Run:
     if task_id is None:
-        if execution_type not in {"direct_answer", "conversation_route"} or input_message_id is None:
+        if execution_type not in {"direct_answer", "conversation_route", "wiki_index"} or input_message_id is None:
             raise ValueError("taskless runs require an input message")
         input_message = db.scalar(select(Message).where(Message.id == input_message_id))
         if input_message is None or input_message.conversation_id is None:

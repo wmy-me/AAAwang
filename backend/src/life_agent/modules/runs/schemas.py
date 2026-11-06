@@ -12,6 +12,7 @@ RunExecutionType = Literal[
     "diagnostic",
     "capability_decision",
     "conversation_route",
+    "wiki_index",
     "direct_answer",
     "shopping_research",
     "shopping_agent",

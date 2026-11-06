@@ -9,6 +9,7 @@ from life_agent.api.routes import (
 	forms,
 	health,
 	maps,
+	wiki,
 	runs,
 	shopping_adjustments,
 	tasks,
@@ -24,3 +25,4 @@ api_router.include_router(tasks.router, tags=["tasks"])
 api_router.include_router(runs.router, tags=["runs"])
 api_router.include_router(shopping_adjustments.router, tags=["shopping-adjustments"])
 api_router.include_router(maps.router, tags=["maps"])
+api_router.include_router(wiki.router, tags=["wiki"])

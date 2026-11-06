@@ -303,6 +303,8 @@ PostgreSQL + pgvector 为推荐检索基线；分块和召回数为实验起点�
 - 商品候选、地点、已验证方案和网页来源只按各自 assistant `run_id` 跟随消息展示；无结构化结果时只显示文本。旧 task/run/地图/方案工作台不再默认铺在聊天页，未删除历史数据或接口。
 - 前端 `npm run lint` 完成（1 条 React 既有风格警告），`npm run build` 通过。未启动真实后端/浏览器，故登录、发送、刷新和真实卡片联动未本轮验收，详见[035报告](reports/035-conversation-ui-report.md)。
 
-## 036 LLM Wiki 私有知识库最小闭环（待执行）
+## 036 LLM Wiki 私有知识库最小闭环（代码已实现，真实联调待补）
 
-- 基于现有 DeepSeek 与 PostgreSQL，先支持 Markdown/文本资料整理、来源与对话查询；不以 Embedding 或 031 真实记忆联调为前置。见 [036 执行文档](vibe%20coding/036-llm-wiki.md)。
+- 已实现 Markdown/文本上传、200 KB/UTF-8 校验、owner 去重与隔离、`wiki_documents`/`wiki_pages` 持久化、taskless `wiki_index` Worker Run、DeepSeek JSON 页面整理、失败状态、来源文件名展示和关键词检索片段。
+- 网页输入区增加上传入口、知识库资料/Wiki 页面/来源展示和删除；上传后的 Run 沿用现有状态与消息。
+- 仅执行本次涉及的 Ruff、compileall、前端 lint/build；未执行迁移、真实 DeepSeek、独立 Worker、PostgreSQL 或浏览器闭环，不能视为真实通过。详见[036报告](reports/036-llm-wiki-report.md)。

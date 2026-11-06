@@ -1,6 +1,6 @@
 # 036：LLM Wiki 私有知识库最小闭环
 
-- 状态：待执行；核对最新 HEAD 与本地工作区，保留已有改动。
+- 状态：代码已实现，真实联调待补；上传、Worker 整理、API/网页入口和来源展示已完成，真实 DeepSeek/PostgreSQL/Worker/浏览器闭环未执行。
 - 阶段：P5 知识库首步；031 Mem0 真实联调暂缓，不是前置。
 - 参考：[对话执行与预算](../design/agent-execution-rules.md)、[数据保护](../design/security-and-idempotency.md)、[035 报告](../reports/035-conversation-ui-report.md)。
 - 报告：`docs/reports/036-llm-wiki-report.md`。
