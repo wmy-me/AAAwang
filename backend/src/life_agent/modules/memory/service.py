@@ -18,6 +18,7 @@ from life_agent.core.config import PROJECT_ROOT, Settings
 
 _SENSITIVE = re.compile(r"(?:password|密码|token|密钥|secret|验证码|身份证|银行卡|支付)", re.IGNORECASE)
 _SPACE = re.compile(r"\s+")
+_SEMANTIC_MATCH_THRESHOLD = 0.45
 
 
 class MemoryUnavailableError(RuntimeError):
@@ -46,7 +47,7 @@ def _clean(value: object, limit: int) -> str:
 def _safe(category: object, key: object, value: object) -> tuple[str, str, str] | None:
     category = _clean(category, 32).lower()
     key, value = _clean(key, 120), _clean(value, 500)
-    if not category or not re.fullmatch(r"[a-z_]{1,32}", category) or not key or not value:
+    if not category or not re.fullmatch(r"[a-z0-9_一-鿿]{1,32}", category) or not key or not value:
         return None
     if _SENSITIVE.search(f"{key} {value}"):
         return None
@@ -85,7 +86,41 @@ class Mem0PreferenceService:
     def _matching(items: list[Preference], category: str, key: str) -> list[Preference]:
         return [item for item in items if item.metadata.get("memory_category") == category and item.metadata.get("memory_key") == key]
 
-    def apply(self, owner_id: uuid.UUID, source_message_id: uuid.UUID, action: dict[str, object], budget: RunBudget) -> str:
+    def _semantic_matches(
+        self, owner_id: uuid.UUID, request_text: str, fallback: str
+    ) -> list[Preference]:
+        """Resolve a forget/update target when the router chose a different label."""
+        query = _clean(request_text or fallback, 1000)
+        if not query:
+            return []
+        try:
+            raw = self._client.search(
+                query,
+                top_k=max(self._recall_limit, 8),
+                filters={"user_id": str(owner_id)},
+            )
+        except Exception as exc:
+            raise MemoryUnavailableError("memory search failed") from exc
+        items = []
+        for item in _results(raw):
+            preference = _preference(item)
+            if preference is None:
+                continue
+            score = item.get("score")
+            if isinstance(score, (int, float)) and score < _SEMANTIC_MATCH_THRESHOLD:
+                continue
+            items.append(preference)
+        scoped = [item for item in items if item.metadata.get("memory_scope") == "explicit_preference"]
+        return list({item.id: item for item in (scoped or items)}.values())
+
+    def apply(
+        self,
+        owner_id: uuid.UUID,
+        source_message_id: uuid.UUID,
+        action: dict[str, object],
+        budget: RunBudget,
+        request_text: str = "",
+    ) -> str:
         operation = action.get("memory_action")
         if operation == "list":
             items = self._all_for_owner(owner_id)
@@ -95,7 +130,7 @@ class Mem0PreferenceService:
         if operation == "forget":
             category = _clean(action.get("memory_category"), 32).lower()
             key = _clean(action.get("memory_key"), 120)
-            safe = (category, key, "") if category and re.fullmatch(r"[a-z_]{1,32}", category) and key and not _SENSITIVE.search(key) else None
+            safe = (category, key, "") if category and re.fullmatch(r"[a-z0-9_一-鿿]{1,32}", category) and key and not _SENSITIVE.search(key) else None
         else:
             safe = _safe(action.get("memory_category"), action.get("memory_key"), action.get("memory_value"))
         if safe is None:
@@ -121,16 +156,19 @@ class Mem0PreferenceService:
             except Exception as exc:
                 raise MemoryUnavailableError("memory add failed") from exc
             return f"已记住：{key}：{value}。"
+        if not matches:
+            matches = self._semantic_matches(owner_id, request_text, f"{category} {key}")
         if len(matches) != 1:
             return "我没有找到唯一可修改或删除的这条偏好；请说明偏好名称。"
         target = matches[0]
+        target_key = str(target.metadata.get("memory_key") or key)
         try:
             if operation == "update":
-                self._client.update(target.id, data=value, metadata={"memory_category": category, "memory_key": key})
-                return f"已更新：{key}：{value}。"
+                self._client.update(target.id, data=value)
+                return f"已更新：{target_key}：{value}。"
             if operation == "forget":
                 self._client.delete(target.id)
-                return f"已忘记：{key}。"
+                return f"已忘记：{target_key}。"
         except Exception as exc:
             raise MemoryUnavailableError("memory mutation failed") from exc
         return "我没有识别到明确的记忆操作。"

@@ -548,7 +548,11 @@ def _run_memory_action_with_lease(settings, claim, budget) -> str:
     heartbeat.start()
     try:
         result = get_memory_service().apply(
-            claim.owner_id, claim.input_message_id, claim.decision or {}, budget
+            claim.owner_id,
+            claim.input_message_id,
+            claim.decision or {},
+            budget,
+            request_text=claim.input_message or claim.goal,
         )
         if lease_lost.is_set():
             raise ToolLoopError("记忆操作租约丢失，结果不会提交；请创建新的 run 重试。")

@@ -16,7 +16,7 @@ dependencies = [
     "mcp>=2.3.0,<3",
     "mem0ai==2.2.1",
     "openai>=3.42.1",
-    "psycopg[binary]>=3.2.13,<4",
+    "psycopg[binary,pool]>=3.2.13,<4",
     "pydantic-settings>=2.16.2",
     "sentence-transformers>=5.2.0,<6",
     "socksio>=1.0.0",

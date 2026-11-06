@@ -23,10 +23,39 @@ def delete(db: Session, owner_id: uuid.UUID, document_id: uuid.UUID):
     item = db.scalar(select(WikiDocument).where(WikiDocument.id == document_id, WikiDocument.owner_id == owner_id))
     if not item: raise LookupError
     db.delete(item); db.commit()
+_SEARCH_STOPWORDS = {
+    "\u4ec0\u4e48", "\u54ea\u5929", "\u54ea\u91cc", "\u600e\u4e48", "\u5982\u4f55", "\u8bf7\u95ee", "\u6839\u636e", "\u8d44\u6599", "\u56de\u7b54",
+    "\u4e0a\u4f20", "\u6211\u7684", "\u4f60\u7684", "\u8fd9\u4e2a", "\u90a3\u4e2a", "\u54ea\u4e9b", "\u662f\u5426", "\u4e00\u4e0b", "\u544a\u8bc9",
+    "\u77e5\u9053", "\u5185\u5bb9", "\u6587\u4ef6", "\u95ee\u9898", "\u53ef\u4ee5", "\u5e2e\u6211",
+}
+
+
+def _search_terms(query: str) -> list[str]:
+    """Split natural-language queries without requiring a Chinese tokenizer."""
+    terms: list[str] = []
+    for token in re.findall(r"[a-z0-9_]{2,}|[\u4e00-\u9fff]+", query.lower()):
+        candidates = [token] if not re.fullmatch(r"[\u4e00-\u9fff]+", token) else []
+        if re.fullmatch(r"[\u4e00-\u9fff]+", token):
+            for size in (4, 3, 2):
+                candidates.extend(token[index:index + size] for index in range(len(token) - size + 1))
+        for term in candidates:
+            if term not in _SEARCH_STOPWORDS and term not in terms:
+                terms.append(term)
+    return terms[:128]
+
+
 def search(db: Session, owner_id: uuid.UUID, query: str):
-    words = [word for word in re.findall(r"[\w\u4e00-\u9fff]{2,}", query.lower())[:8]]
+    terms = _search_terms(query)
+    if not terms:
+        return []
     pages = list(db.scalars(select(WikiPage).where(WikiPage.owner_id == owner_id, WikiPage.status == "ready")))
-    return [p for p in pages if not words or any(word in (p.title + p.content + p.source_excerpt).lower() for word in words)][:5]
+    ranked = []
+    for page in pages:
+        text = (page.title + page.content + page.source_excerpt).lower()
+        score = sum(1 for term in terms if term in text)
+        if score:
+            ranked.append((score, page))
+    return [page for _, page in sorted(ranked, key=lambda item: -item[0])[:5]]
 
 MAX_MODEL_SOURCE_CHARS = 20_000
 
