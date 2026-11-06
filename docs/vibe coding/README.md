@@ -63,6 +63,7 @@
 | 029 | [纯对话入口与 Agent 自主执行](029-conversation-first-agent.md) | 已完成；模型级对话路由、taskless Worker、采买/多轮 revision、商品与来源卡历史/刷新/隔离、多任务澄清和 HTTP 400 根因修复均已验收，见[报告](../reports/029-conversation-first-agent-report.md) |
 | 030 | [对话短期上下文与统一执行预算](030-conversation-context.md) | 已完成（浏览器交互未验证）；已验证持久化 Worker 路由、短期上下文和统一预算的真实主流程及自动化检查。Chrome 仅注册/登录/创建会话，未实际发送消息，聊天/SSE 等未验证但不阻止本任务收口，见[报告](../reports/030-conversation-context-report.md) |
 | 031 | [基于 Mem0 的用户长期偏好记忆](031-user-preference-memory.md) | 代码完成、真实验收待定；Mem0 OSS 适配、Worker/预算与替身边界已实现，真实 BGE-M3、Mem0+pgvector+DeepSeek 闭环尚未运行，见[报告](../reports/031-user-preference-memory-report.md) |
+| 032 | [独立意图识别与主 Agent 入口](032-intent-routing.md) | 待执行；031 真实记忆联调暂缓，不作为前置条件 |
 
 P1 的 001–003、P2 的 004–014 和 P3 的 015–017 均有实现与报告；013 的登出刷新与独立 SSE、014 的两轮任务对话与 assistant 消息持久化、015 的候选快照与服务端复算方案均已验收。016 的不可变调整、并发/幂等/跨账号与真实浏览器刷新已验收；017 已实现目标冲突提示与 Run 前门禁，并完成真实 Worker/DeepSeek/MCP 新 Run 闭环，016/017 均已完成。
 
