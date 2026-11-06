@@ -29,7 +29,7 @@ from life_agent.modules.chat.service import (
     conversation_route_inputs,
 )
 from life_agent.modules.forms.service import persist_model_proposal
-from life_agent.modules.memory import apply_memory_action, relevant_preferences
+from life_agent.modules.memory import MemoryUnavailableError, get_memory_service
 from life_agent.modules.runs.service import (
     cancel_claim,
     claim_run,
@@ -98,7 +98,16 @@ def run_once(worker_id: str) -> bool:
                     claim = apply_conversation_route(route_db, claim, classification, budget.snapshot())
             if claim.execution_type == "direct_answer" and (claim.decision or {}).get("kind") == "memory":
                 with get_session_factory()() as memory_db:
-                    result = apply_memory_action(memory_db, claim.owner_id, claim.input_message_id, claim.decision or {})
+                    if is_cancel_requested(memory_db, claim):
+                        budget.stop("cancelled")
+                        return cancel_claim(memory_db, claim, budget.snapshot())
+                    try:
+                        result = _run_memory_action_with_lease(settings, claim, budget)
+                    except MemoryUnavailableError:
+                        result = "记忆服务暂不可用，普通对话不受影响；这次记住、修改或删除没有完成。"
+                    if is_cancel_requested(memory_db, claim):
+                        budget.stop("cancelled")
+                        return cancel_claim(memory_db, claim, budget.snapshot())
                     return complete_claim(
                         memory_db, claim,
                         shopping_result={"answer": result, "source": {"service_id": None, "tool": "user_preference_memory", "simulated": False}, "execution_version": "031-v1", "decision_type": "memory", "delegated": False, "mcp_call_count": 0},
@@ -106,9 +115,12 @@ def run_once(worker_id: str) -> bool:
                         execution_type=claim.execution_type, capability_ids=claim.capability_ids,
                     )
             if claim.execution_type == "direct_answer":
-                preferences = relevant_preferences(db, claim.owner_id, claim.input_message or claim.goal)
+                try:
+                    preferences = get_memory_service().relevant(claim.owner_id, claim.input_message or claim.goal)
+                except MemoryUnavailableError:
+                    preferences = []
                 if preferences:
-                    claim = replace(claim, preference_context="；".join(f"{item.preference_key}：{item.content}" for item in preferences))
+                    claim = replace(claim, preference_context="；".join(f"{item.metadata.get('memory_key', '偏好')}：{item.content}" for item in preferences))
             _validate_claim_capabilities(claim)
             if claim.execution_type == "capability_decision":
                 decision = decide_capabilities(settings, claim, budget)
@@ -438,6 +450,38 @@ def _run_direct_answer_with_lease(settings, claim, budget) -> str:
         if lease_lost.is_set():
             raise ToolLoopError("直答执行租约丢失，结果不会提交；请创建新的 run 重试。")
         return result.text[:12_000]
+    finally:
+        stop.set()
+        heartbeat.join(timeout=2)
+
+
+def _run_memory_action_with_lease(settings, claim, budget) -> str:
+    """Keep the normal worker lease alive around synchronous Mem0 SDK work."""
+    stop = threading.Event()
+    lease_lost = threading.Event()
+
+    def renew() -> None:
+        interval = max(0.5, settings.run_worker_lease_seconds / 3)
+        while not stop.wait(interval):
+            try:
+                with get_session_factory()() as lease_db:
+                    if not renew_claim(lease_db, claim, settings.run_worker_lease_seconds):
+                        lease_lost.set()
+                        return
+            except Exception:
+                logger.exception("run lease renewal failed for %s", claim.run_id)
+                lease_lost.set()
+                return
+
+    heartbeat = threading.Thread(target=renew, name="memory-lease-renewal", daemon=True)
+    heartbeat.start()
+    try:
+        result = get_memory_service().apply(
+            claim.owner_id, claim.input_message_id, claim.decision or {}, budget
+        )
+        if lease_lost.is_set():
+            raise ToolLoopError("记忆操作租约丢失，结果不会提交；请创建新的 run 重试。")
+        return result
     finally:
         stop.set()
         heartbeat.join(timeout=2)

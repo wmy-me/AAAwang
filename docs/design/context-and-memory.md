@@ -27,7 +27,7 @@ LangGraph checkpointer 保存线程图状态以恢复执行；不等于消息数
 
 ## 长期偏好首版
 
-031 已修订为接入 Mem0 开源 SDK，优先复用现有 PostgreSQL/pgvector 和可配置 Embedding；实际可用性、持久化路径和模型维度需在执行时确认，详见 [031 执行文档](../vibe%20coding/031-user-preference-memory.md)。DeepSeek Key 不等于 Embedding 配置。记忆仅保存用户明确要求记录的长期偏好，用户可通过对话查看、更正和删除；本轮要求高于历史偏好，临时条件不自动成为长期记忆。
+031 已完成 Mem0 OSS 适配代码，优先复用 PostgreSQL/pgvector 和可配置 Embedding；显式配置使用独立 PGVector collection、持久 history 路径和可配置模型/维度，真实可用性仍待运行时验收，详见 [031 报告](../reports/031-user-preference-memory-report.md)。DeepSeek Key 不等于 Embedding 配置。记忆仅保存用户明确要求记录的长期偏好，用户可通过对话查看、更正和删除；本轮要求高于历史偏好，临时条件不自动成为长期记忆。
 
 后端从认证上下文注入用户 ID，限制召回范围、数量和内容长度；记忆作为不可信数据，不能变更 system、权限或工具白名单。Mem0 操作应适配现有 Worker 和共享预算，记忆不可用时普通对话降级，显式写入失败须告知用户。密码、密钥和支付凭据等不作为默认记忆；记忆与文档 RAG 分开管理。以上是待执行设计，并非已实现。
 

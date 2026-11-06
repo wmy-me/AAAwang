@@ -1,5 +1,5 @@
-"""Explicit user preference memory with owner-scoped service operations."""
+"""Mem0-backed, owner-scoped user preference memory."""
 
-from .service import apply_memory_action, relevant_preferences
+from .service import MemoryUnavailableError, Mem0PreferenceService, get_memory_service
 
-__all__ = ["apply_memory_action", "relevant_preferences"]
+__all__ = ["MemoryUnavailableError", "Mem0PreferenceService", "get_memory_service"]

@@ -43,9 +43,6 @@ class User(Base):
     runs: Mapped[list["Run"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan", passive_deletes=True
     )
-    preferences: Mapped[list["UserPreference"]] = relationship(
-        back_populates="owner", cascade="all, delete-orphan", passive_deletes=True
-    )
 
 
 class LoginSession(Base):
@@ -62,29 +59,6 @@ class LoginSession(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     user: Mapped[User] = relationship(back_populates="sessions")
-
-
-class UserPreference(Base):
-    """Explicit, owner-scoped long-term preference; never an inferred task condition."""
-
-    __tablename__ = "user_preferences"
-    __table_args__ = (
-        UniqueConstraint("owner_id", "category", "preference_key", name="uq_preferences_owner_category_key"),
-        UniqueConstraint("owner_id", "source_message_id", name="uq_preferences_owner_source_message"),
-        Index("ix_preferences_owner_status_updated", "owner_id", "status", desc("updated_at")),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    category: Mapped[str] = mapped_column(String(32))
-    preference_key: Mapped[str] = mapped_column(String(120))
-    content: Mapped[str] = mapped_column(String(500))
-    source_message_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("messages.id", ondelete="SET NULL"))
-    status: Mapped[str] = mapped_column(String(16), default="active")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    owner: Mapped[User] = relationship(back_populates="preferences")
 
 
 class Conversation(Base):
